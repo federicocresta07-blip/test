@@ -17,7 +17,7 @@ import {
 } from 'react';
 import type { FacilityId } from '../../domain/facilities.ts';
 import type { StaffRole } from '../../domain/staff.ts';
-import type { GameState, LineupSelection } from '../models/index.ts';
+import type { GameState, LineupSelection, TrainingPlan } from '../models/index.ts';
 import { gameService } from '../services/index.ts';
 import type { PlayRoundReport } from '../services/types.ts';
 
@@ -63,6 +63,10 @@ export type GameContextValue = {
   readonly hireStaff: (role: StaffRole, candidateId: string, label: string) => Promise<void>;
   readonly upgradeFacility: (facilityId: FacilityId, label: string) => Promise<void>;
   readonly dismissInvestment: () => void;
+
+  /** Desarrollo del plantel (seccion 7, fase 4). */
+  readonly saveTraining: (plan: TrainingPlan) => Promise<void>;
+  readonly promoteYouth: (youthId: string, label: string) => Promise<void>;
 
   /** Competicion (seccion 13). */
   readonly round: RoundState;
@@ -235,6 +239,34 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
     [],
   );
 
+  /**
+   * Guarda el plan de entrenamiento y recarga.
+   *
+   * Recarga a proposito: el plan cambia lo que cada jugador entrena, y la
+   * pantalla muestra ese reparto. Parchearlo a mano seria pedir que se
+   * desincronice.
+   */
+  const saveTraining = useCallback(
+    async (plan: TrainingPlan) => {
+      if (!state) return;
+      setState((current) => (current ? { ...current, training: plan } : current));
+      try {
+        await gameService.saveTraining(state.club.id, plan);
+      } catch {
+        setSaveState('error');
+      }
+    },
+    [state],
+  );
+
+  const promoteYouth = useCallback(
+    async (youthId: string, label: string) => {
+      if (!state) return;
+      await invest(() => gameService.promoteYouth(state.club.id, youthId), label);
+    },
+    [invest, state],
+  );
+
   const resetSeason = useCallback(async () => {
     if (!state) return;
     setRound({ playing: true, error: null, report: null });
@@ -267,6 +299,8 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
       hireStaff,
       upgradeFacility,
       dismissInvestment,
+      saveTraining,
+      promoteYouth,
       round,
       playRound,
       clearRound,
@@ -286,6 +320,8 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
       hireStaff,
       upgradeFacility,
       dismissInvestment,
+      saveTraining,
+      promoteYouth,
       round,
       playRound,
       clearRound,

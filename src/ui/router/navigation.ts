@@ -6,6 +6,8 @@
  * si no, en que fase del plan le toca.
  */
 
+import { isPhaseDelivered } from './plan.ts';
+
 export type NavItem = {
   readonly label: string;
   readonly path: string;
@@ -42,7 +44,7 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Entrenamiento',
         path: '/equipo/entrenamiento',
-        ready: false,
+        ready: true,
         phase: 4,
         summary:
           'Planes de entrenamiento por puesto y por jugador, con el efecto del staff y de las instalaciones sobre el desarrollo. Va con inferiores porque las dos cosas necesitan lo mismo: que el motor sepa hacer crecer los atributos de un jugador, que hoy no lo hace.',
@@ -108,7 +110,7 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Inferiores',
         path: '/club/inferiores',
-        ready: false,
+        ready: true,
         phase: 4,
         summary:
           'Plantilla juvenil con potencial estimado como rango: mejor scouting, rango más preciso.',
@@ -231,13 +233,15 @@ export function pendingModuleCount(): number {
 }
 
 /**
- * Hasta que fase llega lo entregado. Se deriva de las propias entradas, asi
- * que agregar una pantalla alcanza para que la sidebar lo diga: no hay un
- * numero escrito a mano que se pueda quedar viejo.
+ * Coherencia entre la navegacion y el plan.
+ *
+ * Una pantalla marcada como lista tiene que pertenecer a una fase entregada, y
+ * al reves. Lo verifica un test: sin eso, marcar `ready: true` y olvidarse de
+ * la fase deja el plan diciendo una cosa y la aplicacion otra.
  */
-export function deliveredThroughPhase(): number {
-  return ALL_ITEMS.filter((item) => item.ready).reduce(
-    (highest, item) => Math.max(highest, item.phase),
-    0,
+export function navigationPhaseMismatches(): readonly string[] {
+  return ALL_ITEMS.filter((item) => item.ready !== isPhaseDelivered(item.phase)).map(
+    (item) =>
+      `${item.path}: la pantalla dice ${item.ready ? 'lista' : 'pendiente'} pero la fase ${item.phase} dice ${isPhaseDelivered(item.phase) ? 'entregada' : 'pendiente'}`,
   );
 }

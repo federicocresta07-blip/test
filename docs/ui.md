@@ -1,10 +1,14 @@
 # Interfaz web — diseño y estado
 
 Prototipo de la interfaz del juego, construido sobre el master prompt de UI
-v0.2. El plan es incremental y por fases: **entregadas las fases 0, 1, 2, 3 y
+v0.2. El plan es incremental y por fases: **entregadas las fases 0 a 4 y la
 7**. La sección 22 pedía empezar por las fases 0 a 2; el resto avanza de a una
 fase por entrega. La 7 se adelantó a pedido: es la que permite jugar los
 partidos, y sin ella el resto del juego no se puede probar.
+
+El estado de cada fase se declara en un solo lugar, `src/ui/router/plan.ts`, y
+lo consultan la navegación, la sidebar y las fichas del staff. Antes vivía en
+tres lugares y se desincronizó: ver más abajo.
 
 ---
 
@@ -16,22 +20,13 @@ partidos, y sin ella el resto del juego no se puede probar.
 | **1** | Despacho del Manager: próximo partido, situación del plantel, bandeja, widgets | **Entregada** |
 | **2** | Plantel y Alineación estilo PC Fútbol | **Entregada** (incluye drag & drop, ficha rápida, táctica y autoselección) |
 | **3** | Staff, desarrollo e instalaciones | **Entregada** (incluye contratación y mejora reales, y la bandeja completa) |
+| **4** | Inferiores, Scouting y Entrenamiento | **Entregada** (el motor ya hace crecer los atributos de un jugador) |
 | **7** | Competición y resultado de partido | **Entregada** (el torneo se juega de verdad: fixture, tabla, goleadores, ficha de partido, rivales y noticias) |
-| 4 | Inferiores, scouting y entrenamiento | Pendiente |
 | 5 | Mercado y negociaciones | Pendiente |
 | 6 | Estadio y finanzas | Pendiente |
 | 8 | Hardening y preparación para backend real | Pendiente |
 
-La pantalla de **Entrenamiento** se movió de la fase 3 a la fase 4. No es un
-recorte de alcance disimulado: los planes de entrenamiento necesitan que el
-motor sepa hacer crecer los atributos de un jugador con el tiempo, y eso hoy
-no existe —`progression/after-match.ts` mueve forma, moral, fatiga y cohesión,
-pero no toca los atributos—. Es la misma pieza que necesita inferiores, así
-que las dos van juntas. Las fichas de los cuatro entrenadores por línea dicen
-"Entrenamiento, fase 4", y un test verifica que esa fase sea exactamente la
-que declara la navegación: si alguien mueve una, la otra falla.
-
-Los 9 módulos pendientes están en la navegación con su página propia, que
+Los 7 módulos pendientes están en la navegación con su página propia, que
 dice qué va a hacer y en qué fase se construye. Ninguno tiene botones que
 finjan funcionar: la página pendiente no tiene un solo botón.
 
@@ -44,7 +39,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 237 tests
+npm test           # 265 tests
 ```
 
 Requiere Node 22.18 o superior.
@@ -69,6 +64,8 @@ No hay números inventados en la interfaz. Todo lo futbolístico sale de
 | Fortalezas de un rival (§13) | `teamStrengthOf` → `computeTeamStrength` |
 | El resultado del partido (§14) | `simulateMatch` |
 | La tabla del torneo (§13) | `buildTable` sobre los partidos jugados |
+| El margen para crecer de un jugador | `headroom` sobre su potencial |
+| El rango de potencial de un juvenil | `scoutPotential` con el efecto del ojeador |
 
 La sección 6.5 pide explícitamente que la penalización por jugar fuera de
 posición venga del motor y no esté hardcodeada en el componente. Se cumple
@@ -160,10 +157,12 @@ src/ui/
                        CompetitionWidget
     match/             Scoreboard, ProjectionStrip, MatchTimeline,
                        MatchStats, MatchRatings
+    youth/             PotentialRange
   pages/               DashboardPage, SquadPage, LineupPage, StaffPage,
                        FacilitiesPage, MessagesPage, CalendarPage,
                        ResultsPage, TablePage, StatsPage, MatchPage,
-                       RivalsPage, NewsPage, PlaceholderPage
+                       RivalsPage, NewsPage, TrainingPage, YouthPage,
+                       PlaceholderPage
   data/                dataset de demostración, desacoplado de los componentes
 ```
 
@@ -172,6 +171,132 @@ src/ui/
 
 El listado de la sección 16 está completo: `StaffCard` y `UpgradeCard` se
 construyeron en la fase 3, que es cuando aparecieron sus primeros usos.
+
+---
+
+## Los jugadores crecen
+
+Hasta la fase 4, `progression/after-match.ts` movía forma, moral, fatiga y
+cohesión — y **los atributos no cambiaban nunca**. El campo `potential` existía
+en `Player` con este comentario: *"informativo para el resto del juego"*. Su
+valor por defecto era el overall actual, así que nadie tenía margen y nadie
+podía crecer.
+
+Eso obligaba a seis de los trece roles del cuerpo técnico a decir "todavía no
+se aplica": cuatro entrenadores por línea, el entrenador juvenil y el ojeador
+juvenil. "Velocidad de desarrollo de defensores" no podía significar nada.
+
+Ahora `progression/development.ts` hace crecer a un jugador, y cuatro cosas lo
+mueven — ninguna es azar puro:
+
+**La edad.** Un pibe de 18 crece rápido, a los 27 se estanca, después de los 31
+empieza a perder. Y no pierde todo junto: primero se va lo físico. Un 5 de 33
+sigue mejorando el posicionamiento mientras le baja la velocidad, y eso es lo
+que hace que un veterano siga sirviendo.
+
+**El techo.** Se crece hacia el potencial, no sin límite. El potencial por
+defecto ahora sale de `defaultPotential(overall, edad, id)`: mucho margen a los
+17, casi ninguno a los 30, con variación — dos pibes de 18 con el mismo overall
+pueden tener techos de 71 y de 83, y **el club no sabe cuál es cuál**.
+
+**Los minutos.** El que no juega crece cerca de la mitad de rápido. Es la única
+forma de que darle la camiseta a un juvenil sea una decisión de verdad.
+
+**El entrenamiento.** El plan reparte hacia dónde va el crecimiento —no suma,
+reparte— y el entrenador de su línea lo acelera. `domain/training.ts` mapea cada
+puesto a su entrenador, y por eso mejorar al entrenador de arqueros no le hace
+nada al 9.
+
+Medido sobre una temporada de 19 fechas (unas 22 semanas):
+
+| Jugador | Gana |
+|---|---|
+| Juvenil de 17 con margen, jugando, entrenador ★4 | **+11** de overall |
+| El mismo sin entrenador | +9 |
+| El mismo sin jugar | +6 |
+| Titular de 22 con algo de margen | +5 |
+| Jugador de 27 o más en su techo | 0 |
+| Veterano de 34 | −3 de físico, −1 de cabeza |
+
+### Muerte por redondeo
+
+El bug más interesante de esta fase. `clampAttribute` redondea a entero, y el
+desarrollo se aplica fecha a fecha: una ganancia de 0,4 puntos por semana se
+redondeaba a cero y **no se acumulaba nunca**. El sistema no fallaba, no tiraba
+errores, y era completamente inerte — un juvenil con veinte puntos de margen
+ganaba cero en una temporada entera.
+
+Los atributos ahora se guardan con decimales y el redondeo pasa al mostrar, que
+es donde corresponde. `developPlayer` no usa `createPlayer` a propósito: pasa
+los atributos por `buildAttributes`, que redondea, y eso volvería a tirar los
+decimales. El test `MUERTE POR REDONDEO` compara desarrollar semana a semana
+contra hacerlo de una vez, y exige que den lo mismo en orden de magnitud.
+
+### El potencial de un juvenil es un rango
+
+La pantalla de inferiores nunca muestra el potencial exacto. Muestra lo que
+informa el ojeador, que es un rango, y **el ancho de ese rango sale del efecto
+del rol** — el mismo número que muestra su ficha en Staff.
+
+Medido en el navegador: con el puesto de ojeador juvenil vacante los rangos
+salen de **44 puntos** ("potencial entre 49 y 93", confianza *muy baja*); al
+contratar a una ojeadora de cuatro estrellas pasan a **16 puntos** y la
+precisión declarada va de "sin ojeador" a "±8 pts". El techo real del jugador no
+cambió: cambió cuánto se ve.
+
+Dos reglas del informe, las dos verificadas:
+
+1. **El real siempre cae dentro del rango.** El ojeador nunca miente, solo es
+   impreciso. Sin eso, el rango no querría decir nada.
+2. **El real NO está en el centro.** Si estuviera, promediar el rango daría la
+   verdad exacta y el ojeador no serviría para nada.
+
+Y hay un guard raro pero deliberado: un test lee el fuente de `YouthPage.tsx` y
+falla si la pantalla toca `player.potential`. El potencial real viaja en el tipo
+porque el juego lo necesita para promover y desarrollar al jugador; no hay forma
+de prohibirlo con tipos sin romper la promoción. Un test que lee el fuente es
+feo, y es mejor que confiar en que nadie lo toque.
+
+### La academia decide la camada
+
+Medido sobre 40 camadas por nivel:
+
+| Academia | Juveniles | Potencial medio | Mejor techo |
+|---|---|---|---|
+| ★☆☆☆☆ | 3 | 56,8 | 62,0 |
+| ★★★☆☆ | 4 | 65,6 | 75,2 |
+| ★★★★★ | 6 | 74,3 | 87,6 |
+
+Mejorar al ojeador y mejorar la academia hacen cosas **distintas**: el ojeador
+angosta el rango sin cambiar al jugador, la academia cambia la camada entera.
+
+### El plan estaba en tres lugares
+
+El estado de cada fase vivía en la tabla de este documento, en la bandera
+`ready` de cada entrada de navegación, y en el `consumer` de cada rol del staff
+—que promete una fase—. Se desincronizó: el analista de rivales decía
+*"todavía no se aplica · Informe de rivales, fase 7"* **después** de que la fase
+7 estuviera entregada. Mi test de honestidad pedía `phase > 3`, que seguía
+siendo cierto, así que no lo agarró.
+
+Tres arreglos:
+
+- `src/ui/router/plan.ts` declara el estado de cada fase y todo lo demás lo
+  consulta. No alcanza con derivarlo de la navegación: la fase 8 no tiene
+  pantalla propia y aun así hay efectos que la esperan.
+- El test ahora exige que la fase prometida por un rol pendiente **exista en el
+  plan y no esté entregada**. Y otro test exige que la navegación y el plan
+  digan lo mismo — ese fue el que me avisó, mientras escribía esta fase, que
+  había marcado la 4 como entregada con sus dos pantallas sin construir.
+- El analista de rivales **ahora se aplica**: `ui/lib/scouting.ts` decide cuánto
+  se ve del perfil de un rival según su nivel. Sin analista solo ves lo que ya
+  está en la tabla; con nivel 3, las nueve dimensiones; con nivel 5, el plantel
+  completo. Antes la pantalla mostraba todo siempre.
+
+Quedan cuatro roles pendientes, y ahora sus fases son verificables: el ojeador y
+el secretario técnico esperan el mercado (fase 5) y el fisioterapeuta espera que
+el motor acepte un riesgo de lesión por equipo (fase 8), que hoy toma de forma
+global.
 
 ---
 
@@ -439,15 +564,21 @@ para correrlo. Convertirlo en tests automatizados es la fase 8.
 
 ## Lo que sigue
 
-Con la fase 7 el prototipo se juega: se prepara el equipo, se juega la fecha, y
-el torneo avanza con sus consecuencias. Lo próximo es la fase 4 (inferiores,
-scouting y entrenamiento), que empieza por el motor: hacer crecer los atributos
-de un jugador con el tiempo, que es lo que hoy falta y lo que desbloquea de una
-vez los cuatro entrenadores por línea, el entrenador juvenil y los dos
-ojeadores. Después la 5 (mercado), la 6 (estadio y finanzas) y la 8
-(preparación para el backend real).
+Con las fases 4 y 7 el prototipo se juega y los planteles evolucionan: se
+prepara el equipo, se juega la fecha, el torneo avanza y los jugadores crecen o
+se caen. Lo próximo es la fase 5 (mercado), después la 6 (estadio y finanzas) y
+la 8 (backend real y el riesgo de lesión por equipo).
 
-Dos cosas que la fase 7 deja anotadas como deuda explícita:
+Deuda anotada, no escondida:
+
+- **La temporada no rota.** Al terminar el torneo se puede empezar uno nuevo,
+  pero nadie cumple años y no entra una camada nueva a inferiores. `ageUp` ya
+  existe en el motor; engancharlo es parte de la fase 6, con el cierre de
+  ejercicio.
+- **Los rivales no tienen cuerpo técnico simulado.** Desarrollan a un ritmo base
+  equivalente a un entrenador de dos estrellas (`BASELINE_COACHING`): si les
+  diera cero, sus juveniles no crecerían nunca y el torneo se desbalancearía
+  solo. Tener staff propio sigue siendo una ventaja concreta.
 
 - **La Primera Nacional no se simula.** Sus cuatro clubes existen para el
   mercado y los ascensos, y la pantalla de tabla lo dice en lugar de mostrar

@@ -47,10 +47,25 @@ import { DEMO_OFFERS_RECEIVED, DEMO_OFFERS_SENT } from '../data/market.ts';
 import { DEMO_INBOX } from '../data/inbox.ts';
 import { staffMessages } from '../lib/staff-messages.ts';
 import { totalRounds } from '../../competition/fixtures.ts';
-import { playRound as playSeasonRound } from '../../competition/season.ts';
+import {
+  playRound as playSeasonRound,
+  type RoundTraining,
+} from '../../competition/season.ts';
 import { accumulateRound } from '../../competition/stats.ts';
-import { progressionEffects, staffSpec, type StaffAssignment } from '../../domain/staff.ts';
+import {
+  progressionEffects,
+  staffEffect,
+  staffSpec,
+  type StaffAssignment,
+} from '../../domain/staff.ts';
 import { LEAGUE_CLUB_IDS, leagueTeams } from '../data/league.ts';
+import { buildYouthSquad } from '../data/youth.ts';
+import { canPromote, scoutPotential } from '../../domain/youth.ts';
+import { focusFor, DEFAULT_TRAINING_PLAN, type TrainingPlan } from '../../domain/training.ts';
+import { overallForPosition } from '../../ratings/overall.ts';
+import type { Player } from '../../domain/player.ts';
+import type { Position } from '../../domain/positions.ts';
+import type { ScoutedYouth } from '../models/index.ts';
 import {
   fixtureDate,
   recordsOfClub,
@@ -81,6 +96,14 @@ const CLUB_ID = 'river';
 
 /** Cohesion con la que arranca el plantel antes de jugar nada. */
 export const INITIAL_CHEMISTRY = 74;
+
+/**
+ * Margen del informe cuando no hay ojeador juvenil.
+ *
+ * Peor que el de un ojeador de una estrella a proposito: sin nadie mirando, el
+ * club estima el techo de un pibe de oido.
+ */
+const NO_SCOUT_SPREAD = 22;
 const LINEUP_STORAGE_KEY = 'manager:lineup:v1';
 
 const DEFAULT_TACTICS_DEMO = createTactics({
@@ -247,6 +270,84 @@ function progressionStaff(development: DevelopmentState): ReturnType<typeof prog
   return progressionEffects(assignments);
 }
 
+
+/** El nivel de la instalacion que respalda a un rol del staff. */
+function facilityLevelFor(development: DevelopmentState, role: StaffRole): FacilityLevel {
+  const facility = staffSpec(role).facility;
+  return composeFacilities(development).find((entry) => entry.id === facility)?.level ?? 1;
+}
+
+/** El efecto de un rol del cuerpo tecnico, o `null` si el puesto esta vacante. */
+function effectOfRole(development: DevelopmentState, role: StaffRole) {
+  const member = composeStaff(development).find((entry) => entry.role === role);
+  if (!member) return null;
+  return staffEffect(role, member.level, facilityLevelFor(development, role));
+}
+
+/**
+ * Los juveniles del club, con el informe del ojeador.
+ *
+ * El ancho del rango sale del efecto del ojeador juvenil: sin ojeador el club
+ * mira a ciegas y el rango es enorme. La camada la decide el nivel de la
+ * academia (seccion 8).
+ */
+function composeYouth(development: DevelopmentState, save: SeasonSave): readonly ScoutedYouth[] {
+  const academy = composeFacilities(development).find((entry) => entry.id === 'academia');
+  const squad = buildYouthSquad(CLUB_ID, academy?.level ?? 1);
+  const scout = effectOfRole(development, 'Ojeador juvenil');
+  // Sin ojeador juvenil el margen es el del nivel 1 empeorado: el club no
+  // tiene a nadie mirando y lo declara en pantalla.
+  const spread = scout ? scout.actual : NO_SCOUT_SPREAD;
+  const promoted = new Set(save.promoted ?? []);
+
+  return squad
+    .filter((entry) => !promoted.has(entry.player.id))
+    .map((entry) => ({
+      id: entry.player.id,
+      name: entry.player.name,
+      position: entry.player.position,
+      age: entry.player.age,
+      origin: entry.origin,
+      yearsAtClub: entry.yearsAtClub,
+      overall: Math.round(overallForPosition(entry.player.attributes, entry.player.position)),
+      report: scoutPotential(entry.player.potential, spread, entry.player.id),
+      promotable: canPromote(entry),
+      player: entry.player,
+    }));
+}
+
+/** Los juveniles que el manager ya subio al plantel profesional. */
+function promotedPlayers(development: DevelopmentState, save: SeasonSave): readonly Player[] {
+  const academy = composeFacilities(development).find((entry) => entry.id === 'academia');
+  const promoted = new Set(save.promoted ?? []);
+  return buildYouthSquad(CLUB_ID, academy?.level ?? 1)
+    .filter((entry) => promoted.has(entry.player.id))
+    .map((entry) => withCondition(entry.player, save.conditions[entry.player.id]));
+}
+
+/**
+ * Lo que el club le pone al entrenamiento de la fecha (fase 4).
+ *
+ * `coachingOf` devuelve el efecto real del entrenador de cada linea, ya con el
+ * limite de las instalaciones descontado. Si el puesto esta vacante devuelve
+ * cero: el plantel desarrolla al ritmo base.
+ */
+function roundTraining(development: DevelopmentState, plan: TrainingPlan): RoundTraining {
+  const cache = new Map<StaffRole, number>();
+  return {
+    intensity: plan.intensity,
+    focusOf: (playerId, position) => focusFor(plan, playerId, position as Position),
+    coachingOf: (role) => {
+      const cached = cache.get(role);
+      if (cached !== undefined) return cached;
+      const effect = effectOfRole(development, role);
+      const value = effect ? effect.actual : 0;
+      cache.set(role, value);
+      return value;
+    },
+  };
+}
+
 /**
  * El dia de hoy.
  *
@@ -270,12 +371,28 @@ function todayOf(save: SeasonSave, rounds: number): string {
  * fecha 1 todos tienen cero, que es la verdad, y el aviso de riesgo de
  * suspension aparece cuando de verdad hay riesgo.
  */
-function composeSquad(save: SeasonSave): readonly ClubPlayer[] {
-  return DEMO_SQUAD.map((entry) => ({
+function composeSquad(development: DevelopmentState, save: SeasonSave): readonly ClubPlayer[] {
+  const base = DEMO_SQUAD.map((entry) => ({
     ...entry,
     player: withCondition(entry.player, save.conditions[entry.player.id]),
     yellowCards: save.totals[entry.player.id]?.yellowCards ?? 0,
   }));
+
+  // Los juveniles promovidos entran al plantel como cualquier otro. No tienen
+  // contrato profesional ni valor de mercado todavia: eso es la fase 5, y
+  // mientras tanto figuran con lo minimo en lugar de con numeros inventados.
+  const promoted: ClubPlayer[] = promotedPlayers(development, save).map((player) => ({
+    player,
+    shirtNumber: 0,
+    nationality: 'Argentina',
+    value: 0,
+    salary: 0,
+    contractUntil: '2029-06-30',
+    yellowCards: save.totals[player.id]?.yellowCards ?? 0,
+    unhappy: false,
+  }));
+
+  return [...base, ...promoted];
 }
 
 /** La temporada como la ve la interfaz. */
@@ -314,7 +431,7 @@ export function createMockGameService(): GameService {
         },
         club,
         clubs: CLUBS,
-        squad: composeSquad(save),
+        squad: composeSquad(development, save),
         lineup: readStoredLineup() ?? initialLineup(),
         finances: composeFinances(development),
         staff: composeStaff(development),
@@ -327,6 +444,8 @@ export function createMockGameService(): GameService {
         offersSent: DEMO_OFFERS_SENT,
         inbox: composeInbox(development, today),
         season: composeSeason(save),
+        youth: composeYouth(development, save),
+        training: save.training ?? DEFAULT_TRAINING_PLAN,
         currentRound: save.round,
         seasonLabel: SEASON_LABEL,
         today,
@@ -462,7 +581,12 @@ export function createMockGameService(): GameService {
 
       // Los planteles base son deterministas; encima se les aplica el estado
       // con el que quedaron de la fecha anterior.
-      const base = leagueTeams(selection.tactics, save.chemistry[CLUB_ID] ?? INITIAL_CHEMISTRY);
+      const development = readDevelopment();
+      const base = leagueTeams(
+        selection.tactics,
+        save.chemistry[CLUB_ID] ?? INITIAL_CHEMISTRY,
+        promotedPlayers(development, save),
+      );
       const teams = restoreTeams(base, save);
 
       const table = seasonTable(save.records);
@@ -484,7 +608,8 @@ export function createMockGameService(): GameService {
         // salgan del mismo lugar es lo que hace que "el jueves y el domingo"
         // se sienta distinto de "domingo a domingo".
         restDays: restDaysBefore(save.round + 1),
-        staff: progressionStaff(readDevelopment()),
+        staff: progressionStaff(development),
+        training: roundTraining(development, save.training ?? DEFAULT_TRAINING_PLAN),
         ...(position > 0 ? { tableMood: tableMood(position, LEAGUE_CLUB_IDS.length) } : {}),
       });
 
@@ -521,6 +646,22 @@ export function createMockGameService(): GameService {
 
     async resetSeason(_clubId: string): Promise<void> {
       writeSeason(emptySeason());
+    },
+
+    async saveTraining(_clubId: string, plan: TrainingPlan): Promise<void> {
+      const save = readSeason();
+      writeSeason({ ...save, training: plan });
+    },
+
+    async promoteYouth(_clubId: string, youthId: string): Promise<void> {
+      const save = readSeason();
+      const development = readDevelopment();
+      const youth = composeYouth(development, save).find((entry) => entry.id === youthId);
+      if (!youth) throw new Error('Ese juvenil ya no está en las inferiores');
+      if (!youth.promotable) {
+        throw new Error(`${youth.name} tiene ${youth.age} años: todavía no puede subir al plantel`);
+      }
+      writeSeason({ ...save, promoted: [...(save.promoted ?? []), youthId] });
     },
   };
 }

@@ -18,6 +18,8 @@ import { StatsPage } from './pages/StatsPage.tsx';
 import { MatchPage } from './pages/MatchPage.tsx';
 import { RivalsPage } from './pages/RivalsPage.tsx';
 import { NewsPage } from './pages/NewsPage.tsx';
+import { TrainingPage } from './pages/TrainingPage.tsx';
+import { YouthPage } from './pages/YouthPage.tsx';
 import { NotFoundPage, PlaceholderPage } from './pages/PlaceholderPage.tsx';
 
 /** Resuelve la pantalla que corresponde a la ruta actual. */
@@ -62,6 +64,10 @@ function Screen(): ReactNode {
       return <RivalsPage />;
     case '/informacion/noticias':
       return <NewsPage />;
+    case '/equipo/entrenamiento':
+      return <TrainingPage />;
+    case '/club/inferiores':
+      return <YouthPage />;
     default:
       return findNavItem(path) ? <PlaceholderPage /> : <NotFoundPage />;
   }

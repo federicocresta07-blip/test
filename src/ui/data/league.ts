@@ -122,14 +122,24 @@ function rivalTeam(entry: Setup): Team {
   });
 }
 
-/** El equipo del club del manager, armado desde su plantel escrito a mano. */
-export function userTeam(tactics?: Tactics, chemistry = 74): Team {
+/**
+ * El equipo del club del manager.
+ *
+ * `extra` son los juveniles que el manager subio al plantel profesional (fase
+ * 4). Entran como cualquier otro jugador: el motor no distingue, y por eso un
+ * juvenil promovido compite por el puesto de verdad.
+ */
+export function userTeam(
+  tactics?: Tactics,
+  chemistry = 74,
+  extra: readonly Player[] = [],
+): Team {
   const club = clubById(USER_CLUB_ID);
   return createTeam({
     id: club.id,
     name: club.name,
     shortName: club.shortName,
-    players: DEMO_SQUAD.map((entry) => entry.player),
+    players: [...DEMO_SQUAD.map((entry) => entry.player), ...extra],
     chemistry,
     ...(tactics ? { tactics } : {}),
     reputation: 78,
@@ -153,9 +163,13 @@ export function rivalTeams(): ReadonlyMap<string, Team> {
 }
 
 /** Todos los equipos del torneo, con el del manager incluido. */
-export function leagueTeams(userTactics?: Tactics, userChemistry?: number): ReadonlyMap<string, Team> {
+export function leagueTeams(
+  userTactics?: Tactics,
+  userChemistry?: number,
+  userExtra: readonly Player[] = [],
+): ReadonlyMap<string, Team> {
   const teams = new Map(rivalTeams());
-  teams.set(USER_CLUB_ID, userTeam(userTactics, userChemistry));
+  teams.set(USER_CLUB_ID, userTeam(userTactics, userChemistry, userExtra));
   return teams;
 }
 

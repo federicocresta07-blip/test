@@ -11,7 +11,7 @@
  *
  * Presupuesto de espacio, medido: ~8,7 kB por partido del manager (con las
  * lineas individuales completas) y ~2,6 kB por partido de IA. Una temporada de
- * 19 fechas ocupa unos 600 kB. Si el navegador se queja, `writeSeason`
+ * 19 fechas ocupa unos 730 kB. Si el navegador se queja, `writeSeason`
  * adelgaza los partidos de IA y reintenta una vez antes de darse por vencido.
  */
 
@@ -19,6 +19,7 @@ import type { Player } from '../../domain/player.ts';
 import type { Team } from '../../domain/team.ts';
 import type { MatchRecord } from '../../competition/season.ts';
 import { EMPTY_TOTALS, type SeasonTotals } from '../../competition/stats.ts';
+import { DEFAULT_TRAINING_PLAN, type TrainingPlan } from '../../domain/training.ts';
 
 /** Lo que cambia de un jugador entre partidos, como tupla para ahorrar lugar. */
 export type ConditionTuple = readonly [
@@ -42,6 +43,10 @@ export type SeasonSave = {
   readonly conditions: Readonly<Record<string, ConditionTuple>>;
   /** Cohesion de cada club, por id. */
   readonly chemistry: Readonly<Record<string, number>>;
+  /** Plan de entrenamiento del club del manager (fase 4). */
+  readonly training?: TrainingPlan;
+  /** Juveniles ya subidos al plantel profesional, por id (fase 4). */
+  readonly promoted?: readonly string[];
 };
 
 export const SEASON_VERSION = 1;
@@ -56,6 +61,8 @@ export function emptySeason(seed = DEFAULT_SEASON_SEED): SeasonSave {
     totals: EMPTY_TOTALS,
     conditions: {},
     chemistry: {},
+    training: DEFAULT_TRAINING_PLAN,
+    promoted: [],
   };
 }
 
@@ -78,6 +85,8 @@ export function readSeason(): SeasonSave {
       totals: parsed.totals ?? EMPTY_TOTALS,
       conditions: parsed.conditions ?? {},
       chemistry: parsed.chemistry ?? {},
+      training: parsed.training ?? DEFAULT_TRAINING_PLAN,
+      promoted: parsed.promoted ?? [],
     };
   } catch {
     return emptySeason();

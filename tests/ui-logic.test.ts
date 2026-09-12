@@ -34,6 +34,7 @@ import { DEMO_OFFERS_RECEIVED, DEMO_OFFERS_SENT } from '../src/ui/data/market.ts
 import { DEMO_INBOX } from '../src/ui/data/inbox.ts';
 import { staffMessages } from '../src/ui/lib/staff-messages.ts';
 import { staffEffect, staffSpec } from '../src/domain/staff.ts';
+import { DEFAULT_TRAINING_PLAN } from '../src/domain/training.ts';
 import {
   naturalOverall,
   overallInSlot,
@@ -85,6 +86,8 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
       lastUserMatch: null,
       chemistry: 74,
     },
+    youth: [],
+    training: DEFAULT_TRAINING_PLAN,
     currentRound: 1,
     seasonLabel: SEASON_LABEL,
     today: '2026-02-06',
@@ -583,21 +586,17 @@ test('las pantallas de la fase 3 estan marcadas como listas', () => {
   }
 });
 
-test('HONESTIDAD: la fase que promete un efecto pendiente es la que dice la navegacion', () => {
-  // Los cuatro entrenadores por linea dicen "Entrenamiento, fase N". Si la
-  // navegacion mueve esa pantalla de fase y nadie actualiza el rol, la ficha
-  // del profesional queda mintiendo. Este test lo impide.
+test('HONESTIDAD: los entrenadores por linea ya se aplican', () => {
+  // Hasta la fase 4 las fichas de los cuatro entrenadores decian "Entrenamiento,
+  // fase 4". Ahora el motor sabe hacer crecer los atributos, asi que se
+  // aplican de verdad y la pantalla existe. El chequeo general de fases vive en
+  // `tests/staff.test.ts`, contra el plan declarado.
   const training = findNavItem('/equipo/entrenamiento');
   assert.ok(training);
-  assert.equal(training.ready, false);
+  assert.equal(training.ready, true, 'la pantalla de entrenamiento ya esta entregada');
 
   const consumer = staffSpec('Entrenador defensivo').consumer;
-  assert.equal(consumer.kind, 'pendiente');
-  if (consumer.kind !== 'pendiente') return;
-  assert.equal(consumer.module, 'Entrenamiento');
-  assert.equal(
-    consumer.phase,
-    training.phase,
-    'la ficha del entrenador y la navegacion prometen fases distintas',
-  );
+  assert.equal(consumer.kind, 'implementado');
+  if (consumer.kind !== 'implementado') return;
+  assert.match(consumer.where, /desarrollo/);
 });

@@ -11,6 +11,8 @@ import { useGameState } from '../state/GameProvider.tsx';
 import { clubById } from '../data/clubs.ts';
 import { LEAGUE_CLUB_IDS, leagueTeams } from '../data/league.ts';
 import { naturalOverall, teamStrengthOf } from '../lib/engine-bridge.ts';
+import { scoutingDetail } from '../lib/scouting.ts';
+import { staffEffect, staffSpec } from '../../domain/staff.ts';
 import { outcomeOf, recordsOfClub, seasonTable } from '../lib/season-bridge.ts';
 import { tacticsLabel } from '../lib/tactics-labels.ts';
 import { decimal } from '../lib/format.ts';
@@ -57,23 +59,52 @@ export function RivalsPage({ clubId }: { readonly clubId?: string | undefined })
   const table = useMemo(() => seasonTable(state.season.records), [state.season.records]);
   const teams = useMemo(() => leagueTeams(), []);
 
+  // Cuanto se ve de un rival lo decide el analista del club (seccion 7). Sin
+  // analista se ve lo que ya esta en la tabla; con uno de cinco estrellas, el
+  // plantel completo.
+  const detail = useMemo(() => {
+    const analyst = state.staff.find((member) => member.role === 'Analista de rivales');
+    if (!analyst) return scoutingDetail(null);
+    const facility = staffSpec(analyst.role).facility;
+    const level = state.facilities.find((entry) => entry.id === facility)?.level ?? 1;
+    return scoutingDetail(staffEffect(analyst.role, analyst.level, level));
+  }, [state.staff, state.facilities]);
+
   if (!clubId) {
     return (
       <div className="page">
         <Panel
           title="Rivales del torneo"
-          subtitle="Los veinte clubes de Primera División. Cada perfil sale del mismo motor que juega los partidos"
+          subtitle={
+            detail.level > 0
+              ? `Informe nivel ${detail.level} de 5 · lo define tu analista de rivales`
+              : 'Sin analista de rivales: solo ves lo que ya está en la tabla'
+          }
           padded={false}
+          actions={
+            detail.missing.length > 0 ? (
+              <Link to="/club/staff">
+                <Button size="sm" variant="ghost">
+                  Mejorar el informe
+                </Button>
+              </Link>
+            ) : undefined
+          }
         >
           <DataTable>
             <thead>
               <tr>
                 <th style={{ width: 30 }}>#</th>
                 <th>Club</th>
-                <th style={{ width: 96 }}>Formación</th>
-                <th style={{ width: 54, textAlign: 'right' }}>Ataque</th>
-                <th style={{ width: 54, textAlign: 'right' }}>Medio</th>
-                <th style={{ width: 54, textAlign: 'right' }}>Defensa</th>
+                {detail.showsTactics && <th style={{ width: 96 }}>Formación</th>}
+                {detail.showsDimensions && (
+                  <>
+                    <th style={{ width: 54, textAlign: 'right' }}>Ataque</th>
+                    <th style={{ width: 54, textAlign: 'right' }}>Medio</th>
+                    <th style={{ width: 54, textAlign: 'right' }}>Defensa</th>
+                  </>
+                )}
+                <th style={{ width: 42, textAlign: 'right' }}>Pts</th>
                 <th style={{ width: 96 }}>Forma</th>
                 <th style={{ width: 70 }} />
               </tr>
@@ -92,15 +123,24 @@ export function RivalsPage({ clubId }: { readonly clubId?: string | undefined })
                         <span className="truncate">{club.name}</span>
                       </span>
                     </td>
-                    <td className="secondary tnum">{team?.tactics.formationId ?? '—'}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      {strength ? <RatingBadge value={strength.dimensions.ataque} size="sm" /> : '—'}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {strength ? <RatingBadge value={strength.dimensions.mediocampo} size="sm" /> : '—'}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {strength ? <RatingBadge value={strength.dimensions.defensa} size="sm" /> : '—'}
+                    {detail.showsTactics && (
+                      <td className="secondary tnum">{team?.tactics.formationId ?? '—'}</td>
+                    )}
+                    {detail.showsDimensions && (
+                      <>
+                        <td style={{ textAlign: 'right' }}>
+                          {strength ? <RatingBadge value={strength.dimensions.ataque} size="sm" /> : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          {strength ? <RatingBadge value={strength.dimensions.mediocampo} size="sm" /> : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          {strength ? <RatingBadge value={strength.dimensions.defensa} size="sm" /> : '—'}
+                        </td>
+                      </>
+                    )}
+                    <td className="tnum" style={{ textAlign: 'right' }}>
+                      {row.points}
                     </td>
                     <td>
                       <FormStrip form={row.form} />
@@ -174,7 +214,7 @@ export function RivalsPage({ clubId }: { readonly clubId?: string | undefined })
             <ClubBadge club={club} size={56} />
             <div className="col">
               <span className="rivalhead__stadium">{club.stadiumName}</span>
-              {team && (
+              {team && detail.showsTactics && (
                 <span className="rivalhead__tactics">
                   {team.tactics.formationId} · {tacticsLabel.mentality(team.tactics.mentality)} ·{' '}
                   {tacticsLabel.passingStyle(team.tactics.passingStyle)} · presión{' '}
@@ -185,7 +225,7 @@ export function RivalsPage({ clubId }: { readonly clubId?: string | undefined })
             </div>
           </div>
 
-          {strength && (
+          {strength && detail.showsDimensions && (
             <div className="rivalhead__dims">
               {ranked.map((entry) => (
                 <div className="rivaldim" key={entry.key}>
@@ -203,7 +243,7 @@ export function RivalsPage({ clubId }: { readonly clubId?: string | undefined })
           )}
         </div>
 
-        {ranked.length >= 6 && (
+        {ranked.length >= 6 && detail.showsVerdict && (
           <p className="rivalverdict">
             Fuerte en{' '}
             <strong>
@@ -254,7 +294,7 @@ export function RivalsPage({ clubId }: { readonly clubId?: string | undefined })
         </Panel>
       )}
 
-      {team && (
+      {team && detail.showsSquad && (
         <Panel
           title="Plantel"
           subtitle={`${team.players.length} jugadores · cohesión ${team.chemistry}`}
@@ -294,6 +334,26 @@ export function RivalsPage({ clubId }: { readonly clubId?: string | undefined })
         </Panel>
       )}
 
+      {detail.missing.length > 0 && (
+        <Panel
+          title={`Informe nivel ${detail.level} de 5`}
+          subtitle="Lo que ves de un rival lo decide tu analista"
+          actions={
+            <Link to="/club/staff">
+              <Button size="sm" variant="primary">
+                Ver el analista
+              </Button>
+            </Link>
+          }
+        >
+          <ul className="scoutmissing">
+            {detail.missing.map((entry) => (
+              <li key={entry}>{entry}</li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+
       <Panel title="De dónde salen estos datos">
         <div className="clubnotes">
           <p>
@@ -306,17 +366,22 @@ export function RivalsPage({ clubId }: { readonly clubId?: string | undefined })
             <strong>computeTeamStrength</strong> sobre el once que el motor pondría hoy. Si acá dice
             que es flojo de pelota parada, lo es cuando juega. Y en el partido, esas dimensiones se
             cruzan con las tuyas (sección 32 del motor), así que un rival fuerte por las bandas
-            castiga distinto según con qué lo enfrentes. Promedio del plantel:{' '}
-            <strong className="tnum">
-              {decimal(
-                team
-                  ? team.players.reduce((total, player) => total + naturalOverall(player), 0) /
-                      team.players.length
-                  : 0,
-                1,
-              )}
-            </strong>
-            .
+            castiga distinto según con qué lo enfrentes.
+            {/* El promedio del plantel es informacion del rival, asi que
+                tambien lo gobierna el informe: sin analista no se ve. */}
+            {team && detail.showsSquad && (
+              <>
+                {' '}Promedio de su plantel:{' '}
+                <strong className="tnum">
+                  {decimal(
+                    team.players.reduce((total, player) => total + naturalOverall(player), 0) /
+                      team.players.length,
+                    1,
+                  )}
+                </strong>
+                .
+              </>
+            )}
           </p>
         </div>
       </Panel>

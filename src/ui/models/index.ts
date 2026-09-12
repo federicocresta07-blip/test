@@ -15,6 +15,8 @@ import type { FacilityId, FacilityLevel } from '../../domain/facilities.ts';
 import type { StaffLevel, StaffRole } from '../../domain/staff.ts';
 import type { MatchRecord } from '../../competition/season.ts';
 import type { SeasonTotals } from '../../competition/stats.ts';
+import type { ScoutingReport } from '../../domain/youth.ts';
+import type { TrainingPlan } from '../../domain/training.ts';
 
 export type Division = 'Primera División' | 'Primera Nacional';
 
@@ -234,6 +236,36 @@ export type SeasonView = {
   readonly chemistry: number;
 };
 
+/**
+ * UN JUVENIL TAL COMO LO VE EL CLUB (seccion 7 — fase 4).
+ *
+ * La pieza importante es que el potencial NO esta en este tipo: esta el
+ * `report`, que es un rango. El club no conoce el techo de sus juveniles,
+ * conoce lo que le dice el ojeador, y esa diferencia es la razon de ser del
+ * ojeador juvenil.
+ *
+ * `player` trae el potencial real porque el juego lo necesita para promover al
+ * jugador y para desarrollarlo. Ninguna pantalla lo muestra, y un test
+ * verifica que la pantalla de inferiores no lo lea.
+ */
+export type ScoutedYouth = {
+  readonly id: string;
+  readonly name: string;
+  readonly position: Position;
+  readonly age: number;
+  /** De donde salio. */
+  readonly origin: string;
+  readonly yearsAtClub: number;
+  /** Su nivel de HOY, que si se conoce: entrena con el plantel. */
+  readonly overall: number;
+  /** Lo que el ojeador informa sobre su techo. */
+  readonly report: ScoutingReport;
+  /** Puede pasar al plantel profesional. */
+  readonly promotable: boolean;
+  /** El jugador real. Su `potential` es la verdad que el club no conoce. */
+  readonly player: Player;
+};
+
 export type AlertSeverity = 'danger' | 'warn' | 'info';
 
 /** Alerta accionable del plantel (seccion 5.3). */
@@ -264,6 +296,10 @@ export type GameState = {
   readonly offersSent: readonly TransferOffer[];
   readonly inbox: readonly InboxMessage[];
   readonly season: SeasonView;
+  /** Las inferiores del club, con el informe del ojeador (fase 4). */
+  readonly youth: readonly ScoutedYouth[];
+  /** El plan de entrenamiento del plantel (fase 4). */
+  readonly training: TrainingPlan;
   readonly currentRound: number;
   readonly seasonLabel: string;
   readonly today: string;
@@ -272,4 +308,16 @@ export type GameState = {
 /** Grupo de posiciones para los filtros rapidos del plantel (seccion 6.2). */
 export type PositionGroup = 'POR' | 'DEF' | 'MED' | 'ATA';
 
-export type { FacilityId, FacilityLevel, MatchRecord, Player, Position, SeasonTotals, StaffLevel, StaffRole, Tactics };
+export type {
+  FacilityId,
+  FacilityLevel,
+  MatchRecord,
+  Player,
+  Position,
+  ScoutingReport,
+  SeasonTotals,
+  StaffLevel,
+  StaffRole,
+  Tactics,
+  TrainingPlan,
+};

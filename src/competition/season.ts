@@ -31,6 +31,14 @@ import type {
   TeamMatchStats,
 } from '../engine/match-types.ts';
 import { updateAfterMatch, type InjuryReport } from '../progression/after-match.ts';
+import {
+  BASELINE_COACHING,
+  developSquad,
+  type SquadDevelopmentResult,
+  type TrainingFocus,
+} from '../progression/development.ts';
+import { coachRoleFor, defaultFocusFor } from '../domain/training.ts';
+import type { StaffRole } from '../domain/staff.ts';
 import { fixturesOfRound, type SeasonFixture } from './fixtures.ts';
 import type { PlayedMatch } from './table.ts';
 
@@ -126,6 +134,22 @@ export type RoundInput = {
   readonly config?: ConfigOverrides | undefined;
   /** Posicion del club en la tabla y total de equipos, para el animo (seccion 35). */
   readonly tableMood?: number | undefined;
+  /**
+   * Entrenamiento del club del manager (seccion 7, fase 4).
+   *
+   * Sin esto el plantel desarrolla al ritmo base, como los rivales: los
+   * atributos se mueven igual, pero el cuerpo tecnico no aporta nada.
+   */
+  readonly training?: RoundTraining | undefined;
+};
+
+/** Lo que el club del manager le pone al entrenamiento de la fecha. */
+export type RoundTraining = {
+  readonly intensity: number;
+  /** Que entrena cada jugador. */
+  readonly focusOf: (playerId: string, position: string) => TrainingFocus;
+  /** Efecto del entrenador de cada linea, en porcentaje. */
+  readonly coachingOf: (role: StaffRole) => number;
 };
 
 export type RoundOutcome = {
@@ -138,6 +162,8 @@ export type RoundOutcome = {
   readonly suspensions: readonly { readonly playerId: string; readonly playerName: string; readonly matches: number }[];
   /** Partidos que no se pudieron jugar y por que. */
   readonly skipped: readonly { readonly fixtureId: string; readonly reason: string }[];
+  /** Jugadores del club del manager que cambiaron de overall (seccion 40). */
+  readonly developed: SquadDevelopmentResult['moved'];
 };
 
 function lineOf(entry: PlayerMatchStats, clubId: string): MatchPlayerLine {
@@ -229,6 +255,7 @@ export function playRound(input: RoundInput): RoundOutcome {
   const updated = new Map(input.teams);
   const injuries: InjuryReport[] = [];
   const suspensions: { playerId: string; playerName: string; matches: number }[] = [];
+  const developed: SquadDevelopmentResult['moved'][number][] = [];
   let userResult: MatchResult | null = null;
 
   for (const fixture of matches) {
@@ -294,10 +321,39 @@ export function playRound(input: RoundInput): RoundOutcome {
         injuries.push(...progression.injuries);
         suspensions.push(...progression.suspensions);
       }
+
+      // --- Desarrollo de atributos (seccion 40, fase 4) ---
+      //
+      // Se aplica aca, con los minutos de ESTE partido y las semanas que
+      // pasaron hasta la fecha siguiente. Por fecha el movimiento es minimo;
+      // lo que importa es que se acumule a lo largo del torneo, igual que
+      // pasa de verdad.
+      const minutes: Record<string, number> = {};
+      for (const line of side === 'local' ? result.home.players : result.away.players) {
+        minutes[line.player.id] = line.minutesPlayed;
+      }
+
+      const development = developSquad({
+        players: progression.team.players,
+        weeks: (input.restDays ?? 7) / 7,
+        minutes,
+        focusOf: (player) =>
+          isUserTeam && input.training
+            ? input.training.focusOf(player.id, player.position)
+            : defaultFocusFor(player.position),
+        coachingOf: (player) =>
+          isUserTeam && input.training
+            ? input.training.coachingOf(coachRoleFor(player.position))
+            : BASELINE_COACHING,
+        ...(isUserTeam && input.training ? { intensity: input.training.intensity } : {}),
+        seed: `${input.seed}:${fixture.id}:${clubId}`,
+      });
+      updated.set(clubId, { ...progression.team, players: development.players });
+      if (isUserTeam) developed.push(...development.moved);
     }
   }
 
-  return { records, teams: updated, userResult, injuries, suspensions, skipped };
+  return { records, teams: updated, userResult, injuries, suspensions, skipped, developed };
 }
 
 /** Los partidos guardados, en la forma que espera la tabla de posiciones. */

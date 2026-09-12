@@ -110,17 +110,24 @@ const IMPLEMENTED_PROGRESSION: EffectConsumer = {
   where: 'evolución del plantel entre partidos',
 };
 
+/** Los cuatro entrenadores por linea y el juvenil: desarrollo de atributos. */
+const IMPLEMENTED_DEVELOPMENT: EffectConsumer = {
+  kind: 'implementado',
+  where: 'desarrollo de los atributos de sus jugadores, fecha a fecha',
+};
+
 /**
- * Los cuatro entrenadores por linea. Su efecto lo va a consumir el modulo de
- * Entrenamiento, que necesita algo que el motor todavia no tiene: hacer
- * crecer los atributos de un jugador con el tiempo. Se construye junto con
- * inferiores, en la fase 4.
+ * Los cuatro entrenadores por linea.
+ *
+ * Su efecto acelera el desarrollo de los atributos de los jugadores de SUS
+ * puestos: `domain/training.ts` mapea cada puesto a su entrenador y
+ * `progression/development.ts` aplica el porcentaje. Por eso mejorar al
+ * entrenador de arqueros no le hace nada al 9, que es como tiene que ser.
+ *
+ * Hasta la fase 4 esto decia "todavia no se aplica": el motor no sabia hacer
+ * crecer los atributos de un jugador con el tiempo.
  */
-function trainingRole(
-  role: StaffRole,
-  effect: string,
-  phase = 4,
-): StaffRoleSpec {
+function trainingRole(role: StaffRole, effect: string): StaffRoleSpec {
   return {
     role,
     area: 'entrenamiento',
@@ -133,7 +140,7 @@ function trainingRole(
     upgradeCost: [900_000, 1_600_000, 2_600_000, 4_200_000],
     upgradeWeeks: [3, 4, 6, 8],
     hireCost: [400_000, 900_000, 1_800_000, 3_200_000, 5_600_000],
-    consumer: { kind: 'pendiente', module: 'Entrenamiento', phase },
+    consumer: IMPLEMENTED_DEVELOPMENT,
   };
 }
 
@@ -182,7 +189,10 @@ export const STAFF_SPECS: Readonly<Record<StaffRole, StaffRoleSpec>> = {
     upgradeCost: [800_000, 1_400_000, 2_300_000, 3_700_000],
     upgradeWeeks: [3, 4, 5, 7],
     hireCost: [350_000, 800_000, 1_600_000, 2_800_000, 4_900_000],
-    consumer: { kind: 'pendiente', module: 'Scouting y mercado', phase: 4 },
+    // El scouting de jugadores de OTROS clubes va con el mercado, no con
+    // inferiores: hace falta que exista un mercado para informar sobre alguien
+    // que se puede comprar.
+    consumer: { kind: 'pendiente', module: 'Mercado', phase: 5 },
   },
 
   'Ojeador juvenil': {
@@ -197,7 +207,13 @@ export const STAFF_SPECS: Readonly<Record<StaffRole, StaffRoleSpec>> = {
     upgradeCost: [700_000, 1_200_000, 2_000_000, 3_200_000],
     upgradeWeeks: [3, 4, 5, 7],
     hireCost: [300_000, 700_000, 1_400_000, 2_500_000, 4_300_000],
-    consumer: { kind: 'pendiente', module: 'Inferiores', phase: 4 },
+    // El margen de error del informe sobre un juvenil: `domain/youth.ts` lo
+    // consume en `scoutPotential`, y es lo que decide el ancho del rango de
+    // potencial que muestra la pantalla de inferiores.
+    consumer: {
+      kind: 'implementado',
+      where: 'ancho del rango de potencial que informa de cada juvenil',
+    },
   },
 
   'Entrenador juvenil': {
@@ -212,7 +228,7 @@ export const STAFF_SPECS: Readonly<Record<StaffRole, StaffRoleSpec>> = {
     upgradeCost: [750_000, 1_300_000, 2_100_000, 3_400_000],
     upgradeWeeks: [3, 4, 6, 8],
     hireCost: [320_000, 750_000, 1_500_000, 2_700_000, 4_700_000],
-    consumer: { kind: 'pendiente', module: 'Inferiores', phase: 4 },
+    consumer: IMPLEMENTED_DEVELOPMENT,
   },
 
   Médico: {
@@ -275,7 +291,14 @@ export const STAFF_SPECS: Readonly<Record<StaffRole, StaffRoleSpec>> = {
     upgradeCost: [900_000, 1_550_000, 2_500_000, 4_000_000],
     upgradeWeeks: [3, 4, 5, 7],
     hireCost: [400_000, 900_000, 1_800_000, 3_100_000, 5_400_000],
-    consumer: { kind: 'pendiente', module: 'Informe de rivales', phase: 7 },
+    // Decide CUANTO se ve del perfil de un rival: con un analista flojo la
+    // pantalla muestra su fuerza general y poco mas; con uno de cinco
+    // estrellas, las nueve dimensiones y el plantel probable. Lo consume
+    // `ui/lib/scouting.ts`.
+    consumer: {
+      kind: 'implementado',
+      where: 'nivel de detalle del perfil de cada rival',
+    },
   },
 
   'Secretario técnico': {

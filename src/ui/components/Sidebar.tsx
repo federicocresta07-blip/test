@@ -1,12 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './Icon.tsx';
 import { Link, isRouteActive, useRouter } from '../router/router.tsx';
-import {
-  deliveredThroughPhase,
-  NAVIGATION,
-  pendingModuleCount,
-  type NavSection,
-} from '../router/navigation.ts';
+import { NAVIGATION, pendingModuleCount, type NavSection } from '../router/navigation.ts';
+import { deliveredPhasesLabel } from '../router/plan.ts';
 
 /**
  * Navegacion principal (seccion 4).
@@ -48,7 +44,7 @@ export function Sidebar(): ReactNode {
         <p className="sidebar__footline">
           {pendingModuleCount()} módulos pendientes del plan por fases
         </p>
-        <p className="sidebar__footline muted">Fases 0 a {deliveredThroughPhase()} entregadas</p>
+        <p className="sidebar__footline muted">Fases {deliveredPhasesLabel()} entregadas</p>
       </footer>
     </nav>
   );

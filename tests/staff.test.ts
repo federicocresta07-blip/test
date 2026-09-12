@@ -35,10 +35,17 @@ import {
   staffUpgradeWeeks,
   utilisation,
   type StaffLevel,
+  type StaffRole,
 } from '../src/domain/staff.ts';
 import { advanceDays } from '../src/progression/after-match.ts';
+import { developPlayer } from '../src/progression/development.ts';
+import { scoutPotential } from '../src/domain/youth.ts';
+import { scoutingDetail } from '../src/ui/lib/scouting.ts';
+import { createPlayer } from '../src/domain/player.ts';
 import { createTeam } from '../src/domain/team.ts';
-import { buildSquad } from '../src/data/squad-builder.ts';
+import { attributesFor, buildSquad } from '../src/data/squad-builder.ts';
+import { navigationPhaseMismatches } from '../src/ui/router/navigation.ts';
+import { phasePlan } from '../src/ui/router/plan.ts';
 
 const LEVELS: readonly StaffLevel[] = [1, 2, 3, 4, 5];
 const FACILITY_LEVELS: readonly FacilityLevel[] = [1, 2, 3, 4, 5];
@@ -249,25 +256,87 @@ test('mejorar la instalacion sube el efecto sin tocar el nivel del profesional',
 // HONESTIDAD: ningun efecto afirma hacer algo que el juego no hace
 // ============================================================
 
-test('HONESTIDAD: solo los roles que la progresion consume se declaran implementados', () => {
+/**
+ * Los tres caminos por los que un efecto del staff llega al juego.
+ *
+ * Un rol que se declara implementado tiene que estar en alguno. Si alguien
+ * agrega uno sin engancharlo, este test lo agarra.
+ */
+const CONSUMED_BY: Readonly<Record<string, readonly StaffRole[]>> = {
+  // Evolucion del plantel entre partidos (`progression/after-match.ts`).
+  progresion: ['Preparador físico', 'Médico', 'Psicólogo deportivo'],
+  // Desarrollo de atributos (`progression/development.ts` via `training.ts`).
+  desarrollo: [
+    'Entrenador de arqueros',
+    'Entrenador defensivo',
+    'Entrenador de mediocampistas',
+    'Entrenador ofensivo',
+    'Entrenador juvenil',
+  ],
+  // Informes: el ancho del rango de un juvenil y el detalle de un rival.
+  informes: ['Ojeador juvenil', 'Analista de rivales'],
+};
+
+test('HONESTIDAD: todo rol implementado tiene un consumidor de verdad', () => {
   const claimed = STAFF_ROLES.filter(
     (role) => STAFF_SPECS[role].consumer.kind === 'implementado',
   );
+  const wired = Object.values(CONSUMED_BY).flat();
 
-  // Los tres que la progresion entre partidos consume de verdad.
-  const consumed = ['Preparador físico', 'Médico', 'Psicólogo deportivo'];
-  assert.deepEqual([...claimed].sort(), [...consumed].sort());
+  assert.deepEqual(
+    [...claimed].sort(),
+    [...wired].sort(),
+    'hay un rol que se declara implementado sin estar enganchado a ningun modulo',
+  );
 
-  // Y cada uno de ellos mueve de verdad su campo en la progresion: si alguien
-  // agrega un rol "implementado" sin engancharlo, este assert lo agarra.
-  for (const role of claimed) {
+  // Y cada camino mueve de verdad lo que tiene que mover.
+  for (const role of CONSUMED_BY['progresion'] as readonly StaffRole[]) {
     const withRole = progressionEffects([{ role, level: 5, facilityLevel: 5 }]);
-    const withoutRole = progressionEffects([]);
-    assert.notDeepEqual(withRole, withoutRole, `${role} se declara implementado pero no aporta nada`);
+    assert.notDeepEqual(withRole, NO_STAFF_EFFECTS, `${role} no aporta nada a la progresion`);
   }
+
+  for (const role of CONSUMED_BY['desarrollo'] as readonly StaffRole[]) {
+    // El entrenador tiene que acelerar el desarrollo de sus jugadores.
+    const player = createPlayer({
+      id: 'joven',
+      name: 'Joven',
+      position: role === 'Entrenador de arqueros' ? 'POR' : 'DC',
+      age: 18,
+      potential: 88,
+      attributes: attributesFor(role === 'Entrenador de arqueros' ? 'POR' : 'DC', 65),
+    });
+    const coaching = staffEffect(role, 5, 5).actual;
+    assert.ok(coaching > 0, `${role} declara un efecto de cero`);
+
+    const withCoach = developPlayer({ player, weeks: 22, minutes: 1800, coaching, seed: 'x' });
+    const without = developPlayer({ player, weeks: 22, minutes: 1800, coaching: 0, seed: 'x' });
+    assert.ok(
+      withCoach.overallAfter > without.overallAfter,
+      `${role} no hace crecer mas rapido a sus jugadores`,
+    );
+  }
+
+  // El ojeador juvenil angosta el rango; el analista sube el detalle.
+  const poor = scoutPotential(80, staffEffect('Ojeador juvenil', 1, 1).actual, 'x');
+  const good = scoutPotential(80, staffEffect('Ojeador juvenil', 5, 5).actual, 'x');
+  assert.ok(good.width < poor.width, 'un mejor ojeador juvenil tiene que informar un rango mas angosto');
+  assert.ok(
+    scoutingDetail(staffEffect('Analista de rivales', 5, 5)).showsSquad,
+    'un analista de cinco estrellas tiene que destrabar el plantel del rival',
+  );
+  assert.equal(
+    scoutingDetail(staffEffect('Analista de rivales', 1, 1)).showsSquad,
+    false,
+    'un analista de una estrella no puede mostrar el plantel del rival',
+  );
 });
 
-test('cada efecto pendiente nombra su modulo y una fase futura', () => {
+test('HONESTIDAD: un efecto pendiente apunta a una fase que de verdad esta pendiente', () => {
+  // La version anterior de este test pedia `phase > 3`, y eso dejo pasar al
+  // analista de rivales diciendo "fase 7" DESPUES de entregar la fase 7. Ahora
+  // se verifica contra el plan declarado en `router/plan.ts`, que es el unico
+  // lugar donde vive el estado de cada fase.
+
   for (const role of STAFF_ROLES) {
     const consumer = STAFF_SPECS[role].consumer;
     if (consumer.kind === 'implementado') {
@@ -275,7 +344,13 @@ test('cada efecto pendiente nombra su modulo y una fase futura', () => {
       continue;
     }
     assert.ok(consumer.module.length > 3, `${role} no nombra el modulo que lo va a usar`);
-    assert.ok(consumer.phase > 3, `${role} dice fase ${consumer.phase}: ya deberia estar hecho`);
+    const promised = phasePlan(consumer.phase);
+    assert.ok(promised, `${role} promete la fase ${consumer.phase}, que no existe en el plan`);
+    assert.equal(
+      promised.delivered,
+      false,
+      `${role} promete la fase ${consumer.phase} (${promised.label}), que ya esta entregada`,
+    );
   }
 });
 
@@ -337,4 +412,10 @@ test('las instalaciones cambian cuanto sirve el mismo preparador fisico', () => 
     fatigueOf(good) < fatigueOf(poor),
     'el mismo profesional tendria que rendir mas con mejores instalaciones',
   );
+});
+
+test('HONESTIDAD: la navegacion y el plan dicen lo mismo', () => {
+  // Marcar una pantalla como lista sin actualizar su fase dejaria el plan
+  // diciendo una cosa y la aplicacion otra.
+  assert.deepEqual(navigationPhaseMismatches(), []);
 });

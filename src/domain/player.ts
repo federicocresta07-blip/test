@@ -8,6 +8,7 @@ import {
   type PartialAttributes,
 } from './attributes.ts';
 import { clamp } from '../core/math.ts';
+import { Rng } from '../core/rng.ts';
 import { overallForPosition } from '../ratings/overall.ts';
 import type { Position } from './positions.ts';
 
@@ -108,7 +109,16 @@ export function createPlayer(input: PlayerInput): Player {
     // Sin dato explicito, la experiencia crece con la edad.
     experience: clamp(input.experience ?? defaultExperienceForAge(age), 1, 100),
     consistency: clamp(input.consistency ?? 60, 1, 100),
-    potential: clamp(input.potential ?? overallForPosition(buildAttributes(input.attributes, isGk), input.position), 1, 100),
+    potential: clamp(
+      input.potential ??
+        defaultPotential(
+          overallForPosition(buildAttributes(input.attributes, isGk), input.position),
+          age,
+          input.id,
+        ),
+      1,
+      100,
+    ),
     injuryProneness: clamp(input.injuryProneness ?? 40, 1, 100),
     preferredFoot: input.preferredFoot ?? 'derecho',
     injuryDaysRemaining: Math.max(
@@ -124,6 +134,41 @@ export function createPlayer(input: PlayerInput): Player {
 
 /** Dias de baja cuando solo se dice "esta lesionado" sin precisar cuanto. */
 export const DEFAULT_INJURY_DAYS = 14;
+
+/**
+ * MARGEN DE CRECIMIENTO POR EDAD (fase 4).
+ *
+ * Cuanto por encima de su nivel actual puede llegar un jugador segun su edad.
+ * El primer numero es el minimo y el segundo el maximo: la variacion es lo que
+ * hace que valga la pena tener un ojeador. Dos pibes de 18 con el mismo
+ * overall pueden tener techos de 71 y de 83, y el club no sabe cual es cual
+ * hasta que alguien lo mire jugar.
+ */
+const POTENTIAL_HEADROOM: readonly { readonly maxAge: number; readonly min: number; readonly max: number }[] = [
+  { maxAge: 17, min: 12, max: 26 },
+  { maxAge: 19, min: 9, max: 21 },
+  { maxAge: 21, min: 6, max: 16 },
+  { maxAge: 23, min: 3, max: 11 },
+  { maxAge: 25, min: 1, max: 6 },
+  { maxAge: 99, min: 0, max: 2 },
+];
+
+/**
+ * El potencial de un jugador, cuando no se declara uno.
+ *
+ * Antes el potencial era, por defecto, el overall actual: nadie tenia margen y
+ * por lo tanto nadie podia crecer. El campo existia pero no significaba nada.
+ *
+ * Es determinista: sale del id del jugador, asi que el mismo jugador tiene
+ * siempre el mismo techo y una partida guardada no necesita guardarlo.
+ */
+export function defaultPotential(overall: number, age: number, seed: string): number {
+  const band =
+    POTENTIAL_HEADROOM.find((entry) => age <= entry.maxAge) ??
+    (POTENTIAL_HEADROOM[POTENTIAL_HEADROOM.length - 1] as { min: number; max: number });
+  const rng = new Rng(`potencial:${seed}`);
+  return clamp(Math.round(overall + rng.intBetween(band.min, band.max)), 1, 99);
+}
 
 function defaultExperienceForAge(age: number): number {
   // 17 anios -> ~12 ; 25 -> ~55 ; 32+ -> ~90

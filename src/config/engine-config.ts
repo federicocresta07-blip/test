@@ -325,6 +325,41 @@ export type EngineConfig = {
     readonly idleRecoveryBonus: number;
   };
 
+  /**
+   * DESARROLLO DE ATRIBUTOS (secciones 7, 40 — fase 4).
+   *
+   * Estos numeros deciden a que velocidad crece un jugador, y por lo tanto
+   * cuanto vale un juvenil y cuanto sirve un entrenador. La referencia para
+   * calibrar: un juvenil de 17 con mucho margen, jugando seguido y con un buen
+   * entrenador, tiene que poder ganar entre 8 y 14 puntos de overall en una
+   * temporada. Uno de 29 en su techo, cero. Uno de 34, perder.
+   */
+  readonly development: {
+    /** Puntos de atributo por semana que puede GANAR, antes de los factores. */
+    readonly pointsPerWeek: number;
+    /**
+     * Puntos por semana que puede PERDER un veterano.
+     *
+     * Va aparte y es mucho mas chico que el crecimiento a proposito. Con la
+     * misma base, un jugador de 34 perdia once puntos de fisico en una
+     * temporada y en tres quedaba inservible. Se cae, pero de a poco: un
+     * veterano bien cuidado tiene que poder seguir sirviendo un par de anios.
+     */
+    readonly declinePerWeek: number;
+    /** Dispersion del azar acotado, como fraccion. */
+    readonly variation: number;
+    /**
+     * Cuanto puede pasarse un atributo suelto por encima del potencial.
+     *
+     * El potencial es el techo del OVERALL, no de cada atributo: un 9 con
+     * potencial 80 puede tener definicion 88 si el resto lo compensa. Sin este
+     * margen, entrenar un atributo puntual seria imposible.
+     */
+    readonly attributeCeilingSlack: number;
+    /** Piso al que puede caer un atributo por edad. */
+    readonly attributeFloor: number;
+  };
+
   /** Notas individuales del partido (seccion 50). */
   readonly ratings: {
     readonly base: number;
@@ -527,6 +562,27 @@ export const DEFAULT_CONFIG: EngineConfig = {
     recoveryBasePerDay: 3.2,
     recoveryStaminaPerDay: 3.7,
     idleRecoveryBonus: 6,
+  },
+
+  development: {
+    // Con 0.055 puntos por semana y los factores de edad, margen, minutos y
+    // entrenador, una temporada de 19 fechas (unas 22 semanas) da:
+    //   juvenil de 17 con margen, jugando, con entrenador de 4 estrellas -> +10
+    //   titular de 24 con algo de margen -> +3
+    //   jugador de 29 en su techo -> 0
+    //   veterano de 34 -> -4 de fisico, +1 de cabeza
+    // Con 0.38 por semana y los factores de edad, margen, minutos y
+    // entrenador, una temporada de 19 fechas (unas 22 semanas) da:
+    //   juvenil de 17 con margen, jugando, con entrenador de 4 estrellas -> +11
+    //   el mismo sin entrenador -> +9    |    el mismo sin jugar -> +6
+    //   titular de 22 con algo de margen -> +5
+    //   jugador de 27 o mas en su techo -> 0
+    //   veterano de 34 -> -3 de fisico, -1 de cabeza
+    pointsPerWeek: 0.38,
+    declinePerWeek: 0.12,
+    variation: 0.3,
+    attributeCeilingSlack: 12,
+    attributeFloor: 8,
   },
 
   ratings: {

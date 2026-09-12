@@ -750,3 +750,288 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* --- Lo que falta de un informe de scouting (fase 4) --- */
+.scoutmissing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding-left: var(--sp-6);
+  list-style: disc;
+  max-width: 80ch;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* --- Entrenamiento (fase 4) --- */
+.intensity {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--sp-4);
+}
+
+.intensity__option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-5);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  text-align: left;
+  transition: background var(--transition-fast);
+  min-width: 0;
+}
+
+.intensity__option:hover {
+  background: var(--surface-2);
+}
+
+.intensity__option.is-active {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+}
+
+.intensity__label {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+
+.intensity__option.is-active .intensity__label {
+  color: var(--accent-text);
+}
+
+.intensity__note {
+  font-size: var(--fs-2xs);
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.coachgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--sp-5);
+}
+
+.coachcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.coachcard.is-vacant {
+  border-left: 2px solid var(--warn);
+}
+
+.coachcard__role {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.coachcard__covers {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+.coachcard__effect {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--ok);
+}
+
+.coachcard__effect .muted {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-regular);
+}
+
+.coachcard__limited {
+  font-size: var(--fs-2xs);
+  color: var(--warn);
+}
+
+.coachcard__vacant {
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--warn);
+}
+
+.margin {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.margin__bar {
+  flex: 1;
+  height: 4px;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.margin__fill {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+
+.margin__label {
+  font-size: var(--fs-2xs);
+  color: var(--ok);
+  flex-shrink: 0;
+}
+
+.planselect {
+  width: 100%;
+  height: 22px;
+  padding: 0 var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--fs-2xs);
+  font-family: inherit;
+}
+
+/* --- Inferiores (fase 4) --- */
+.youthname {
+  color: var(--text-primary);
+  font-size: inherit;
+  text-align: left;
+  border-bottom: 1px dotted var(--border-strong);
+}
+
+.youthname:hover {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+}
+
+.potrange {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.potrange__track {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  min-width: 60px;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+}
+
+.potrange--lg .potrange__track {
+  height: 10px;
+}
+
+.potrange__band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-pill);
+}
+
+/* Donde esta hoy, sobre la misma escala. */
+.potrange__now {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--text-primary);
+  border-radius: 1px;
+}
+
+.potrange__label {
+  font-size: var(--fs-xs);
+  flex-shrink: 0;
+}
+
+.potrange--lg .potrange__label {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+}
+
+.potrange__width {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  font-weight: var(--fw-regular);
+}
+
+.youthdetail {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+  gap: var(--sp-7);
+  align-items: start;
+}
+
+.youthdetail__figures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.youthdetail__figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  align-items: flex-start;
+}
+
+.youthdetail__value {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+}
+
+.youthdetail__report {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.youthdetail__summary {
+  max-width: 70ch;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 880px) {
+  .youthdetail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.plancell {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.plancell .planselect {
+  width: 108px;
+  flex-shrink: 0;
+}
+
+.plancell__resolved {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Un plan elegido a mano se distingue del heredado del puesto. */
+.plancell__resolved.is-own {
+  color: var(--accent-text);
+  font-weight: var(--fw-medium);
+}

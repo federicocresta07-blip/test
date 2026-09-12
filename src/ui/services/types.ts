@@ -11,7 +11,7 @@
 
 import type { FacilityId } from '../../domain/facilities.ts';
 import type { StaffRole } from '../../domain/staff.ts';
-import type { GameState, LineupSelection, MatchRecord } from '../models/index.ts';
+import type { GameState, LineupSelection, MatchRecord, TrainingPlan } from '../models/index.ts';
 
 /**
  * Lo que dejo una fecha jugada.
@@ -72,4 +72,16 @@ export type GameService = {
 
   /** Vuelve a empezar el torneo desde la fecha 1. */
   resetSeason(clubId: string): Promise<void>;
+
+  /** Guarda el plan de entrenamiento del plantel (seccion 7, fase 4). */
+  saveTraining(clubId: string, plan: TrainingPlan): Promise<void>;
+
+  /**
+   * Sube un juvenil al plantel profesional (fase 4).
+   *
+   * Es irreversible en el prototipo: el juvenil deja las inferiores. Lo que se
+   * sube es el jugador real, no el informe, asi que un techo que el ojeador
+   * informaba mal se descubre jugando.
+   */
+  promoteYouth(clubId: string, youthId: string): Promise<void>;
 };
