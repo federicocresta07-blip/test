@@ -37,6 +37,7 @@ export {
   getFormation,
   type Formation,
   type FormationSlot,
+  type FormationTraits,
 } from './domain/formations.ts';
 export {
   buildAutomaticLineup,
@@ -87,7 +88,7 @@ export {
 
 // Valoraciones (secciones 25, 26, 27, 30, 33)
 export { bestPosition, overallForPosition, POSITION_WEIGHTS } from './ratings/overall.ts';
-export { evaluatePositionFit, type PositionFit } from './ratings/position-fit.ts';
+export { evaluatePositionFit, positionalOverall, type PositionFit } from './ratings/position-fit.ts';
 export { evaluateTacticalFit } from './ratings/tactical-fit.ts';
 export {
   evaluatePerformance,

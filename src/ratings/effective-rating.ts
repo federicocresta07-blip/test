@@ -25,8 +25,7 @@ import type { Player } from '../domain/player.ts';
 import type { Position } from '../domain/positions.ts';
 import type { TacticalProfile } from '../domain/tactics.ts';
 import type { Rng } from '../core/rng.ts';
-import { preciseOverallForPosition } from './overall.ts';
-import { evaluatePositionFit, type PositionFit } from './position-fit.ts';
+import { positionalOverall, type PositionFit } from './position-fit.ts';
 import { evaluateTacticalFit } from './tactical-fit.ts';
 
 export type PerformanceContext = {
@@ -81,17 +80,12 @@ export function evaluatePerformance(
   rng?: Rng,
 ): PerformanceBreakdown {
   const perf = config.performance;
-  const naturalOverall = preciseOverallForPosition(player.attributes, player.position);
-  const assignedOverall = preciseOverallForPosition(player.attributes, assigned);
-  const fit = evaluatePositionFit(player, assigned, config);
-
-  // Aptitud por atributos del puesto asignado: matiza, no reemplaza al overall.
-  const suitability =
-    clamp(assignedOverall - naturalOverall, -perf.positionAttributeCap, perf.positionAttributeCap) *
-    perf.positionAttributeMix;
-  const adjustedBase = naturalOverall + suitability;
-  const positionAdjustment = suitability - adjustedBase * fit.penalty;
-  const afterPosition = adjustedBase * (1 - fit.penalty);
+  // El ajuste por puesto es el mismo que muestra la interfaz (seccion 26).
+  const positional = positionalOverall(player, assigned, config);
+  const naturalOverall = positional.natural;
+  const fit = positional.fit;
+  const afterPosition = positional.effective;
+  const positionAdjustment = afterPosition - naturalOverall;
 
   const condition = player.condition;
   const formDelta = ((condition.form - 50) / 50) * perf.formSwing;

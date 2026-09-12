@@ -1,0 +1,80 @@
+/* Layout de paginas y utilidades compartidas entre pantallas. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+.page--narrow {
+  max-width: 760px;
+}
+
+/* --- Placeholder honesto --- */
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  align-items: flex-start;
+  padding: var(--sp-6) var(--sp-4);
+}
+
+.placeholder__phase {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--sp-4);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent-text);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.placeholder__title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+}
+
+.placeholder__summary {
+  max-width: 62ch;
+  color: var(--text-secondary);
+}
+
+.placeholder__note {
+  max-width: 62ch;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+/* --- Estados globales de carga y error --- */
+.bootstate {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: var(--sp-8);
+}
+
+.bootstate__box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+  max-width: 420px;
+  text-align: center;
+}
+
+.bootstate__title {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+}
+
+.bootstate__detail {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}

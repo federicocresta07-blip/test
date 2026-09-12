@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
     "target": "es2023",
-    "lib": ["es2023"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "types": ["node"],
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"],
 
+    "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
     "isolatedModules": true,
@@ -23,6 +23,6 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "scripts"],
-  "exclude": ["src/ui"]
+  "include": ["src", "vite.config.ts"],
+  "exclude": ["tests", "scripts"]
 }

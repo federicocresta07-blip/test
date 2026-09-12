@@ -1,11 +1,12 @@
-# Match Engine
+# Argentina Manager
 
-Motor de simulación de partidos de fútbol para un juego de management.
+Juego de management de fútbol argentino: **motor de simulación** + **interfaz
+web**.
 
 No hay partido 2D ni 3D ni movimiento de jugadores: el partido se resuelve
 con el motor de simulación, el usuario ve el marcador y después consulta las
 estadísticas. Todo el esfuerzo está puesto donde importa, que es la calidad
-de la simulación.
+de la simulación y la sensación de manejar un club.
 
 ```
 RIVER PLATE 2 - 1 RACING CLUB
@@ -14,16 +15,41 @@ RIVER PLATE 2 - 1 RACING CLUB
 ## Cómo se usa
 
 Requiere **Node 22.18 o superior** (ejecuta TypeScript de forma nativa).
-El motor no tiene dependencias de runtime.
 
 ```bash
-npm install        # solo TypeScript y los tipos de Node, para el typecheck
+npm install
+
+npm run dev        # la interfaz web en http://localhost:5173
+npm run build      # build de producción
+
 npm run demo       # simula un partido y muestra todo lo que el motor sabe contar
 npm run season     # 10 fechas seguidas con evolución del plantel
-npm test           # 134 tests
-npm run typecheck
 npm run calibrate  # miles de partidos y distribución de resultados
+
+npm test           # 162 tests
+npm run typecheck  # motor + interfaz
 ```
+
+El motor no tiene **ninguna dependencia de runtime**. La interfaz agrega solo
+React; el drag & drop es HTML5 nativo y el router son 60 líneas propias.
+
+## Las dos mitades del proyecto
+
+| | Qué es | Dónde | Documentación |
+|---|---|---|---|
+| **Motor** | Simulación de partidos por probabilidades, calibrada | `src/` (menos `src/ui`) | [`docs/match-engine.md`](docs/match-engine.md) |
+| **Interfaz** | Game shell, despacho del manager, plantel y alineación | `src/ui/` | [`docs/ui.md`](docs/ui.md) |
+
+La interfaz **consume el motor real**: el overall por puesto, la penalización
+por jugar fuera de posición, las métricas de ataque/mediocampo/defensa/arquero
+y el autoarmado del once salen del motor, no de números inventados en los
+componentes.
+
+La interfaz sigue un plan incremental por fases. Están hechas la fase 0
+(fundaciones y shell), la fase 1 (Despacho del Manager) y la fase 2 (Plantel y
+Alineación). Los 18 módulos que faltan aparecen en la navegación con una
+página que dice qué van a hacer y en qué fase se construyen — ninguno tiene
+botones que finjan funcionar.
 
 ### Simular un partido
 
@@ -220,6 +246,8 @@ se nota sin que un crack tape a diez jugadores flojos.
   (secciones 25 a 53) contra el código y los tests que la verifican.
 - [`docs/calibracion.md`](docs/calibracion.md) — estado actual de la
   calibración, los valores objetivo y cómo recalibrar.
+- [`docs/ui.md`](docs/ui.md) — diseño de la interfaz: estado por fases,
+  decisiones de arquitectura, cómo se conecta con el motor y qué se verificó.
 
 ## Estructura
 
@@ -237,6 +265,7 @@ src/
   calibration/                 miles de simulaciones y su informe
   presentation/                marcador, tabla de estadísticas, notas
   data/                        generador de planteles y equipos de ejemplo
-tests/                         134 tests
-scripts/                       demo y calibración
+  ui/                          la interfaz web (ver docs/ui.md)
+tests/                         162 tests
+scripts/                       demo, temporada, calibración y humo de la UI
 ```

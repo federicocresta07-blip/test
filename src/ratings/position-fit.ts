@@ -6,8 +6,10 @@
  */
 
 import type { EngineConfig } from '../config/engine-config.ts';
+import { clamp, clampRating } from '../core/math.ts';
 import { familiarityTier, type FamiliarityTier, type Position } from '../domain/positions.ts';
 import type { Player } from '../domain/player.ts';
+import { preciseOverallForPosition } from './overall.ts';
 
 export type PositionFit = {
   readonly natural: Position;
@@ -60,4 +62,40 @@ function fitLabel(
   if (tier <= 1) return 'adaptado';
   if (tier === 2) return 'incomodo';
   return 'fuera de posicion';
+}
+
+/**
+ * Overall del jugador ya ajustado por el puesto en el que va a jugar
+ * (seccion 26). Es el numero que la interfaz muestra como
+ * "overall natural 82 -> jugando como LD -> overall efectivo 76".
+ *
+ * Solo tiene en cuenta el puesto: no incluye forma, moral, fatiga ni tactica.
+ * Para el rendimiento completo del partido esta `evaluatePerformance`, que
+ * parte de este mismo calculo.
+ */
+export function positionalOverall(
+  player: Player,
+  assigned: Position,
+  config: EngineConfig,
+): {
+  readonly natural: number;
+  readonly effective: number;
+  readonly fit: PositionFit;
+} {
+  const perf = config.performance;
+  const natural = preciseOverallForPosition(player.attributes, player.position);
+  const asAssigned = preciseOverallForPosition(player.attributes, assigned);
+  const fit = evaluatePositionFit(player, assigned, config);
+
+  // Los atributos del puesto asignado matizan el overall natural, sin
+  // reemplazarlo: un MC con buen marcaje sufre menos como DFC.
+  const suitability =
+    clamp(asAssigned - natural, -perf.positionAttributeCap, perf.positionAttributeCap) *
+    perf.positionAttributeMix;
+
+  return {
+    natural: clampRating(natural),
+    effective: clampRating((natural + suitability) * (1 - fit.penalty)),
+    fit,
+  };
 }

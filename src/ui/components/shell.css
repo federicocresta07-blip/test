@@ -1,0 +1,511 @@
+/* ============================================================
+   GAME SHELL (secciones 3.1, 4, 5.1)
+   ============================================================ */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  height: 100%;
+  background: var(--bg-base);
+}
+
+.shell__main {
+  display: grid;
+  grid-template-rows: var(--topbar-h) var(--clubheader-h) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.shell__content {
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--sp-6);
+}
+
+/* --- Sidebar --- */
+.sidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--bg-sunken);
+  border-right: 1px solid var(--border-subtle);
+  min-height: 0;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: var(--topbar-h);
+  padding: 0 var(--sp-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sidebar__logo {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  background: var(--accent);
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+}
+
+.sidebar__brandname {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+}
+
+.sidebar__brandmeta {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+.sidebar__scroll {
+  overflow-y: auto;
+  padding: var(--sp-4) var(--sp-3);
+}
+
+.sidebar__single,
+.sidebar__sectionhead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  height: 30px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.sidebar__single:hover,
+.sidebar__sectionhead:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.sidebar__single.is-active {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+
+.sidebar__section {
+  margin-top: var(--sp-2);
+}
+
+.sidebar__section.is-active .sidebar__sectionhead {
+  color: var(--text-primary);
+}
+
+.sidebar__sectionlabel {
+  flex: 1;
+  text-align: left;
+}
+
+.sidebar__chevron {
+  color: var(--text-muted);
+  transform: rotate(90deg);
+  transition: transform var(--transition-fast);
+}
+
+.sidebar__chevron.is-open {
+  transform: rotate(-90deg);
+}
+
+.sidebar__items {
+  padding: var(--sp-1) 0 var(--sp-2) var(--sp-8);
+}
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  height: 26px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.sidebar__item:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.sidebar__item.is-active {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  font-weight: var(--fw-medium);
+}
+
+.sidebar__item.is-pending {
+  color: var(--text-muted);
+}
+
+.sidebar__pending {
+  flex-shrink: 0;
+  font-size: 8px;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.sidebar__foot {
+  padding: var(--sp-4) var(--sp-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sidebar__footline {
+  font-size: var(--fs-2xs);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* --- Barra superior --- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-6);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+}
+
+.topbar__club {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  margin-left: calc(var(--sp-3) * -1);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.topbar__club:hover {
+  background: var(--surface-2);
+}
+
+.clubbadge {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+}
+
+.topbar__clubname {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  line-height: 1.2;
+}
+
+.topbar__division {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+.topbar__context {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-7);
+  padding-left: var(--sp-6);
+  border-left: 1px solid var(--border-subtle);
+  height: 28px;
+}
+
+.topbar__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  cursor: help;
+}
+
+.topbar__metriclabel {
+  font-size: 9px;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.topbar__metricvalue {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  line-height: 1.1;
+}
+
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.topbar__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+}
+
+.topbar__icon:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.topbar__count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  background: var(--danger);
+  border-radius: var(--radius-pill);
+  color: #fff;
+  font-size: 9px;
+  font-weight: var(--fw-bold);
+}
+
+.topbar__manager {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  max-width: 160px;
+  padding-left: var(--sp-5);
+  border-left: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.notifpop {
+  position: absolute;
+  top: calc(var(--topbar-h) - 6px);
+  right: var(--sp-6);
+  z-index: var(--z-drawer);
+  width: 300px;
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+
+.notifpop__list {
+  margin-top: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.notifpop__item {
+  font-size: var(--fs-sm);
+}
+
+.notifpop__item.is-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-3);
+  color: var(--text-muted);
+}
+
+.notifpop__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+
+.notifpop__link {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+.notifpop__link:hover {
+  background: var(--surface-hover);
+}
+
+.notifpop__badge {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--sp-2);
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  flex-shrink: 0;
+}
+
+.notifpop__chevron {
+  margin-left: auto;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* --- Franja de club / proximo partido --- */
+.clubheader {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-7);
+  padding: 0 var(--sp-6);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.clubheader__title {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+
+.clubheader__match {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding-left: var(--sp-7);
+  border-left: 1px solid var(--border-subtle);
+  min-width: 0;
+}
+
+.clubheader__teams {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.clubheader__vs {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+
+.clubheader__meta {
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.clubheader__right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.clubheader__alert {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--sp-4);
+  background: var(--danger-subtle);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+}
+
+.clubheader__alert:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.clubheader__ready {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+}
+
+.clubheader__ready {
+  cursor: help;
+}
+
+.clubheader__ready.is-listo { color: var(--ok); }
+.clubheader__ready.is-atencion { color: var(--warn); }
+.clubheader__ready.is-incompleto { color: var(--danger); }
+
+/* 1440x900 es el objetivo (seccion 3.2); por debajo se compacta el contexto
+   en lugar de generar scroll horizontal. */
+@media (max-width: 1280px) {
+  .topbar__context {
+    gap: var(--sp-5);
+  }
+  .topbar__manager {
+    display: none;
+  }
+}
+
+@media (max-width: 1040px) {
+  .topbar,
+  .clubheader {
+    gap: var(--sp-5);
+    padding: 0 var(--sp-5);
+  }
+  /* De las metricas del contexto quedan las dos que siempre hacen falta. */
+  .topbar__metric:nth-child(n + 3) {
+    display: none;
+  }
+  .topbar__club .col {
+    display: none;
+  }
+  .clubheader__match {
+    padding-left: var(--sp-5);
+  }
+  .clubheader__meta {
+    display: none;
+  }
+}
+
+@media (max-width: 880px) {
+  .clubheader__match {
+    display: none;
+  }
+  .clubheader__alert {
+    display: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .shell {
+    grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr);
+  }
+  .sidebar__brandname,
+  .sidebar__brandmeta,
+  .sidebar__sectionlabel,
+  .sidebar__items,
+  .sidebar__foot,
+  .sidebar__chevron,
+  .sidebar__single span {
+    display: none;
+  }
+  .sidebar__brand,
+  .sidebar__single,
+  .sidebar__sectionhead {
+    justify-content: center;
+    padding: 0;
+  }
+}

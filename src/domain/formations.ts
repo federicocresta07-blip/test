@@ -131,6 +131,34 @@ export const FORMATIONS: readonly Formation[] = [
     traits: { width: 0.7, boxPresence: 0.5, boxProtection: 0.6, pressingBias: 0.65, counterBias: 0.55 },
   },
   {
+    id: '4-3-1-2',
+    name: '4-3-1-2 (rombo)',
+    slots: [
+      GK,
+      slot('LD', 0.42, 0.82),
+      slot('DFC', 0.12, 1),
+      slot('DFC', 0.12, 1),
+      slot('LI', 0.42, 0.82),
+      slot('MCD', 0.2, 0.95),
+      slot('MC', 0.45, 0.72),
+      slot('MC', 0.45, 0.72),
+      slot('MCO', 0.85, 0.35),
+      slot('DC', 0.95, 0.12),
+      slot('SD', 0.9, 0.18),
+    ],
+    modifiers: {
+      mediocampo: 3,
+      creacion: 2,
+      ataque: 0.5,
+      defensa: -1,
+      contraataque: -1.5,
+      balonParado: -1,
+      fisico: -2,
+    },
+    // El rombo no tiene amplitud natural: todo pasa por el medio.
+    traits: { width: 0.35, boxPresence: 0.6, boxProtection: 0.55, pressingBias: 0.6, counterBias: 0.45 },
+  },
+  {
     id: '4-1-4-1',
     name: '4-1-4-1',
     slots: [

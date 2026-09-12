@@ -1,0 +1,123 @@
+/*
+ * TOKENS VISUALES (secciones 15, 16).
+ *
+ * Objetivo: manager clasico de futbol + aplicacion deportiva moderna.
+ * Densidad alta, tablas legibles, jerarquia clara. Nada de gradientes,
+ * tarjetas gigantes ni estetica SaaS.
+ *
+ * Ningun componente define colores, tamanios ni espaciados propios: todo
+ * sale de aqui.
+ */
+
+:root {
+  /* --- Superficies: fondo oscuro sobrio, tipo panel de control deportivo --- */
+  --bg-base: #0e1116;
+  --bg-sunken: #0a0d11;
+  --surface-1: #151a21;
+  --surface-2: #1b2129;
+  --surface-3: #222a34;
+  --surface-hover: #26303b;
+  --surface-active: #2d3945;
+
+  /* --- Bordes --- */
+  --border-subtle: #222b35;
+  --border-default: #2c3742;
+  --border-strong: #3b4956;
+
+  /* --- Texto --- */
+  --text-primary: #e8edf3;
+  --text-secondary: #9dabba;
+  --text-muted: #6b7987;
+  --text-inverse: #0e1116;
+
+  /* --- Identidad: el acento es del producto, no del club --- */
+  --accent: #2f81f7;
+  --accent-hover: #4a92f8;
+  --accent-subtle: #16294a;
+  --accent-text: #79b0ff;
+
+  /* --- Cancha --- */
+  --pitch-grass: #1c3d28;
+  --pitch-grass-alt: #1f4430;
+  --pitch-line: #3d6b4e;
+  --pitch-slot-empty: #24402e;
+
+  /* --- Semanticos --- */
+  --ok: #3fb950;
+  --ok-subtle: #10251a;
+  --warn: #d29922;
+  --warn-subtle: #2a2213;
+  --danger: #f85149;
+  --danger-subtle: #2d1517;
+  --info: #58a6ff;
+  --info-subtle: #12233d;
+
+  /* --- Escala de ratings 1-100 (secciones 6.2, 6.3) --- */
+  --rating-elite: #3fb950;
+  --rating-great: #74c365;
+  --rating-good: #d3c022;
+  --rating-average: #d29922;
+  --rating-poor: #d4643c;
+  --rating-bad: #b5483f;
+
+  /* --- Tipografia --- */
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Mono", monospace;
+  --font-condensed: "Inter Tight", "Inter", system-ui, sans-serif;
+
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 18px;
+  --fs-2xl: 22px;
+  --fs-3xl: 28px;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --lh-tight: 1.15;
+  --lh-normal: 1.45;
+
+  /* --- Espaciado: escala de 4, densa a proposito --- */
+  --sp-0: 0;
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 20px;
+  --sp-8: 24px;
+  --sp-9: 32px;
+  --sp-10: 40px;
+
+  /* --- Radios: contenidos, nada redondeado de mas --- */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+
+  /* --- Sombras: solo para capas flotantes --- */
+  --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-drag: 0 6px 16px rgba(0, 0, 0, 0.6);
+
+  /* --- Layout del shell --- */
+  --sidebar-w: 216px;
+  --sidebar-w-collapsed: 52px;
+  --topbar-h: 52px;
+  --clubheader-h: 44px;
+  --content-max: 1560px;
+
+  --z-sticky: 10;
+  --z-drawer: 40;
+  --z-modal: 50;
+  --z-tooltip: 60;
+  --z-drag: 70;
+
+  --transition-fast: 90ms ease;
+  --transition-base: 150ms ease;
+}

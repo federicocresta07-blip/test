@@ -1,0 +1,300 @@
+/* ============================================================
+   PLANTEL (seccion 6.2)
+   ============================================================ */
+
+.squadsummary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--sp-5);
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.squadsummary__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  cursor: help;
+}
+
+.squadsummary__value {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.squadsummary__hint {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+/* --- Tabla de plantel --- */
+.squadtable {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.squadtable__filters {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.squadtable__table tbody tr.is-unavailable {
+  opacity: 0.5;
+}
+
+.squadtable__table tbody tr[draggable='true'] {
+  cursor: grab;
+}
+
+.squadtable__table tbody tr[draggable='true']:active {
+  cursor: grabbing;
+}
+
+/* --- Celdas --- */
+.postag {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  height: 17px;
+  padding: 0 var(--sp-2);
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.02em;
+}
+
+.postag--secondary {
+  color: var(--text-muted);
+  border-color: var(--border-default);
+}
+
+.playername {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.playername__number {
+  flex-shrink: 0;
+  width: 18px;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+
+.playername__text {
+  font-weight: var(--fw-medium);
+}
+
+.playername__secondary {
+  flex-shrink: 0;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.formcell {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-xs);
+  min-width: 0;
+}
+
+.formcell__arrow {
+  flex-shrink: 0;
+  font-size: 9px;
+}
+
+.energycell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 44px;
+}
+
+.energycell__value {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+
+.statuscell {
+  display: inline-flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.roletag {
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+
+.roletag--titular {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.roletag--suplente {
+  background: var(--surface-3);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+.roletag--no-convocado {
+  background: transparent;
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+}
+
+/* --- Ficha rapida (seccion 6.9) --- */
+.quickpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.quickpanel__top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
+
+.quickpanel__ovr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.quickpanel__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.outofpos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--warn-subtle);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+}
+
+.outofpos__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.outofpos__row--result {
+  padding-top: var(--sp-3);
+  border-top: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  font-weight: var(--fw-semibold);
+}
+
+.outofpos__label {
+  font-size: var(--fs-xs);
+  color: var(--warn);
+}
+
+.outofpos__delta {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.quickpanel__state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.staterow {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) 74px;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: var(--fs-sm);
+}
+
+.staterow__label {
+  color: var(--text-secondary);
+}
+
+.staterow__value {
+  text-align: right;
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.quickpanel__contract {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4) var(--sp-6);
+  padding: var(--sp-5);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+.contractcell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.contractcell__value {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.attrgroup__list {
+  margin-top: var(--sp-4);
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.attrrow {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: var(--fs-xs);
+}
+
+.attrrow__label {
+  color: var(--text-secondary);
+}
+
+.attrrow__value {
+  text-align: right;
+  font-weight: var(--fw-semibold);
+}
+
+@media (max-width: 1200px) {
+  .squadsummary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

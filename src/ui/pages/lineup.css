@@ -1,0 +1,571 @@
+/* ============================================================
+   ALINEACION (seccion 6)
+   Plantel + cancha + suplentes + acciones, todo en una pantalla.
+   ============================================================ */
+
+.lineup {
+  height: 100%;
+  min-height: 0;
+}
+
+.lineup__grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 460px) minmax(0, 1fr) minmax(220px, 260px);
+  gap: var(--sp-6);
+  align-items: start;
+  min-height: 0;
+}
+
+.lineup__squad {
+  min-width: 0;
+  border-radius: var(--radius-lg);
+  transition: box-shadow var(--transition-fast);
+}
+
+.lineup__squad.is-dropzone {
+  box-shadow: 0 0 0 2px var(--warn);
+}
+
+.lineup__squad .squadtable__table tbody {
+  max-height: none;
+}
+
+.lineup__pitchcol,
+.lineup__metricscol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  min-width: 0;
+}
+
+.formationpick {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+/* --- Cancha --- */
+.pitch {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 68 / 92;
+  min-height: 400px;
+  background: repeating-linear-gradient(
+    var(--pitch-grass) 0 24px,
+    var(--pitch-grass-alt) 24px 48px
+  );
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.pitch__lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  stroke: var(--pitch-line);
+  stroke-width: 0.55;
+  fill: none;
+  opacity: 0.85;
+}
+
+.pitch__lines .pitch__spot {
+  fill: var(--pitch-line);
+  stroke: none;
+}
+
+.pitch__slot {
+  position: absolute;
+  transform: translate(-50%, 50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.pitch__slotlabel {
+  font-size: 9px;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.pitch__chipbtn {
+  display: block;
+  border-radius: var(--radius-md);
+  cursor: grab;
+}
+
+.pitch__chipbtn:active {
+  cursor: grabbing;
+}
+
+.pitch__empty {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 50px;
+  border: 1px dashed var(--pitch-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--pitch-slot-empty) 70%, transparent);
+  color: rgba(255, 255, 255, 0.45);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.pitch__empty:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.pitch__plus {
+  font-size: var(--fs-xl);
+  line-height: 1;
+}
+
+.pitch__slot.is-droppable .pitch__empty {
+  border-color: var(--accent);
+  border-style: solid;
+}
+
+.pitch__slot.is-hover .pitch__empty,
+.pitch__slot.is-hover .chip {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.pitch__slot.is-selected .chip {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* --- Ficha de jugador --- */
+.chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 74px;
+  padding: var(--sp-2) var(--sp-2) var(--sp-3);
+  background: rgba(10, 14, 18, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  color: #fff;
+}
+
+.chip--compact {
+  width: 66px;
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+}
+
+.chip--outofposition {
+  border-color: color-mix(in srgb, var(--warn) 65%, transparent);
+}
+
+.chip__top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  width: 100%;
+}
+
+.chip__number {
+  font-size: 9px;
+  font-weight: var(--fw-bold);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.chip__natural {
+  padding: 0 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--warn) 28%, transparent);
+  color: var(--warn);
+  font-size: 8px;
+  font-weight: var(--fw-bold);
+}
+
+.chip__name {
+  width: 100%;
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.chip__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+
+.chip__ovr {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+
+.chip__delta {
+  font-size: 8px;
+  color: var(--warn);
+}
+
+.chip__statuses {
+  display: inline-flex;
+  gap: 1px;
+}
+
+.chip__statuses .status {
+  width: 11px;
+  height: 11px;
+  font-size: 7px;
+}
+
+/* --- Banco --- */
+.bench {
+  margin-top: var(--sp-5);
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.bench.is-droppable {
+  border-color: var(--accent);
+}
+
+.bench.is-hover {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.bench__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-4);
+}
+
+.bench__count {
+  font-size: var(--fs-xs);
+}
+
+.bench__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+.bench__chip {
+  position: relative;
+  border-radius: var(--radius-md);
+  cursor: grab;
+}
+
+.bench__chip:active {
+  cursor: grabbing;
+}
+
+.bench__chip.is-selected .chip {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.bench__remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 9px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  cursor: pointer;
+}
+
+.bench__chip:hover .bench__remove {
+  opacity: 1;
+}
+
+.bench__remove:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.bench__placeholder {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 44px;
+  padding: 0 var(--sp-5);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* --- Metricas del equipo (seccion 6.8) --- */
+.metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.metrics__warning {
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--warn-subtle);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  color: var(--warn);
+}
+
+.metrics__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.metricrow {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.metricrow__label {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.metricrow__value {
+  text-align: right;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+
+.metrics__secondary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-4);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.smallmetric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  cursor: help;
+}
+
+.smallmetric__value {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: 1.1;
+}
+
+/* --- Resumen de tactica --- */
+.tacticsummary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+}
+
+.tacticsummary__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  font-size: var(--fs-xs);
+}
+
+.tacticsummary__label {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.tacticsummary__value {
+  color: var(--text-primary);
+  text-align: right;
+}
+
+/* --- Panel de tactica --- */
+.tacticsform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.field__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+
+.field__hint {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  text-align: right;
+  max-width: 58%;
+}
+
+.choice {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.choice__option {
+  flex: 1;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.choice__option:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.choice__option.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.tacticsform__toggles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.toggle__track {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.toggle.is-on .toggle__track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle.is-on {
+  color: var(--text-primary);
+}
+
+.toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: var(--text-primary);
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+}
+
+.toggle.is-on .toggle__knob {
+  transform: translateX(14px);
+  background: #fff;
+}
+
+.tacticsform__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.playerselect {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.playerselect__label {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+/* --- Barra de acciones --- */
+.lineup__actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-6);
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.28);
+}
+
+.lineup__hint {
+  font-size: var(--fs-xs);
+}
+
+.saveind {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+}
+
+.saveind.is-ok { color: var(--ok); }
+.saveind.is-pending { color: var(--warn); }
+.saveind.is-error { color: var(--danger); }
+
+@media (max-width: 1400px) {
+  .lineup__grid {
+    grid-template-columns: minmax(320px, 400px) minmax(0, 1fr) minmax(200px, 230px);
+  }
+}
+
+@media (max-width: 1200px) {
+  .lineup__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .lineup__metricscol {
+    grid-column: 1 / -1;
+    flex-direction: row;
+  }
+  .lineup__metricscol > * {
+    flex: 1;
+  }
+}
