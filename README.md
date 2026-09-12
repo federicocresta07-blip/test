@@ -25,8 +25,9 @@ npm run build      # build de producción
 npm run demo       # simula un partido y muestra todo lo que el motor sabe contar
 npm run season     # 10 fechas seguidas con evolución del plantel
 npm run calibrate  # miles de partidos y distribución de resultados
+npm run clausura98 # estado del dataset histórico del Clausura 1998
 
-npm test           # 162 tests
+npm test           # 186 tests
 npm run typecheck  # motor + interfaz
 ```
 
@@ -248,6 +249,9 @@ se nota sin que un crack tape a diez jugadores flojos.
   calibración, los valores objetivo y cómo recalibrar.
 - [`docs/ui.md`](docs/ui.md) — diseño de la interfaz: estado por fases,
   decisiones de arquitectura, cómo se conecta con el motor y qué se verificó.
+- [`docs/clausura-1998.md`](docs/clausura-1998.md) — dataset histórico del
+  Torneo Clausura 1998: qué está verificado, qué falta y en qué formato
+  pasar los planteles que faltan.
 
 ## Estructura
 
@@ -265,7 +269,9 @@ src/
   calibration/                 miles de simulaciones y su informe
   presentation/                marcador, tabla de estadísticas, notas
   data/                        generador de planteles y equipos de ejemplo
+  data/clausura-1998/          dataset histórico real (ver docs/clausura-1998.md)
   ui/                          la interfaz web (ver docs/ui.md)
-tests/                         162 tests
-scripts/                       demo, temporada, calibración y humo de la UI
+tests/                         186 tests
+scripts/                       demo, temporada, calibración, dataset histórico
+                               y humo de la UI
 ```

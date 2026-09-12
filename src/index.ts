@@ -135,8 +135,32 @@ export {
 } from './calibration/simulate-many.ts';
 
 // Datos de ejemplo
-export { buildSquad, DEFAULT_SQUAD_SHAPE, type BuildSquadOptions } from './data/squad-builder.ts';
+export { attributesFor, buildSquad, DEFAULT_SQUAD_SHAPE, type BuildSquadOptions } from './data/squad-builder.ts';
 export { racingClub, riverPlate, sampleFixture } from './data/sample-teams.ts';
+
+// Dataset historico: Torneo Clausura 1998 (ver docs/clausura-1998.md)
+export {
+  allHistoricalTeams,
+  buildHistoricalTeam,
+  CLAUSURA_1998_CHAMPION,
+  CLAUSURA_1998_CLUBS,
+  CLAUSURA_1998_ROUNDS,
+  CLAUSURA_1998_SQUADS,
+  CLAUSURA_1998_TABLE,
+  CLAUSURA_1998_TOP_SCORER,
+  clausura1998Club,
+  clausura1998Squad,
+  missingSquads,
+  playableTeams,
+  squadProgress,
+  velezVsLanus,
+  type HistoricalClub,
+  type HistoricalPlayerEntry,
+  type HistoricalSquad,
+  type HistoricalStandingRow,
+  type HistoricalTeam,
+  type SquadConfidence,
+} from './data/clausura-1998/index.ts';
 
 // Presentacion (secciones 28, 50)
 export {

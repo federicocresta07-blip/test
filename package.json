@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.ui.json",
     "calibrate": "node scripts/calibrate.ts",
     "demo": "node scripts/demo.ts",
-    "season": "node scripts/season.ts"
+    "season": "node scripts/season.ts",
+    "clausura98": "node scripts/clausura-1998.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
