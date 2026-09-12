@@ -121,11 +121,14 @@ function recovery(
   restDays: number,
   minutes: number,
   staffRecovery = 0,
+  config: EngineConfig = DEFAULT_CONFIG,
 ): number {
+  const { recoveryBasePerDay, recoveryStaminaPerDay, idleRecoveryBonus } = config.progression;
   const stamina = player.attributes.resistencia;
-  const perDay = (7 + (stamina / 100) * 6) * (1 + staffRecovery / 100);
+  const perDay =
+    (recoveryBasePerDay + (stamina / 100) * recoveryStaminaPerDay) * (1 + staffRecovery / 100);
   // El que no jugo recupera mas rapido.
-  const bonus = minutes <= 0 ? 6 : 0;
+  const bonus = minutes <= 0 ? idleRecoveryBonus : 0;
   return perDay * Math.max(0, restDays) + bonus;
 }
 
@@ -156,7 +159,7 @@ export function updateAfterMatch(input: ProgressionInput): ProgressionResult {
     const fatigue = clamp(
       player.condition.fatigue +
         fatigueFromMinutes(player, line?.position ?? player.position, minutes, config) -
-        recovery(player, restDays, minutes, staff.recovery),
+        recovery(player, restDays, minutes, staff.recovery, config),
       0,
       100,
     );
@@ -272,12 +275,11 @@ export function advanceDays(
   staff: ProgressionStaffEffects = NO_STAFF_EFFECTS,
   config: EngineConfig = DEFAULT_CONFIG,
 ): Team {
-  void config;
   const players = team.players.map((player): Player => ({
     ...player,
     condition: {
       ...player.condition,
-      fatigue: clamp(player.condition.fatigue - recovery(player, days, 0, staff.recovery), 0, 100),
+      fatigue: clamp(player.condition.fatigue - recovery(player, days, 0, staff.recovery, config), 0, 100),
       sharpness: clamp(player.condition.sharpness - days * 0.4, 20, 100),
     },
     injuryDaysRemaining: Math.max(0, player.injuryDaysRemaining - days),

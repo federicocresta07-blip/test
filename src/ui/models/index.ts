@@ -13,6 +13,8 @@ import type { Position } from '../../domain/positions.ts';
 import type { Tactics } from '../../domain/tactics.ts';
 import type { FacilityId, FacilityLevel } from '../../domain/facilities.ts';
 import type { StaffLevel, StaffRole } from '../../domain/staff.ts';
+import type { MatchRecord } from '../../competition/season.ts';
+import type { SeasonTotals } from '../../competition/stats.ts';
 
 export type Division = 'Primera División' | 'Primera Nacional';
 
@@ -205,6 +207,33 @@ export type InboxMessage = {
   readonly action: { readonly label: string; readonly route: string } | null;
 };
 
+/**
+ * El torneo tal como lo ve la interfaz (seccion 13).
+ *
+ * Ni el fixture ni la tabla estan aca: los dos se derivan. Lo que si esta es
+ * lo que no se puede recalcular —los partidos jugados y los acumulados— mas
+ * en que fecha va el torneo.
+ */
+export type SeasonView = {
+  readonly seed: string;
+  /** Proxima fecha a jugar. */
+  readonly round: number;
+  readonly totalRounds: number;
+  readonly finished: boolean;
+  readonly records: readonly MatchRecord[];
+  readonly totals: SeasonTotals;
+  /** El ultimo partido del club del manager, si ya jugo alguno. */
+  readonly lastUserMatch: MatchRecord | null;
+  /**
+   * Cohesion del plantel del manager, 1..100 (seccion 39).
+   *
+   * La calcula la progresion del motor despues de cada partido y la guarda la
+   * temporada. Antes se estimaba en la interfaz a partir de la moral: eran dos
+   * fuentes de verdad para el mismo numero, y la del motor es la que manda.
+   */
+  readonly chemistry: number;
+};
+
 export type AlertSeverity = 'danger' | 'warn' | 'info';
 
 /** Alerta accionable del plantel (seccion 5.3). */
@@ -234,6 +263,7 @@ export type GameState = {
   readonly offersReceived: readonly TransferOffer[];
   readonly offersSent: readonly TransferOffer[];
   readonly inbox: readonly InboxMessage[];
+  readonly season: SeasonView;
   readonly currentRound: number;
   readonly seasonLabel: string;
   readonly today: string;
@@ -242,4 +272,4 @@ export type GameState = {
 /** Grupo de posiciones para los filtros rapidos del plantel (seccion 6.2). */
 export type PositionGroup = 'POR' | 'DEF' | 'MED' | 'ATA';
 
-export type { FacilityId, FacilityLevel, Player, Position, StaffLevel, StaffRole, Tactics };
+export type { FacilityId, FacilityLevel, MatchRecord, Player, Position, SeasonTotals, StaffLevel, StaffRole, Tactics };

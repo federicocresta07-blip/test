@@ -19,7 +19,8 @@
     "calibrate": "node scripts/calibrate.ts",
     "demo": "node scripts/demo.ts",
     "season": "node scripts/season.ts",
-    "clausura98": "node scripts/clausura-1998.ts"
+    "clausura98": "node scripts/clausura-1998.ts",
+    "torneo": "node scripts/torneo.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

@@ -11,7 +11,27 @@
 
 import type { FacilityId } from '../../domain/facilities.ts';
 import type { StaffRole } from '../../domain/staff.ts';
-import type { GameState, LineupSelection } from '../models/index.ts';
+import type { GameState, LineupSelection, MatchRecord } from '../models/index.ts';
+
+/**
+ * Lo que dejo una fecha jugada.
+ *
+ * `saveWarning` existe porque guardar puede fallar por falta de espacio en el
+ * navegador. Cuando pasa, la fecha SI se jugo: lo que no se puede prometer es
+ * que sobreviva a una recarga, y eso se dice en pantalla en lugar de
+ * esconderlo.
+ */
+export type PlayRoundReport = {
+  /** La fecha que se acaba de jugar. */
+  readonly round: number;
+  /** El partido del club del manager. `null` si no jugo esa fecha. */
+  readonly record: MatchRecord | null;
+  readonly injuries: readonly { readonly playerName: string; readonly severity: string; readonly daysOut: number }[];
+  readonly suspensions: readonly { readonly playerName: string; readonly matches: number }[];
+  /** Partidos que no se pudieron jugar, con el motivo. */
+  readonly skipped: readonly string[];
+  readonly saveWarning: string | null;
+};
 
 export type GameService = {
   /** Carga el estado completo del club que maneja el usuario. */
@@ -40,4 +60,16 @@ export type GameService = {
    * Cobra la obra y sube el mantenimiento mensual.
    */
   upgradeFacility(clubId: string, facilityId: FacilityId): Promise<void>;
+
+  /**
+   * Juega la fecha completa del torneo (secciones 13, 49).
+   *
+   * El partido del club del manager usa la alineacion elegida; los demas los
+   * resuelve la IA por el mismo motor. Devuelve lo que paso para poder
+   * mostrarlo sin volver a consultar.
+   */
+  playRound(clubId: string, selection: LineupSelection): Promise<PlayRoundReport>;
+
+  /** Vuelve a empezar el torneo desde la fecha 1. */
+  resetSeason(clubId: string): Promise<void>;
 };

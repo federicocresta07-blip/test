@@ -8,7 +8,7 @@ import { nextFixture } from '../lib/fixtures.ts';
 import { squadAlerts } from '../lib/alerts.ts';
 import { preparationStatus } from '../lib/preparation.ts';
 import { longDate } from '../lib/format.ts';
-import { findNavItem } from '../router/navigation.ts';
+import { pageTitle as titleOf } from '../router/navigation.ts';
 
 /**
  * Segunda fila del shell (seccion 3.1).
@@ -22,7 +22,7 @@ export function ClubHeader(): ReactNode {
   const fixture = nextFixture(state);
   const preparation = preparationStatus(state);
   const criticalAlerts = squadAlerts(state).filter((alert) => alert.severity === 'danger').length;
-  const pageTitle = findNavItem(path)?.label ?? 'Despacho del Manager';
+  const pageTitle = titleOf(path);
 
   return (
     <div className="clubheader">

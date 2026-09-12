@@ -1,9 +1,10 @@
 # Interfaz web — diseño y estado
 
 Prototipo de la interfaz del juego, construido sobre el master prompt de UI
-v0.2. El plan es incremental y por fases: **entregadas las fases 0, 1, 2 y
-3**. La sección 22 pedía empezar por las fases 0 a 2; el resto avanza de a
-una fase por entrega.
+v0.2. El plan es incremental y por fases: **entregadas las fases 0, 1, 2, 3 y
+7**. La sección 22 pedía empezar por las fases 0 a 2; el resto avanza de a una
+fase por entrega. La 7 se adelantó a pedido: es la que permite jugar los
+partidos, y sin ella el resto del juego no se puede probar.
 
 ---
 
@@ -15,10 +16,10 @@ una fase por entrega.
 | **1** | Despacho del Manager: próximo partido, situación del plantel, bandeja, widgets | **Entregada** |
 | **2** | Plantel y Alineación estilo PC Fútbol | **Entregada** (incluye drag & drop, ficha rápida, táctica y autoselección) |
 | **3** | Staff, desarrollo e instalaciones | **Entregada** (incluye contratación y mejora reales, y la bandeja completa) |
+| **7** | Competición y resultado de partido | **Entregada** (el torneo se juega de verdad: fixture, tabla, goleadores, ficha de partido, rivales y noticias) |
 | 4 | Inferiores, scouting y entrenamiento | Pendiente |
 | 5 | Mercado y negociaciones | Pendiente |
 | 6 | Estadio y finanzas | Pendiente |
-| 7 | Competición y resultado de partido | Pendiente |
 | 8 | Hardening y preparación para backend real | Pendiente |
 
 La pantalla de **Entrenamiento** se movió de la fase 3 a la fase 4. No es un
@@ -30,7 +31,7 @@ que las dos van juntas. Las fichas de los cuatro entrenadores por línea dicen
 "Entrenamiento, fase 4", y un test verifica que esa fase sea exactamente la
 que declara la navegación: si alguien mueve una, la otra falla.
 
-Los 15 módulos pendientes están en la navegación con su página propia, que
+Los 9 módulos pendientes están en la navegación con su página propia, que
 dice qué va a hacer y en qué fase se construye. Ninguno tiene botones que
 finjan funcionar: la página pendiente no tiene un solo botón.
 
@@ -43,7 +44,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 210 tests
+npm test           # 237 tests
 ```
 
 Requiere Node 22.18 o superior.
@@ -65,6 +66,9 @@ No hay números inventados en la interfaz. Todo lo futbolístico sale de
 | AUTOSELECCIONAR XI (§6.12) | `buildAutomaticLineup` |
 | Formaciones disponibles (§6.6) | `FORMATIONS` del motor |
 | Opciones de táctica (§6.10) | el tipo `Tactics` del motor |
+| Fortalezas de un rival (§13) | `teamStrengthOf` → `computeTeamStrength` |
+| El resultado del partido (§14) | `simulateMatch` |
+| La tabla del torneo (§13) | `buildTable` sobre los partidos jugados |
 
 La sección 6.5 pide explícitamente que la penalización por jugar fuera de
 posición venga del motor y no esté hardcodeada en el componente. Se cumple
@@ -154,8 +158,12 @@ src/ui/
     dashboard/         NextMatchCard, SquadSituation, ManagerInbox,
                        MarketWidget, FinanceWidget, DevelopmentWidget,
                        CompetitionWidget
+    match/             Scoreboard, ProjectionStrip, MatchTimeline,
+                       MatchStats, MatchRatings
   pages/               DashboardPage, SquadPage, LineupPage, StaffPage,
-                       FacilitiesPage, MessagesPage, PlaceholderPage
+                       FacilitiesPage, MessagesPage, CalendarPage,
+                       ResultsPage, TablePage, StatsPage, MatchPage,
+                       RivalsPage, NewsPage, PlaceholderPage
   data/                dataset de demostración, desacoplado de los componentes
 ```
 
@@ -164,6 +172,126 @@ src/ui/
 
 El listado de la sección 16 está completo: `StaffCard` y `UpgradeCard` se
 construyeron en la fase 3, que es cuando aparecieron sus primeros usos.
+
+---
+
+## El torneo se juega de verdad
+
+Antes de la fase 7 la tabla era esto:
+
+```ts
+const SEEDS = [
+  ['velez', 9, 3, 2, 26, 13, 'VVEVD'],
+  ['river', 8, 4, 2, 27, 14, 'VEVVD'],
+  // ...dieciocho filas más, con los puntos cuadrados a mano
+];
+```
+
+Veinte filas inventadas, con un test que verificaba que los números cerraran
+entre sí. Cerraban, pero no venían de ningún partido: jugar no las movía.
+
+Ahora **el torneo se juega**. `src/competition/` es un módulo de dominio sin
+dependencias, con tres piezas:
+
+| Pieza | Qué hace |
+|---|---|
+| `fixtures.ts` | Fixture de una vuelta por el método del círculo, determinista |
+| `table.ts` | La tabla, **calculada** desde los partidos jugados |
+| `stats.ts` | Goleadores, asistencias y notas, acumulados fecha a fecha |
+| `season.ts` | Juega la fecha completa y guarda lo que pasó |
+
+Y los veinte planteles existen: el del manager está escrito a mano en
+`data/squad.ts`, los otros diecinueve los genera `data/league.ts` con el mismo
+generador que usa la calibración del motor. **Los diez partidos de cada fecha
+pasan por `simulateMatch`** —el propio con la alineación elegida, los otros
+nueve IA contra IA, como pide la sección 49 del motor—, y de ahí sale todo lo
+demás: la tabla, los goleadores, la forma, la moral, la fatiga, las lesiones,
+las suspensiones, la cohesión y las noticias.
+
+Una temporada completa medida: 190 partidos, 2,27 goles por partido, reparto
+local-empate-visitante de 39,5% / 24,2% / 36,3%, y el goleador del torneo con
+10 goles en 19 fechas. `npm run torneo` lo corre e imprime la tabla final con
+sus controles de coherencia.
+
+### Tres bugs que encontró esta fase
+
+**Uno de la fase 7 y dos del motor.** Vale anotarlos porque los tres estaban
+escondidos detrás de algo que parecía funcionar.
+
+**1. Un club no jugó el torneo entero.** Puse `'5-4-1'` y la formación se llama
+`'4-5-1'`. El `catch` de `playRound` convertía cualquier error en "no se pudo
+simular el partido", así que Platense terminó con 0 partidos jugados y el
+síntoma no decía la causa. Dos arreglos: `createTactics` ahora **valida el id
+de formación** —falla al construir la táctica, con el listado de las
+disponibles, y no a mitad del primer partido—, y `playRound` solo atrapa
+`InsufficientPlayersError`, que es un estado legítimo del juego. Cualquier otro
+error se propaga: un bug no se degrada a "no se pudo jugar".
+
+**2. La fatiga no podía acumularse nunca.** Un partido de 95 minutos costaba
+unos 36 puntos y tres días de descanso recuperaban 42. Es decir: repetir el
+mismo once toda la temporada era gratis, y todo el sistema de fatiga y de
+profundidad del plantel (secciones 37 y 48) quedaba inerte. Peor: los números
+de la recuperación estaban **escritos a mano** dentro de
+`progression/after-match.ts`, fuera del config centralizado que pide la
+sección 52. Ahora están en `config.progression` y recalibrados:
+
+| Descanso | Fatiga que queda encima |
+|---|---|
+| 7 días | 0 (recuperado) |
+| 4 días | ~14 |
+| 3 días | ~19 |
+
+Y el calendario tiene fechas de mitad de semana a propósito —el patrón es
+`7, 7, 4, 3, …`—, de donde salen **a la vez** el día que muestra el calendario
+y los días de descanso que usa la progresión. Que los dos números vengan del
+mismo lugar es lo que hace que "el jueves y el domingo" se sienta distinto de
+"domingo a domingo". La calibración del motor no se tocó: `recovery()` vive
+solo en la progresión y no se referencia en ningún punto de `simulateMatch`,
+así que un partido suelto no puede haber cambiado.
+
+**3. Un club jugaba 16 partidos de local sobre 19.** Alternar la localía por
+paridad de la fecha —lo primero que uno escribe— no funciona: el equipo que
+queda fijo en el círculo siempre cae en la misma posición. Ahora la localía se
+asigna al que viene más necesitado, con una pasada de corrección que da vuelta
+los partidos que arreglan las dos puntas a la vez. Verificado contra 1.400
+sorteos: nadie se desvía más de un partido del reparto parejo.
+
+### Lo que se guarda y lo que se recalcula
+
+Guardar 440 jugadores completos serían varios megabytes y además quedaría
+congelado. Se guarda **solo lo que no se puede volver a calcular**:
+
+- los partidos jugados (marcador, estadísticas, goleadores, y el detalle
+  completo de los del manager);
+- el estado de cada jugador, como una tupla de seis números;
+- la cohesión de cada club.
+
+El fixture, la tabla, los planteles base, los atributos y las fechas del
+calendario se reconstruyen: son deterministas. Medido, una temporada de 19
+fechas ocupa unos **730 kB**; si el navegador se queda sin lugar,
+`writeSeason` adelgaza los partidos ajenos, reintenta una vez, y si sigue sin
+entrar **lo dice en pantalla** en lugar de perder la temporada en silencio.
+
+Hay una limitación que las pantallas declaran: las **notas y los minutos** solo
+se guardan de los partidos que dirige el manager. De un partido entre dos
+clubes de IA sabemos quién convirtió, pero no cuántos minutos jugó el resto, y
+sumar cero minutos a alguien que jugó los noventa sería peor que no sumar nada.
+Por eso la tabla de estadísticas muestra entre paréntesis sobre cuántos
+partidos se calcula cada promedio, y la de mejores notas pide un mínimo de
+tres.
+
+### La cohesión tenía dos fuentes de verdad
+
+`engine-bridge.ts` estimaba la cohesión del plantel a partir de la moral media
+y la estabilidad del once. Pero la progresión del motor **ya la calcula** después
+de cada partido (sección 39), y era ese número el que se usaba para simular. Eran
+dos valores distintos para la misma cosa, y el de la interfaz no era el que
+mandaba. Ahora `teamChemistry()` lee el de la temporada.
+
+Lo mismo con las amarillas: `ClubPlayer.yellowCards` estaba declarado en los
+datos de demostración. Ahora se cuenta del torneo, así que en la fecha 1 todos
+tienen cero —que es la verdad— y el aviso de riesgo de suspensión aparece
+cuando de verdad hay riesgo.
 
 ---
 
@@ -311,11 +439,21 @@ para correrlo. Convertirlo en tests automatizados es la fase 8.
 
 ## Lo que sigue
 
-La fase 3 está completa: staff, instalaciones, la interacción entre ambos y la
-bandeja. Lo próximo según el plan es la fase 4 (inferiores, scouting y
-entrenamiento), que empieza por el motor: hacer crecer los atributos de un
-jugador con el tiempo, que es lo que hoy falta y lo que desbloquea de una vez
-los cuatro entrenadores por línea, el entrenador juvenil y los dos ojeadores.
+Con la fase 7 el prototipo se juega: se prepara el equipo, se juega la fecha, y
+el torneo avanza con sus consecuencias. Lo próximo es la fase 4 (inferiores,
+scouting y entrenamiento), que empieza por el motor: hacer crecer los atributos
+de un jugador con el tiempo, que es lo que hoy falta y lo que desbloquea de una
+vez los cuatro entrenadores por línea, el entrenador juvenil y los dos
+ojeadores. Después la 5 (mercado), la 6 (estadio y finanzas) y la 8
+(preparación para el backend real).
+
+Dos cosas que la fase 7 deja anotadas como deuda explícita:
+
+- **La Primera Nacional no se simula.** Sus cuatro clubes existen para el
+  mercado y los ascensos, y la pantalla de tabla lo dice en lugar de mostrar
+  una tabla inventada.
+- **El torneo es de una sola vuelta** (19 fechas). Dos vueltas, copas y
+  descensos son parte de la fase 6/7 ampliada.
 
 Vale una nota sobre la fase 7: el resultado de partido ya está resuelto del
 lado del motor —`simulateMatch` devuelve marcador, eventos minuto a minuto,

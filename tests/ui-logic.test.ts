@@ -16,7 +16,13 @@ import { createTactics } from '../src/domain/tactics.ts';
 import { attributesFor } from '../src/data/squad-builder.ts';
 import { DEMO_SQUAD } from '../src/ui/data/squad.ts';
 import { clubById, CLUBS } from '../src/ui/data/clubs.ts';
-import { DEMO_TABLE, CURRENT_ROUND, DEMO_FIXTURES, SEASON_LABEL, TODAY } from '../src/ui/data/competition.ts';
+import { SEASON_LABEL } from '../src/ui/data/competition.ts';
+import { buildRoundRobin, fixturesOfClub, totalRounds } from '../src/competition/fixtures.ts';
+import { buildTable } from '../src/competition/table.ts';
+import { playRound, toPlayedMatches } from '../src/competition/season.ts';
+import { accumulateRound, topScorers } from '../src/competition/stats.ts';
+import { LEAGUE_CLUB_IDS, leagueTeams, USER_CLUB_ID } from '../src/ui/data/league.ts';
+import { restDaysBefore, seasonTable, toUiFixtures } from '../src/ui/lib/season-bridge.ts';
 import {
   DEMO_FACILITIES,
   DEMO_FINANCES,
@@ -41,6 +47,8 @@ import { preparationStatus } from '../src/ui/lib/preparation.ts';
 import { NAVIGATION, findNavItem } from '../src/ui/router/navigation.ts';
 import type { GameState, LineupSelection } from '../src/ui/models/index.ts';
 
+const TODAY = '2026-02-06';
+
 const TACTICS = createTactics({ formationId: '4-3-3' });
 
 function makeState(overrides: Partial<GameState> = {}): GameState {
@@ -62,14 +70,24 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
     vacancies: DEMO_VACANCIES,
     facilities: DEMO_FACILITIES,
     projects: DEMO_PROJECTS,
-    fixtures: DEMO_FIXTURES,
-    table: DEMO_TABLE,
+    fixtures: [],
+    table: [],
     offersReceived: DEMO_OFFERS_RECEIVED,
     offersSent: DEMO_OFFERS_SENT,
     inbox: DEMO_INBOX,
-    currentRound: CURRENT_ROUND,
+    season: {
+      seed: 'test',
+      round: 1,
+      totalRounds: 19,
+      finished: false,
+      records: [],
+      totals: {},
+      lastUserMatch: null,
+      chemistry: 74,
+    },
+    currentRound: 1,
     seasonLabel: SEASON_LABEL,
-    today: TODAY,
+    today: '2026-02-06',
   };
   return { ...base, ...overrides };
 }
@@ -100,10 +118,6 @@ test('los datos demo son coherentes entre pantallas', () => {
     assert.doesNotThrow(() => clubById(offer.fromClubId));
     assert.doesNotThrow(() => clubById(offer.toClubId));
   }
-  for (const fixture of DEMO_FIXTURES) {
-    assert.doesNotThrow(() => clubById(fixture.homeClubId));
-    assert.doesNotThrow(() => clubById(fixture.awayClubId));
-  }
   // Las rutas de los mensajes de la bandeja existen en la navegacion.
   for (const message of DEMO_INBOX) {
     if (!message.action) continue;
@@ -111,41 +125,129 @@ test('los datos demo son coherentes entre pantallas', () => {
   }
 });
 
-test('la tabla cierra como un torneo de verdad', () => {
+test('el fixture hace jugar a todos contra todos una sola vez', () => {
+  const fixtures = buildRoundRobin(LEAGUE_CLUB_IDS, 'test');
+  assert.equal(totalRounds(fixtures), LEAGUE_CLUB_IDS.length - 1);
+  assert.equal(fixtures.length, (LEAGUE_CLUB_IDS.length * (LEAGUE_CLUB_IDS.length - 1)) / 2);
+
+  // Cada club juega una vez por fecha y una sola vez contra cada rival.
+  for (const clubId of LEAGUE_CLUB_IDS) {
+    const own = fixturesOfClub(fixtures, clubId);
+    assert.equal(own.length, LEAGUE_CLUB_IDS.length - 1, `${clubId}: le faltan partidos`);
+    const rounds = new Set(own.map((fixture) => fixture.round));
+    assert.equal(rounds.size, own.length, `${clubId}: juega dos veces en la misma fecha`);
+    const rivals = new Set(
+      own.map((fixture) => (fixture.homeClubId === clubId ? fixture.awayClubId : fixture.homeClubId)),
+    );
+    assert.equal(rivals.size, own.length, `${clubId}: repite rival`);
+    assert.ok(!rivals.has(clubId), `${clubId}: juega contra si mismo`);
+
+    // Y la localia esta repartida: nadie se desvia mas de un partido del
+    // reparto parejo. Sin esta verificacion el equipo fijo de la rueda se
+    // llevaba 16 partidos de local sobre 19.
+    const home = own.filter((fixture) => fixture.homeClubId === clubId).length;
+    const expected = Math.floor(own.length / 2);
+    assert.ok(
+      home >= expected - 1 && home <= expected + 2,
+      `${clubId}: ${home} partidos de local de ${own.length}`,
+    );
+  }
+});
+
+test('el calendario no pone un partido despues de la fecha siguiente', () => {
+  const fixtures = buildRoundRobin(LEAGUE_CLUB_IDS, 'test');
+  const ui = toUiFixtures(fixtures, []);
+  const lastOf = new Map<number, string>();
+  const firstOf = new Map<number, string>();
+  for (const fixture of ui) {
+    const last = lastOf.get(fixture.round);
+    if (!last || fixture.date > last) lastOf.set(fixture.round, fixture.date);
+    const first = firstOf.get(fixture.round);
+    if (!first || fixture.date < first) firstOf.set(fixture.round, fixture.date);
+  }
+  for (let round = 1; round < totalRounds(fixtures); round += 1) {
+    assert.ok(
+      (lastOf.get(round) as string) < (firstOf.get(round + 1) as string),
+      `la fecha ${round} se solapa con la ${round + 1}`,
+    );
+  }
+});
+
+test('el patron de descanso mete fechas de mitad de semana', () => {
+  // Si todas las fechas estuvieran a siete dias, la fatiga no se acumularia
+  // nunca y rotar el plantel no tendria precio (secciones 37 y 48).
+  const gaps = Array.from({ length: 19 }, (_, index) => restDaysBefore(index + 1));
+  assert.ok(gaps.some((gap) => gap <= 4), 'el torneo tiene que tener fechas seguidas');
+  assert.ok(gaps.every((gap) => gap >= 3), 'nunca menos de tres dias entre fechas');
+});
+
+test('una fecha jugada de verdad cierra como un torneo', () => {
+  const fixtures = buildRoundRobin(LEAGUE_CLUB_IDS, 'test');
+  let teams = leagueTeams();
+  let records: ReturnType<typeof playRound>['records'] = [];
+
+  for (let round = 1; round <= 3; round += 1) {
+    const outcome = playRound({
+      fixtures,
+      round,
+      teams,
+      userClubId: USER_CLUB_ID,
+      seed: 'test',
+      restDays: restDaysBefore(round + 1),
+    });
+    assert.equal(outcome.skipped.length, 0, `fecha ${round}: hubo partidos sin jugar`);
+    assert.equal(outcome.records.length, LEAGUE_CLUB_IDS.length / 2);
+    assert.notEqual(outcome.userResult, null, 'el club del manager tiene que jugar');
+    teams = outcome.teams;
+    records = [...records, ...outcome.records];
+  }
+
+  const table = buildTable(LEAGUE_CLUB_IDS, toPlayedMatches(records), (id) => clubById(id).name);
   let goalsFor = 0;
   let goalsAgainst = 0;
   let won = 0;
   let drawn = 0;
   let lost = 0;
-  let played = 0;
 
-  for (const row of DEMO_TABLE) {
+  for (const row of table) {
     assert.equal(row.points, row.won * 3 + row.drawn, `${row.clubId}: los puntos no cierran`);
     assert.equal(row.played, row.won + row.drawn + row.lost, `${row.clubId}: los partidos no cierran`);
-    assert.equal(row.form.length, 5, `${row.clubId}: la forma tiene que ser de cinco partidos`);
+    assert.equal(row.played, 3, `${row.clubId}: jugo ${row.played} fechas de 3`);
     goalsFor += row.goalsFor;
     goalsAgainst += row.goalsAgainst;
     won += row.won;
     drawn += row.drawn;
     lost += row.lost;
-    played += row.played;
   }
 
   // En un torneo, cada victoria de alguien es la derrota de otro.
-  assert.equal(won, lost, 'las victorias del torneo tienen que igualar a las derrotas');
+  assert.equal(won, lost, 'las victorias tienen que igualar a las derrotas');
   assert.equal(drawn % 2, 0, 'los empates se cuentan dos veces: el total tiene que ser par');
   assert.equal(goalsFor, goalsAgainst, 'los goles a favor tienen que igualar a los goles en contra');
-  // Todos jugaron la misma cantidad de fechas.
-  const rounds = DEMO_TABLE[0]?.played ?? 0;
-  for (const row of DEMO_TABLE) assert.equal(row.played, rounds, `${row.clubId}: fechas distintas`);
-  assert.equal(played, DEMO_TABLE.length * rounds);
+
+  // Y la tabla viene ordenada y numerada.
+  for (let index = 1; index < table.length; index += 1) {
+    const previous = table[index - 1]!;
+    const current = table[index]!;
+    assert.ok(previous.points >= current.points, 'la tabla tiene que venir ordenada');
+    assert.equal(current.position, index + 1, 'las posiciones tienen que ser consecutivas');
+  }
+
+  // Los goleadores salen de los partidos, no de una lista.
+  const totals = accumulateRound({}, records);
+  const scorers = topScorers(totals, 5);
+  assert.ok(scorers.length > 0, 'en tres fechas alguien tuvo que convertir');
+  const totalGoals = Object.values(totals).reduce((sum, entry) => sum + entry.goals, 0);
+  assert.equal(totalGoals, goalsFor, 'los goles de los jugadores tienen que dar el total del torneo');
 });
 
-test('la tabla viene ordenada por puntos', () => {
-  for (let i = 1; i < DEMO_TABLE.length; i += 1) {
-    const previous = DEMO_TABLE[i - 1]!;
-    const current = DEMO_TABLE[i]!;
-    assert.ok(previous.points >= current.points, 'la tabla tiene que venir ordenada');
+test('la tabla de la interfaz sale de los partidos y no de un dato guardado', () => {
+  const empty = seasonTable([]);
+  assert.equal(empty.length, LEAGUE_CLUB_IDS.length);
+  for (const row of empty) {
+    assert.equal(row.played, 0);
+    assert.equal(row.points, 0);
+    assert.equal(row.form.length, 0);
   }
 });
 

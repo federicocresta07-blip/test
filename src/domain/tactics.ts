@@ -48,8 +48,18 @@ export const DEFAULT_TACTICS: Tactics = {
   setPieceFocus: false,
 };
 
+/**
+ * Arma una tactica sobre los valores por defecto.
+ *
+ * Valida la formacion: un id que no existe tiene que fallar aca, con el
+ * listado de las disponibles, y no a mitad del primer partido. Sin esta
+ * validacion un `'5-4-1'` en lugar de `'4-5-1'` deja a un club sin jugar el
+ * torneo entero y el error aparece muy lejos de donde se escribio.
+ */
 export function createTactics(overrides: Partial<Tactics> = {}): Tactics {
-  return { ...DEFAULT_TACTICS, ...overrides };
+  const tactics = { ...DEFAULT_TACTICS, ...overrides };
+  getFormation(tactics.formationId);
+  return tactics;
 }
 
 /** Perfil numerico de una tactica, ya combinada con la estructura de la formacion. */

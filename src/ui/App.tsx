@@ -11,11 +11,27 @@ import { LineupPage } from './pages/LineupPage.tsx';
 import { StaffPage } from './pages/StaffPage.tsx';
 import { FacilitiesPage } from './pages/FacilitiesPage.tsx';
 import { MessagesPage } from './pages/MessagesPage.tsx';
+import { CalendarPage } from './pages/CalendarPage.tsx';
+import { ResultsPage } from './pages/ResultsPage.tsx';
+import { TablePage } from './pages/TablePage.tsx';
+import { StatsPage } from './pages/StatsPage.tsx';
+import { MatchPage } from './pages/MatchPage.tsx';
+import { RivalsPage } from './pages/RivalsPage.tsx';
+import { NewsPage } from './pages/NewsPage.tsx';
 import { NotFoundPage, PlaceholderPage } from './pages/PlaceholderPage.tsx';
 
 /** Resuelve la pantalla que corresponde a la ruta actual. */
 function Screen(): ReactNode {
   const { path } = useRouter();
+
+  // Dos rutas llevan un id adentro: la ficha de un partido y el perfil de un
+  // club. Se parsean aca en lugar de meterle patrones al router, que para seis
+  // secciones planas no los necesita (regla de la seccion 21).
+  const match = matchParam(path, '/competicion/partido/');
+  if (match) return <MatchPage fixtureId={match} />;
+
+  const rival = matchParam(path, '/informacion/rivales/');
+  if (rival) return <RivalsPage clubId={rival} />;
 
   switch (path) {
     case '/':
@@ -34,9 +50,28 @@ function Screen(): ReactNode {
       return <FacilitiesPage />;
     case '/informacion/mensajes':
       return <MessagesPage />;
+    case '/competicion/calendario':
+      return <CalendarPage />;
+    case '/competicion/resultados':
+      return <ResultsPage />;
+    case '/competicion/tabla':
+      return <TablePage />;
+    case '/competicion/estadisticas':
+      return <StatsPage />;
+    case '/informacion/rivales':
+      return <RivalsPage />;
+    case '/informacion/noticias':
+      return <NewsPage />;
     default:
       return findNavItem(path) ? <PlaceholderPage /> : <NotFoundPage />;
   }
+}
+
+/** El segmento que sigue a un prefijo de ruta, si la ruta lo trae. */
+function matchParam(path: string, prefix: string): string | null {
+  if (!path.startsWith(prefix)) return null;
+  const rest = path.slice(prefix.length);
+  return rest.length > 0 ? rest : null;
 }
 
 export function App(): ReactNode {

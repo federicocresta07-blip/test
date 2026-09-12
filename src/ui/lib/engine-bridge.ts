@@ -21,6 +21,7 @@ import { positionalOverall, type PositionFit } from '../../ratings/position-fit.
 import type { PerformanceContext, RatedPlayer } from '../../ratings/effective-rating.ts';
 import { evaluatePerformance } from '../../ratings/effective-rating.ts';
 import { computeTeamStrength } from '../../ratings/team-strength.ts';
+import type { DimensionRatings } from '../../domain/dimensions.ts';
 import type { ClubPlayer, GameState, LineupSelection } from '../models/index.ts';
 import { energyOf } from './ratings.ts';
 
@@ -34,17 +35,15 @@ function contextFor(state: GameState): PerformanceContext {
 }
 
 /**
- * Cohesion del plantel (seccion 39 del motor / 6.8 de la UI).
- * Es un dato del club; mientras no exista backend se deriva de la moral
- * media y la estabilidad del once, y queda en un solo lugar.
+ * Cohesion del plantel.
+ *
+ * Sale de la temporada, que es donde la deja la progresion del motor despues
+ * de cada partido (seccion 39). Antes se estimaba aca a partir de la moral:
+ * eran dos numeros distintos para la misma cosa, y el de la interfaz no era
+ * el que el motor usaba para simular.
  */
 export function teamChemistry(state: GameState): number {
-  const moral =
-    state.squad.reduce((total, p) => total + p.player.condition.morale, 0) /
-    Math.max(1, state.squad.length);
-  const picked = state.lineup.starters.filter((id) => id !== null).length;
-  const completeness = picked / Math.max(1, state.lineup.starters.length);
-  return Math.round(Math.max(1, Math.min(100, moral * 0.75 + completeness * 25)));
+  return state.season.chemistry;
 }
 
 export function slotsOf(formationId: string): readonly FormationSlot[] {
@@ -177,6 +176,47 @@ export function teamMetrics(state: GameState, selection: LineupSelection): TeamM
     condicion,
     missing,
   };
+}
+
+/**
+ * Fuerza por dimensiones de cualquier equipo del torneo (seccion 30).
+ *
+ * Arma el once que el motor pondria hoy y lo evalua con el mismo
+ * `computeTeamStrength` que decide los partidos. Lo usa la pantalla de
+ * rivales: sus fortalezas no son etiquetas escritas a mano, son el calculo
+ * que se aplica cuando juegan.
+ */
+export function teamStrengthOf(
+  team: Team,
+  importance = 0.5,
+): { readonly dimensions: DimensionRatings; readonly formationId: string } {
+  const context: PerformanceContext = {
+    isHome: true,
+    importance,
+    chemistry: team.chemistry,
+  };
+  const lineup = buildAutomaticLineup(team, DEFAULT_CONFIG, context);
+  const profile = buildTacticalProfile(team.tactics);
+  const rated: RatedPlayer[] = lineup.starters.map((entry) => {
+    const performance = evaluatePerformance(
+      entry.player,
+      entry.position,
+      entry.slot,
+      profile,
+      context,
+      DEFAULT_CONFIG,
+    );
+    return {
+      player: entry.player,
+      position: entry.position,
+      slot: entry.slot,
+      performance,
+      rating: performance.expected,
+    };
+  });
+
+  const strength = computeTeamStrength(team, lineup, profile, rated, DEFAULT_CONFIG);
+  return { dimensions: strength.dimensions, formationId: team.tactics.formationId };
 }
 
 /**

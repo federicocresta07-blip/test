@@ -146,28 +146,28 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Calendario',
         path: '/competicion/calendario',
-        ready: false,
+        ready: true,
         phase: 7,
         summary: 'Fixture completo del torneo, con PREPARAR EQUIPO y JUGAR PARTIDO en cada fecha.',
       },
       {
         label: 'Resultados',
         path: '/competicion/resultados',
-        ready: false,
+        ready: true,
         phase: 7,
         summary: 'Resultados fecha por fecha con acceso a las estadísticas de cada partido.',
       },
       {
         label: 'Tabla',
         path: '/competicion/tabla',
-        ready: false,
+        ready: true,
         phase: 7,
         summary: 'Tabla completa de Primera División y Primera Nacional.',
       },
       {
         label: 'Estadísticas',
         path: '/competicion/estadisticas',
-        ready: false,
+        ready: true,
         phase: 7,
         summary: 'Goleadores, asistencias y estadísticas del torneo.',
       },
@@ -181,7 +181,7 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Noticias',
         path: '/informacion/noticias',
-        ready: false,
+        ready: true,
         phase: 7,
         summary: 'Novedades del universo: resultados, transferencias y movimientos de otros clubes.',
       },
@@ -195,7 +195,7 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Rivales',
         path: '/informacion/rivales',
-        ready: false,
+        ready: true,
         phase: 7,
         summary: 'Perfil de cada club del torneo: plantel, forma, fortalezas y debilidades.',
       },
@@ -207,6 +207,22 @@ const ALL_ITEMS = NAVIGATION.flatMap((section) => section.items);
 
 export function findNavItem(path: string): NavItem | undefined {
   return ALL_ITEMS.find((item) => item.path === path);
+}
+
+/**
+ * Nombre de la pantalla actual, para el encabezado.
+ *
+ * Las dos rutas que llevan un id adentro —la ficha de un partido y el perfil
+ * de un club— no estan en la navegacion, asi que `findNavItem` no las
+ * encuentra. Sin esto el encabezado decia "Despacho del Manager" estando en
+ * la ficha de un partido.
+ */
+export function pageTitle(path: string): string {
+  const item = findNavItem(path);
+  if (item) return item.label;
+  if (path.startsWith('/competicion/partido/')) return 'Partido';
+  if (path.startsWith('/informacion/rivales/')) return 'Rival';
+  return 'Despacho del Manager';
 }
 
 /** Cuantos modulos quedan pendientes: la sidebar lo informa sin esconderlo. */

@@ -19,6 +19,7 @@ import type { FacilityId } from '../../domain/facilities.ts';
 import type { StaffRole } from '../../domain/staff.ts';
 import type { GameState, LineupSelection } from '../models/index.ts';
 import { gameService } from '../services/index.ts';
+import type { PlayRoundReport } from '../services/types.ts';
 
 export type SaveState = 'limpio' | 'sin-guardar' | 'guardando' | 'guardado' | 'error';
 
@@ -31,6 +32,18 @@ export type InvestmentState = {
   readonly error: string | null;
   /** Lo ultimo que se hizo bien, para confirmarlo en pantalla. */
   readonly done: string | null;
+};
+
+/**
+ * Estado de la fecha que se esta jugando.
+ *
+ * `report` queda disponible despues de jugar para que la pantalla de partido
+ * pueda mostrar lo que paso sin volver a pedirlo. Se limpia con `clearRound`.
+ */
+export type RoundState = {
+  readonly playing: boolean;
+  readonly error: string | null;
+  readonly report: PlayRoundReport | null;
 };
 
 export type GameContextValue = {
@@ -50,6 +63,12 @@ export type GameContextValue = {
   readonly hireStaff: (role: StaffRole, candidateId: string, label: string) => Promise<void>;
   readonly upgradeFacility: (facilityId: FacilityId, label: string) => Promise<void>;
   readonly dismissInvestment: () => void;
+
+  /** Competicion (seccion 13). */
+  readonly round: RoundState;
+  readonly playRound: () => Promise<void>;
+  readonly clearRound: () => void;
+  readonly resetSeason: () => Promise<void>;
 };
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -65,6 +84,7 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
     error: null,
     done: null,
   });
+  const [round, setRound] = useState<RoundState>({ playing: false, error: null, report: null });
 
   useEffect(() => {
     let cancelled = false;
@@ -182,6 +202,56 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
     [],
   );
 
+  /**
+   * Juega la fecha.
+   *
+   * Guarda primero la alineacion: el partido se juega con el once que quedo
+   * confirmado, no con uno a medio editar. Despues recarga el estado, porque
+   * la fecha cambia casi todo —tabla, calendario, forma, moral, fatiga,
+   * lesiones, suspensiones, cohesion— y recomponerlo a mano seria pedir que
+   * se desincronice.
+   */
+  const playRound = useCallback(async () => {
+    if (!state) return;
+    setRound({ playing: true, error: null, report: null });
+    try {
+      await gameService.saveLineup(state.club.id, state.lineup);
+      const report = await gameService.playRound(state.club.id, state.lineup);
+      const refreshed = await gameService.loadGame();
+      setState(refreshed);
+      setSaveState('limpio');
+      setRound({ playing: false, error: null, report });
+    } catch (cause: unknown) {
+      setRound({
+        playing: false,
+        error: cause instanceof Error ? cause.message : 'No se pudo jugar la fecha',
+        report: null,
+      });
+    }
+  }, [state]);
+
+  const clearRound = useCallback(
+    () => setRound({ playing: false, error: null, report: null }),
+    [],
+  );
+
+  const resetSeason = useCallback(async () => {
+    if (!state) return;
+    setRound({ playing: true, error: null, report: null });
+    try {
+      await gameService.resetSeason(state.club.id);
+      const refreshed = await gameService.loadGame();
+      setState(refreshed);
+      setRound({ playing: false, error: null, report: null });
+    } catch (cause: unknown) {
+      setRound({
+        playing: false,
+        error: cause instanceof Error ? cause.message : 'No se pudo reiniciar el torneo',
+        report: null,
+      });
+    }
+  }, [state]);
+
   const value = useMemo<GameContextValue>(
     () => ({
       state,
@@ -197,6 +267,10 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
       hireStaff,
       upgradeFacility,
       dismissInvestment,
+      round,
+      playRound,
+      clearRound,
+      resetSeason,
     }),
     [
       state,
@@ -212,6 +286,10 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
       hireStaff,
       upgradeFacility,
       dismissInvestment,
+      round,
+      playRound,
+      clearRound,
+      resetSeason,
     ],
   );
 

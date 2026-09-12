@@ -41,24 +41,46 @@ import {
   type DevelopmentState,
   type InvestmentRecord,
 } from './development-store.ts';
-import type { ClubFacility, InboxMessage, StaffMember, StaffVacancy } from '../models/index.ts';
-import {
-  CURRENT_ROUND,
-  DEMO_FIXTURES,
-  DEMO_TABLE,
-  SEASON_LABEL,
-  TODAY,
-} from '../data/competition.ts';
+import type { ClubFacility, ClubPlayer, InboxMessage, StaffMember, StaffVacancy } from '../models/index.ts';
+import { SEASON_LABEL } from '../data/competition.ts';
 import { DEMO_OFFERS_RECEIVED, DEMO_OFFERS_SENT } from '../data/market.ts';
 import { DEMO_INBOX } from '../data/inbox.ts';
 import { staffMessages } from '../lib/staff-messages.ts';
-import type { GameService } from './types.ts';
+import { totalRounds } from '../../competition/fixtures.ts';
+import { playRound as playSeasonRound } from '../../competition/season.ts';
+import { accumulateRound } from '../../competition/stats.ts';
+import { progressionEffects, staffSpec, type StaffAssignment } from '../../domain/staff.ts';
+import { LEAGUE_CLUB_IDS, leagueTeams } from '../data/league.ts';
+import {
+  fixtureDate,
+  recordsOfClub,
+  restDaysBefore,
+  seasonFixtures,
+  seasonTable,
+  tableMood,
+  toUiFixtures,
+  toUiTable,
+} from '../lib/season-bridge.ts';
+import {
+  emptySeason,
+  readSeason,
+  restoreTeams,
+  snapshotChemistry,
+  snapshotConditions,
+  withCondition,
+  writeSeason,
+  type SeasonSave,
+} from './season-store.ts';
+import type { GameService, PlayRoundReport } from './types.ts';
 
 /** Aviso visible en la interfaz: estos datos no son un dataset oficial. */
 export const DEMO_DATA_NOTICE =
   'Datos de demostración: los clubes son reales, los jugadores y los números son inventados.';
 
 const CLUB_ID = 'river';
+
+/** Cohesion con la que arranca el plantel antes de jugar nada. */
+export const INITIAL_CHEMISTRY = 74;
 const LINEUP_STORAGE_KEY = 'manager:lineup:v1';
 
 const DEFAULT_TACTICS_DEMO = createTactics({
@@ -191,16 +213,87 @@ function record(
  * Los derivados se recalculan en cada carga, asi que despues de mejorar una
  * instalacion el mensaje del profesional que estaba limitado ya no aparece.
  */
-function composeInbox(development: DevelopmentState): readonly InboxMessage[] {
+function composeInbox(development: DevelopmentState, today: string): readonly InboxMessage[] {
   const derived = staffMessages(
     composeStaff(development),
     composeVacancies(development),
     composeFacilities(development),
-    TODAY,
+    today,
   );
   return [...DEMO_INBOX, ...derived]
     .map((message) => (readMessages.has(message.id) ? { ...message, unread: false } : message))
     .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+
+/**
+ * El cuerpo tecnico en la forma que consume la progresion del plantel.
+ *
+ * Es lo que hace que el staff de la fase 3 se aplique de verdad cuando se
+ * juega una fecha: el preparador fisico acelera la recuperacion, el medico
+ * acorta las lesiones y el psicologo levanta la moral.
+ */
+function progressionStaff(development: DevelopmentState): ReturnType<typeof progressionEffects> {
+  const facilities = composeFacilities(development);
+  const levelOf = (facilityId: FacilityId): FacilityLevel =>
+    facilities.find((facility) => facility.id === facilityId)?.level ?? 1;
+
+  const assignments: StaffAssignment[] = composeStaff(development).map((member) => ({
+    role: member.role,
+    level: member.level,
+    facilityLevel: levelOf(staffSpec(member.role).facility),
+  }));
+
+  return progressionEffects(assignments);
+}
+
+/**
+ * El dia de hoy.
+ *
+ * No es un dato guardado: es el dia de la fecha que se viene. Asi el
+ * calendario, la bandeja y el encabezado avanzan solos al jugar, en lugar de
+ * quedarse clavados en una fecha escrita a mano.
+ */
+function todayOf(save: SeasonSave, rounds: number): string {
+  return fixtureDate(Math.min(save.round, Math.max(1, rounds)), 0).date;
+}
+
+/**
+ * El plantel del manager con el estado de la temporada aplicado.
+ *
+ * Sin esto, jugar una fecha no se veria en ningun lado: el plantel seguiria
+ * mostrando la forma, la moral y la fatiga con las que arranco. Los atributos
+ * y los datos de gestion (dorsal, contrato, valor) salen de `squad.ts`; lo que
+ * cambia partido a partido sale de la temporada guardada.
+ *
+ * Las amarillas tambien: se cuentan del torneo, no se declaran. Por eso en la
+ * fecha 1 todos tienen cero, que es la verdad, y el aviso de riesgo de
+ * suspension aparece cuando de verdad hay riesgo.
+ */
+function composeSquad(save: SeasonSave): readonly ClubPlayer[] {
+  return DEMO_SQUAD.map((entry) => ({
+    ...entry,
+    player: withCondition(entry.player, save.conditions[entry.player.id]),
+    yellowCards: save.totals[entry.player.id]?.yellowCards ?? 0,
+  }));
+}
+
+/** La temporada como la ve la interfaz. */
+function composeSeason(save: SeasonSave): GameState['season'] {
+  const fixtures = seasonFixtures(save.seed);
+  const rounds = totalRounds(fixtures);
+  const own = recordsOfClub(save.records, CLUB_ID);
+
+  return {
+    seed: save.seed,
+    round: save.round,
+    totalRounds: rounds,
+    finished: save.round > rounds,
+    records: save.records,
+    totals: save.totals,
+    lastUserMatch: own[0] ?? null,
+    chemistry: save.chemistry[CLUB_ID] ?? INITIAL_CHEMISTRY,
+  };
 }
 
 export function createMockGameService(): GameService {
@@ -208,6 +301,10 @@ export function createMockGameService(): GameService {
     async loadGame(): Promise<GameState> {
       const club = clubById(CLUB_ID);
       const development = readDevelopment();
+      const save = readSeason();
+      const fixtures = seasonFixtures(save.seed);
+      const table = seasonTable(save.records);
+      const today = todayOf(save, totalRounds(fixtures));
       return {
         manager: {
           id: 'mgr-1',
@@ -217,21 +314,22 @@ export function createMockGameService(): GameService {
         },
         club,
         clubs: CLUBS,
-        squad: DEMO_SQUAD,
+        squad: composeSquad(save),
         lineup: readStoredLineup() ?? initialLineup(),
         finances: composeFinances(development),
         staff: composeStaff(development),
         vacancies: composeVacancies(development),
         facilities: composeFacilities(development),
         projects: DEMO_PROJECTS,
-        fixtures: DEMO_FIXTURES,
-        table: DEMO_TABLE,
+        fixtures: toUiFixtures(fixtures, save.records),
+        table: toUiTable(table),
         offersReceived: DEMO_OFFERS_RECEIVED,
         offersSent: DEMO_OFFERS_SENT,
-        inbox: composeInbox(development),
-        currentRound: CURRENT_ROUND,
+        inbox: composeInbox(development, today),
+        season: composeSeason(save),
+        currentRound: save.round,
         seasonLabel: SEASON_LABEL,
-        today: TODAY,
+        today,
       };
     },
 
@@ -346,6 +444,83 @@ export function createMockGameService(): GameService {
           { facilityLevels: { ...development.facilityLevels, [facilityId]: nextLevel } },
         ),
       );
+    },
+    /**
+     * Juega la fecha completa (secciones 13, 49).
+     *
+     * Los diez partidos pasan por el mismo motor. El del manager con la
+     * alineacion que eligio; los otros nueve, IA contra IA. Despues se guarda
+     * lo que paso y el estado en que quedaron los planteles.
+     */
+    async playRound(_clubId: string, selection: LineupSelection): Promise<PlayRoundReport> {
+      const save = readSeason();
+      const fixtures = seasonFixtures(save.seed);
+      const rounds = totalRounds(fixtures);
+      if (save.round > rounds) {
+        throw new Error('El torneo ya terminó. Podés empezar uno nuevo desde el calendario.');
+      }
+
+      // Los planteles base son deterministas; encima se les aplica el estado
+      // con el que quedaron de la fecha anterior.
+      const base = leagueTeams(selection.tactics, save.chemistry[CLUB_ID] ?? INITIAL_CHEMISTRY);
+      const teams = restoreTeams(base, save);
+
+      const table = seasonTable(save.records);
+      const position = table.findIndex((row) => row.clubId === CLUB_ID) + 1;
+
+      const outcome = playSeasonRound({
+        fixtures,
+        round: save.round,
+        teams,
+        userClubId: CLUB_ID,
+        // La alineacion elegida por el manager. Los huecos vacios los
+        // completa el motor con su propia autoseleccion.
+        userLineup: {
+          starterIds: selection.starters.filter((id): id is string => id !== null),
+          benchIds: selection.bench,
+        },
+        seed: save.seed,
+        // Los mismos dias que muestra el calendario. Que estos dos numeros
+        // salgan del mismo lugar es lo que hace que "el jueves y el domingo"
+        // se sienta distinto de "domingo a domingo".
+        restDays: restDaysBefore(save.round + 1),
+        staff: progressionStaff(readDevelopment()),
+        ...(position > 0 ? { tableMood: tableMood(position, LEAGUE_CLUB_IDS.length) } : {}),
+      });
+
+      const next: SeasonSave = {
+        ...save,
+        round: save.round + 1,
+        records: [...save.records, ...outcome.records],
+        totals: accumulateRound(save.totals, outcome.records),
+        conditions: snapshotConditions(outcome.teams),
+        chemistry: snapshotChemistry(outcome.teams),
+      };
+      const written = writeSeason(next);
+
+      return {
+        round: save.round,
+        record: outcome.records.find((record) => record.userMatch) ?? null,
+        injuries: outcome.injuries.map((injury) => ({
+          playerName: injury.playerName,
+          severity: injury.severity,
+          daysOut: injury.daysOut,
+        })),
+        suspensions: outcome.suspensions.map((entry) => ({
+          playerName: entry.playerName,
+          matches: entry.matches,
+        })),
+        skipped: outcome.skipped.map((entry) => entry.reason),
+        saveWarning: written.saved
+          ? written.trimmed
+            ? 'Guardamos la temporada, pero hubo que dejar de lado el detalle de los partidos que no jugaste: el navegador se estaba quedando sin lugar.'
+            : null
+          : (written.error ?? 'No se pudo guardar la temporada.'),
+      };
+    },
+
+    async resetSeason(_clubId: string): Promise<void> {
+      writeSeason(emptySeason());
     },
   };
 }

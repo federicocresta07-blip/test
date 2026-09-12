@@ -302,6 +302,29 @@ export type EngineConfig = {
     readonly refereeBias: number;
   };
 
+  /**
+   * EVOLUCION DEL PLANTEL ENTRE PARTIDOS (secciones 35 a 39).
+   *
+   * Estaba escrito a mano dentro de `progression/after-match.ts`, lo que
+   * ademas de violar la seccion 52 escondia un problema de balance: un
+   * partido de 95 minutos costaba unos 36 puntos de fatiga y tres dias de
+   * descanso recuperaban 42, asi que la fatiga no podia acumularse nunca y
+   * rotar el plantel no servia para nada. La fase 7 lo destapo: un torneo con
+   * fechas de mitad de semana no le costaba nada al mismo once.
+   *
+   * La referencia para calibrar: un titular tiene que terminar el torneo
+   * fundido si juega TODO, y llegar entero si se lo cuida. Una semana completa
+   * recupera del todo; tres o cuatro dias, no.
+   */
+  readonly progression: {
+    /** Recuperacion diaria de un jugador con resistencia 0. */
+    readonly recoveryBasePerDay: number;
+    /** Recuperacion diaria extra de un jugador con resistencia 100. */
+    readonly recoveryStaminaPerDay: number;
+    /** Recuperacion extra de un dia para el que no jugo. */
+    readonly idleRecoveryBonus: number;
+  };
+
   /** Notas individuales del partido (seccion 50). */
   readonly ratings: {
     readonly base: number;
@@ -491,6 +514,19 @@ export const DEFAULT_CONFIG: EngineConfig = {
     performanceBonus: 0.9,
     xgMultiplier: 1.055,
     refereeBias: 0.9,
+  },
+
+  progression: {
+    // Con estos numeros, y un partido de 95 minutos que cuesta unos 37 puntos
+    // a un jugador de resistencia media:
+    //   7 dias -> recuperado del todo, tambien el de menos resistencia
+    //   4 dias -> queda con unos 14 puntos encima
+    //   3 dias -> queda con unos 19
+    // Es lo que hace que la profundidad del plantel (seccion 48) tenga precio:
+    // con fechas de mitad de semana, repetir el mismo once se paga.
+    recoveryBasePerDay: 3.2,
+    recoveryStaminaPerDay: 3.7,
+    idleRecoveryBonus: 6,
   },
 
   ratings: {

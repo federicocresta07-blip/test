@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Panel } from '../components/ui/Panel.tsx';
-import { findNavItem } from '../router/navigation.ts';
+import { findNavItem, pendingModuleCount } from '../router/navigation.ts';
 import { useRouter } from '../router/router.tsx';
 
 /**
@@ -21,9 +21,11 @@ export function PlaceholderPage(): ReactNode {
           <h2 className="placeholder__title">Este módulo todavía no está construido</h2>
           {item?.summary && <p className="placeholder__summary">{item.summary}</p>}
           <p className="placeholder__note">
-            El plan de implementación es incremental y por fases. Esta entrega cubre la fase 0
-            (fundaciones y shell), la fase 1 (Despacho del Manager) y la estructura de la fase 2
-            (Plantel y Alineación). El resto se construye después, en orden.
+            El plan de implementación es incremental y por fases. Están entregadas las fases 0
+            (fundaciones y shell), 1 (Despacho del Manager), 2 (Plantel, Alineación y Táctica), 3
+            (Staff, Instalaciones y Bandeja) y 7 (Competición: se juegan los partidos y de ahí
+            salen la tabla, los goleadores y las noticias). Quedan {pendingModuleCount()} módulos,
+            cada uno con su página como esta.
           </p>
         </div>
       </Panel>

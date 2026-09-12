@@ -5,10 +5,9 @@ import { ClubBadge } from '../ClubBadge.tsx';
 import { Link } from '../../router/router.tsx';
 import { useGameState } from '../../state/GameProvider.tsx';
 import { clubById } from '../../data/clubs.ts';
-import { DEMO_LAST_ROUND } from '../../data/competition.ts';
 import { outcomeFor, recentFixtures, tablePosition } from '../../lib/fixtures.ts';
 import { shortDate } from '../../lib/format.ts';
-import type { LeagueRow } from '../../models/index.ts';
+import type { Fixture, GameState, LeagueRow } from '../../models/index.ts';
 
 /**
  * COMPETICION (secciones 5.5, 13).
@@ -21,6 +20,7 @@ export function CompetitionWidget(): ReactNode {
   const position = tablePosition(state, state.club.id);
   const rows = windowAround(state.table, position - 1, 5);
   const own = recentFixtures(state, 3);
+  const lastRound = lastRoundElsewhere(state);
 
   return (
     <Panel
@@ -96,22 +96,39 @@ export function CompetitionWidget(): ReactNode {
         </ul>
       </div>
 
-      <div className="lastresults">
-        <span className="label">Fecha {DEMO_LAST_ROUND[0]?.round ?? ''} en la división</span>
-        <ul>
-          {DEMO_LAST_ROUND.slice(1, 4).map((fixture) => (
-            <li key={fixture.id} className="resultrow">
-              <span className="truncate secondary">
-                {clubById(fixture.homeClubId).shortName} — {clubById(fixture.awayClubId).shortName}
-              </span>
-              <span className="tnum resultrow__score">
-                {fixture.score?.home}-{fixture.score?.away}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {/* Lo que paso en el resto de la division en la ultima fecha jugada.
+          Son partidos de verdad: los jugo la IA con el mismo motor. */}
+      {lastRound.length > 0 && (
+        <div className="lastresults">
+          <span className="label">Resto de la fecha {lastRound[0]?.round}</span>
+          <ul>
+            {lastRound.slice(0, 4).map((fixture) => (
+              <li key={fixture.id} className="resultrow">
+                <span className="truncate secondary">
+                  {clubById(fixture.homeClubId).shortName} — {clubById(fixture.awayClubId).shortName}
+                </span>
+                <span className="tnum resultrow__score">
+                  {fixture.score?.home}-{fixture.score?.away}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </Panel>
+  );
+}
+
+/** Los otros partidos de la ultima fecha jugada, sin el del club propio. */
+function lastRoundElsewhere(state: GameState): readonly Fixture[] {
+  const round = state.season.round - 1;
+  if (round < 1) return [];
+  return state.fixtures.filter(
+    (fixture) =>
+      fixture.round === round &&
+      fixture.score !== null &&
+      fixture.homeClubId !== state.club.id &&
+      fixture.awayClubId !== state.club.id,
   );
 }
 

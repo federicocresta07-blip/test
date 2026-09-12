@@ -3,7 +3,7 @@ import { Panel } from '../ui/Panel.tsx';
 import { Button } from '../ui/Button.tsx';
 import { ClubBadge } from '../ClubBadge.tsx';
 import { Link } from '../../router/router.tsx';
-import { useGameState } from '../../state/GameProvider.tsx';
+import { useGame, useGameState } from '../../state/GameProvider.tsx';
 import { clubById } from '../../data/clubs.ts';
 import { nextFixture, tablePosition, tableRow } from '../../lib/fixtures.ts';
 import { preparationStatus } from '../../lib/preparation.ts';
@@ -19,14 +19,24 @@ import type { LeagueRow } from '../../models/index.ts';
  */
 export function NextMatchCard(): ReactNode {
   const state = useGameState();
+  const { round, playRound, clearRound } = useGame();
   const fixture = nextFixture(state);
 
   if (!fixture) {
     return (
       <Panel title="Próximo partido">
         <EmptyState
-          title="No hay partidos programados"
-          detail="El calendario del torneo se implementa en la fase 7 del plan."
+          title={state.season.finished ? 'El torneo terminó' : 'No hay partidos programados'}
+          detail={
+            state.season.finished
+              ? `Se jugaron las ${state.season.totalRounds} fechas. Desde el calendario podés empezar un torneo nuevo.`
+              : 'No encontramos el próximo partido del club en el fixture.'
+          }
+          action={
+            <Link to="/competicion/calendario">
+              <Button variant="primary">Ir al calendario</Button>
+            </Link>
+          }
         />
       </Panel>
     );
@@ -80,16 +90,58 @@ export function NextMatchCard(): ReactNode {
               </ul>
             )}
           </div>
-          <Link to="/equipo/alineacion">
-            <Button variant="primary" size="lg">
-              Preparar equipo
+          <div className="matchcard__ctas">
+            <Link to="/equipo/alineacion">
+              <Button variant="ghost" size="lg">
+                Preparar equipo
+              </Button>
+            </Link>
+            <Button
+              variant="primary"
+              size="lg"
+              disabled={round.playing}
+              onClick={() => void playRound()}
+            >
+              {round.playing ? 'Jugando…' : 'Jugar el partido'}
             </Button>
-          </Link>
+          </div>
         </div>
 
+        {round.error && (
+          <div className="investbanner investbanner--error" role="alert">
+            <span className="investbanner__text">{round.error}</span>
+            <Button size="sm" variant="ghost" onClick={clearRound}>
+              Entendido
+            </Button>
+          </div>
+        )}
+
+        {round.report?.record && (
+          <div className="roundreport" role="status">
+            <div className="roundreport__head">
+              <span className="roundreport__title">
+                Se jugó la fecha {round.report.round}:{' '}
+                {clubById(round.report.record.homeClubId).shortName} {round.report.record.homeGoals}
+                {' - '}
+                {round.report.record.awayGoals}{' '}
+                {clubById(round.report.record.awayClubId).shortName}
+              </span>
+              <Link
+                to={`/competicion/partido/${round.report.record.fixtureId}`}
+                onNavigate={clearRound}
+              >
+                <Button size="sm" variant="primary">
+                  Ver el partido
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+
         <p className="matchcard__note muted">
-          El partido se resuelve con el motor de simulación, sin representación 2D ni 3D. Jugarlo y
-          ver el resultado corresponde a la fase 7 del plan.
+          El partido se resuelve con el motor de simulación, sin representación 2D ni 3D: el
+          resultado se explica con las estadísticas, el minuto a minuto y las notas. Al jugar la
+          fecha también se resuelven los otros nueve partidos, IA contra IA, con el mismo motor.
         </p>
       </div>
     </Panel>
