@@ -13,4 +13,4 @@
  * calendario, en `lib/season-bridge.ts`.
  */
 
-export const SEASON_LABEL = 'Temporada 2026 · Liga Profesional';
+export const SEASON_LABEL = 'Torneo Apertura 1998 · Primera División';

@@ -5,7 +5,7 @@ import { Badge } from './ui/Badge.tsx';
 import { Tooltip } from './ui/Tooltip.tsx';
 import { Link } from '../router/router.tsx';
 import { useGameState } from '../state/GameProvider.tsx';
-import { DEMO_DATA_NOTICE } from '../services/index.ts';
+import { DATA_SOURCE_LABEL, DATA_SOURCE_NOTICE } from '../services/index.ts';
 import { moneyShort, shortDate } from '../lib/format.ts';
 import { squadAlerts } from '../lib/alerts.ts';
 
@@ -55,8 +55,8 @@ export function TopBar(): ReactNode {
       </div>
 
       <div className="topbar__right">
-        <Tooltip content={DEMO_DATA_NOTICE} side="bottom">
-          <Badge tone="warn">Datos demo</Badge>
+        <Tooltip content={DATA_SOURCE_NOTICE} side="bottom">
+          <Badge tone="accent">{DATA_SOURCE_LABEL}</Badge>
         </Tooltip>
 
         <button

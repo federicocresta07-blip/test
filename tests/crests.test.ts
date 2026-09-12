@@ -55,14 +55,16 @@ test('un club sin escudo no pide ningun archivo', () => {
   }
 });
 
-test('los veinte de Primera tienen escudo real', () => {
-  // La linea es explicita: Primera completa, Primera Nacional con el dibujado.
-  // Si algun dia entra un club de Primera sin escudo, este test lo dice.
+test('los clubes de Primera sin escudo son exactamente los que no estan en la fuente', () => {
+  // La linea no es "todos los de Primera tienen escudo": Ferro Carril Oeste y
+  // Gimnasia de Jujuy no estan en la carpeta de AFA del repo de origen, y eso
+  // se declara en lugar de dibujarles uno parecido. El test fija la lista para
+  // que si algun dia aparecen, o si se pierde otro, salte aca.
   const primera = CLUBS.filter((club) => club.division !== 'Primera Nacional');
-  const sinEscudo = primera.filter((club) => !CLUBS_WITH_CREST.has(club.id));
-  assert.deepEqual(
-    sinEscudo.map((club) => club.name),
-    [],
-    'todos los clubes de Primera tienen que tener escudo real',
-  );
+  const sinEscudo = primera
+    .filter((club) => !CLUBS_WITH_CREST.has(club.id))
+    .map((club) => club.id)
+    .sort();
+  assert.deepEqual(sinEscudo, ['ferro', 'jujuy']);
+  assert.equal(primera.length, 20, 'el Apertura 98 se juega con veinte clubes');
 });

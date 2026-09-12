@@ -39,7 +39,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 299 tests
+npm test           # 310 tests
 ```
 
 Requiere Node 22.18 o superior.
@@ -640,9 +640,10 @@ Siguiendo la sección 19:
   el prototipo. Desde la ingesta de escudos, los **veinte de Primera llevan su
   escudo oficial**; los cuatro de la Primera Nacional siguen con el badge
   dibujado con iniciales y colores institucionales. Ver más abajo.
-- **Los jugadores son inventados.** No representan a futbolistas reales.
-- **Todo está marcado como demo** con una insignia visible en la barra
-  superior.
+- **Los jugadores ya NO son inventados.** Los 462 del torneo salen de
+  `EQ003003.PKF`; ver la sección siguiente. Esta parte de la sección 19 dejó de
+  aplicar a propósito, y el cartel de la barra superior cambió para no declarar
+  inventado un dato que es real.
 
 Los datos son coherentes entre pantallas y hay tests que lo verifican: las
 ofertas apuntan a jugadores que existen en el plantel, las rutas de los
@@ -650,6 +651,119 @@ mensajes de la bandeja existen en la navegación, y la tabla cierra como un
 torneo de verdad (las victorias igualan a las derrotas, los empates son un
 número par y los goles a favor igualan a los goles en contra). Ese último
 test también salió de un error real en los datos escritos a mano.
+
+---
+
+## El juego se juega con los planteles reales del Apertura 98
+
+Hasta acá el prototipo tenía **jugadores inventados**: el plantel del manager
+estaba escrito a mano y los diecinueve rivales se generaban con niveles
+elegidos a dedo. Ya no. Los veinte planteles salen de `EQ003003.PKF`, el
+archivo de equipos de PC Apertura 6.0 — **462 jugadores** con sus nombres,
+dorsales, fechas de nacimiento y los diez atributos que guarda el juego.
+
+River arranca con Burgos en el arco, Sorín y Berizzo en el fondo, Astrada y
+Gallardo en el medio, y Aimar de 18 y Saviola de 16 en el plantel. Boca con
+Córdoba, Bermúdez, Samuel, Riquelme de 20 y Palermo.
+
+Cómo se extrajo está en [`docs/pcf_data_format.md`](pcf_data_format.md); acá
+va sólo lo que hizo falta para que el motor los pueda jugar.
+
+### Diez atributos contra veintinueve
+
+PC Fútbol guarda diez atributos por jugador; el motor usa veintinueve. Así que
+**diez se toman del archivo sin tocarlos** y **diecinueve se derivan**:
+
+| Del archivo, sin tocar | Derivado de |
+|---|---|
+| `velocidad`, `resistencia`, `agresividad` | — |
+| `tecnica` ← calidad | `vision`, `decisiones`, `trabajoEquipo`, `control` |
+| `regate`, `paseCorto` ← pase | `centros`, `paseLargo` |
+| `definicion` ← remate | `penales` |
+| `remate` ← tiro | `tirosLibres` |
+| `quite` y `marcaje` ← entradas | `posicionamiento`, `concentracion` (en puestos defensivos) |
+| `reflejos` ← portero | `manos`, `achique`, `saque` |
+
+`pcf-bridge.ts` declara atributo por atributo cuál es cuál, y un test verifica
+que la lista cubra exactamente los veintinueve del motor: si mañana se agrega
+un atributo al motor y nadie dice de dónde sale, el test lo dice.
+
+### Cómo se verifica que el mapeo no deforma a nadie
+
+Con dos fórmulas que no se conocen entre sí. El motor calcula su overall por
+puesto con veintinueve pesos; PC Fútbol calcula su media con cuatro atributos.
+Si el mapeo estuviera mal, los dos números se despegarían.
+
+En los 409 jugadores de campo: **r = 0,85** y un sesgo global de −1,6 puntos.
+
+### Los arqueros divergen, y la culpa es del juego original
+
+Con los arqueros la correlación cae a 0,66, y no es el mapeo: **la media de PC
+Fútbol no incluye el atributo `portero`**. Es `(velocidad + resistencia +
+agresividad + calidad) / 4`, así que para un arquero mide todo menos lo único
+que importa de su puesto. En el archivo hay arqueros con media 62 y `portero`
+19.
+
+Eso se prueba **sin que el motor intervenga**: la correlación entre la media de
+PC Fútbol y su propio atributo `portero`, entre los 143 arqueros del archivo,
+ya es floja de por sí. El test lo afirma y avisa si algún día sube.
+
+El overall del motor, que sí es por puesto, es el número correcto ahí. Chilavert
+queda 91 por su `portero` 90, no a pesar de él.
+
+### Diecinueve roles contra once puestos
+
+El archivo guarda hasta **seis roles** por jugador, de una tabla de diecinueve.
+Eso mapea bien a los once puestos del motor, y los roles secundarios se
+conservan como posiciones alternativas: un lateral que el PKF marca también
+como central no juega fuera de puesto ahí.
+
+Riquelme trae `medio centro organizador, interior derecho, interior izquierdo,
+centrocampista izquierda, centrocampista derecha, media punta por el centro` →
+**MC con MCO secundaria**.
+
+Con una excepción deliberada: **el arco no se mezcla con la cancha.** Tres de
+los 143 arqueros del archivo traen un rol de campo en el segundo slot —Burgos y
+Costanzo figuran como laterales izquierdos además de arqueros—. Tomarlo literal
+habilita al motor a poner a Burgos de lateral sin penalización, que es un bug
+de juego disfrazado de fidelidad al dato. Se filtra en las dos direcciones.
+
+### Las tácticas también son las del archivo
+
+El PKF guarda por club el porcentaje de toque, el de contragolpe, el tipo de
+ataque, el tipo de entradas, el marcaje, los despejes y la presión. Los siete
+mapean casi uno a uno a la táctica del motor, así que **los rivales juegan como
+jugaban**.
+
+La **formación** no: está dentro del bloque de "táctica definida" de 264 bytes,
+que no se decodificó. Se elige por la forma **real** del plantel —cuántos
+centrales, cuántos volantes, cuántos delanteros tiene cada club—, que sí es
+dato. No es la formación histórica, pero tampoco un número elegido a dedo.
+
+La **reputación** sale de los socios y la capacidad del estadio, que están en
+el archivo: River con 63.000 socios y 76.687 de aforo pesa distinto que
+Platense con 7.500 y 12.657.
+
+### Lo que sigue siendo nuestro, y está declarado
+
+| Dato | De dónde sale |
+|---|---|
+| Valor de mercado y salario | los calcula `domain/market.ts`: el formato no los guarda |
+| Forma, moral y fatiga iniciales | derivadas de una semilla fija por jugador; son estado de partida, no historia |
+| Contrato | uno solo para todos, porque PC Fútbol no guarda contratos |
+| Cohesión | la misma para los veinte clubes |
+| Colores institucionales y siglas | el formato PKF no los guarda |
+| Lesiones y sanciones | no existen en el formato: el plantel arranca sano |
+
+### El cartel de la barra superior decía una mentira nueva
+
+Decía **"Datos demo: los clubes son reales, los jugadores y los números son
+inventados"**. Era cierto mientras el plantel se generaba; desde que sale del
+archivo, dejarlo así sería mentir en la dirección contraria: declarar inventado
+un dato que es real.
+
+Ahora dice **"PC Apertura 98"** y al pasar el mouse explica la frontera: qué
+sale del archivo y qué calcula este juego.
 
 ---
 
@@ -718,7 +832,7 @@ interfaz.
 
 ## Verificación
 
-**Tests automatizados** (`npm test`, 299 en total):
+**Tests automatizados** (`npm test`, 310 en total):
 
 - `tests/ui-logic.test.ts` — el puente con el motor, las alertas derivadas,
   el estado de preparación, la autoselección, el cambio de formación sin
@@ -729,6 +843,11 @@ interfaz.
 - `tests/crests.test.ts` — que el manifiesto de escudos no se desincronice de
   los clubes: ningún id inventado, ningún club en las dos listas ni en
   ninguna, y el archivo de cada escudo declarado existe.
+- `tests/pcf-bridge.test.ts` — el puente con los datos del Apertura 98: que el
+  mapeo cubra los 29 atributos del motor declarando el origen de cada uno, que
+  el overall siga a la media original en los jugadores de campo, que ningún
+  atributo derivado se salga de escala, que el arco no se mezcle con la cancha
+  y que el mapeo sea determinista.
 - `tests/season.test.ts` — el fixture, la tabla y las estadísticas del torneo.
 - `tests/staff.test.ts` — entre otras cosas, el test de **honestidad**: un rol
   no puede declararse `implementado` sin un consumidor real que se mueva, y la

@@ -18,8 +18,15 @@ import { clubById } from '../data/clubs.ts';
 import { LEAGUE_CLUB_IDS } from '../data/league.ts';
 import type { Fixture, LeagueRow } from '../models/index.ts';
 
-/** Primera fecha del torneo. */
-export const SEASON_START = '2026-02-06';
+/**
+ * Primera fecha del torneo.
+ *
+ * El Torneo Apertura 1998 arranco a fines de agosto del 98 y termino en
+ * diciembre. Antes esto decia febrero de 2026, que era coherente con el
+ * dataset inventado; con los planteles de EQ003003.PKF, un Apertura jugandose
+ * en mayo no cerraba.
+ */
+export const SEASON_START = '1998-08-28';
 
 /** Horarios tipicos del futbol argentino, repartidos por partido. */
 const KICKOFFS = ['15:30', '17:00', '18:15', '19:00', '20:00', '21:30'] as const;

@@ -8,5 +8,5 @@ import type { GameService } from './types.ts';
 
 export const gameService: GameService = createMockGameService();
 
-export { DEMO_DATA_NOTICE } from './mockGameService.ts';
+export { DEMO_DATA_NOTICE, DATA_SOURCE_NOTICE, DATA_SOURCE_LABEL } from './mockGameService.ts';
 export type { GameService } from './types.ts';

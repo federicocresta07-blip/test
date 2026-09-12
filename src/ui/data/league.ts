@@ -1,84 +1,169 @@
 /**
- * LOS PLANTELES DE TODO EL TORNEO (secciones 13, 19, 49).
+ * LOS PLANTELES DE TODO EL TORNEO — Apertura 1998.
  *
- * Para que la tabla sea de verdad hacen falta veinte planteles, no uno. El
- * del club del manager esta escrito a mano en `squad.ts`; los otros
- * diecinueve se generan con el mismo generador que usa la calibracion del
- * motor, y despues juegan IA contra IA por el mismo `simulateMatch`.
+ * Los veinte planteles son REALES: salen de `EQ003003.PKF`, el archivo de
+ * equipos de PC Apertura 6.0, con sus 462 jugadores, sus dorsales y los diez
+ * atributos que guarda el juego. Antes los diecinueve rivales se generaban
+ * con niveles inventados; ya no hace falta inventar nada.
  *
- * Todo es determinista: el mismo club da siempre el mismo plantel, con los
- * mismos nombres y los mismos atributos. Eso es lo que permite guardar una
- * temporada sin guardar 440 jugadores.
+ * Las TACTICAS tambien son las del archivo. El PKF guarda por club el
+ * porcentaje de toque, el de contragolpe, el tipo de ataque, el tipo de
+ * entradas, el marcaje, los despejes y la presion, y todo eso mapea a la
+ * tactica del motor. Asi que los rivales juegan como jugaban.
  *
- * LOS NIVELES SON INVENTADOS. No son un ranking de los clubes reales: son
- * numeros elegidos para que el torneo tenga candidatos, mitad de tabla y
- * promedios flojos, que es lo que hace que la competencia se sienta. La
- * interfaz lo marca como dato demo en todas las pantallas.
+ * La FORMACION no se pudo sacar del archivo: esta dentro del bloque de
+ * "tactica definida" de 264 bytes, que no se decodifico. Se elige a partir de
+ * la forma REAL del plantel —cuantos centrales, cuantos volantes, cuantos
+ * delanteros tiene cada club— que si es dato. No es la formacion historica,
+ * pero tampoco es un numero elegido a dedo.
+ *
+ * La COHESION no existe en PC Futbol y se le pone la misma a todos.
  */
 
-import { createPlayer, type Player } from '../../domain/player.ts';
+import type { Player } from '../../domain/player.ts';
 import { createTactics, type Tactics } from '../../domain/tactics.ts';
 import { createTeam, type Team } from '../../domain/team.ts';
-import { buildSquad } from '../../data/squad-builder.ts';
 import { CLUBS, clubById } from './clubs.ts';
 import { DEMO_SQUAD } from './squad.ts';
-import { uniqueNames } from './names.ts';
-
-/** El club que dirige el manager. Su plantel no se genera. */
-export const USER_CLUB_ID = 'river';
+import {
+  APERTURA98_CLUBS,
+  apertura98Club,
+  apertura98Squad,
+  type Apertura98Club,
+} from '../../data/apertura98.ts';
+import { playerFromApertura98 } from '../../data/pcf-bridge.ts';
+import { overallForPosition } from '../../ratings/overall.ts';
 
 type Setup = {
   readonly clubId: string;
-  /** Overall aproximado del once inicial. */
+  /** Overall real del once mas fuerte del plantel del archivo. */
   readonly target: number;
   readonly chemistry: number;
   readonly tactics: Tactics;
 };
 
-function setup(
-  clubId: string,
-  target: number,
-  chemistry: number,
-  formationId: string,
-  overrides: Partial<Parameters<typeof createTactics>[0]> = {},
-): Setup {
-  return {
-    clubId,
-    target,
-    chemistry,
-    tactics: createTactics({ formationId, ...overrides }),
-  };
+/** El club que dirige el manager. */
+export const USER_CLUB_ID = 'river';
+
+/**
+ * La cohesion, igual para todos.
+ *
+ * PC Futbol no guarda nada parecido a la cohesion de un plantel, asi que
+ * cualquier reparto por club seria invento. Un valor unico es la unica opcion
+ * que no fabrica una diferencia que no existe en la fuente.
+ */
+const PCF_CHEMISTRY = 70;
+
+/**
+ * La formacion, elegida por la forma real del plantel.
+ *
+ * El PKF guarda un bloque de "tactica definida" de 264 bytes que no se
+ * decodifico, asi que la formacion historica no esta disponible. Lo que si es
+ * dato son los puestos de los 462 jugadores, y de ahi sale una formacion que
+ * el plantel puede cubrir: un club con cinco centrales y dos delanteros no
+ * juega igual que uno con tres delanteros.
+ */
+function formationForSquad(players: readonly Player[]): string {
+  const count = (positions: readonly string[]): number =>
+    players.filter((p) => positions.includes(p.position)).length;
+  const forwards = count(['DC', 'SD']);
+  const wingers = count(['ED', 'EI']);
+  const attackingMids = count(['MCO']);
+  const holders = count(['MCD']);
+  const centreBacks = count(['DFC']);
+
+  if (centreBacks >= 7 && forwards <= 3) return '5-3-2';
+  if (forwards >= 5 && wingers >= 3) return '4-3-3';
+  if (wingers >= 4 && attackingMids >= 2) return '4-2-3-1';
+  if (attackingMids >= 4) return '4-3-1-2';
+  if (holders >= 3) return '4-1-4-1';
+  if (forwards <= 2) return '4-5-1';
+  return '4-4-2';
 }
 
 /**
- * Los diecinueve rivales.
+ * La tactica del club, traducida del PKF.
  *
- * Las tacticas estan repartidas a proposito entre las nueve formaciones y los
- * distintos estilos: si todos jugaran igual, el sistema de cruces tacticos
- * (seccion 32) no tendria nada que cruzar y el torneo seria una comparacion de
- * overalls.
+ * Los siete bytes de tactica de equipo del archivo mapean casi uno a uno a la
+ * tactica del motor. Lo unico que no tiene equivalente directo es el marcaje
+ * (zona u hombre), que el motor no modela como opcion separada.
  */
-const RIVALS: readonly Setup[] = [
-  setup('boca', 82, 76, '4-3-3', { mentality: 'ofensiva', pressing: 'alta', attackFocus: 'centro' }),
-  setup('velez', 81, 78, '4-2-3-1', { passingStyle: 'posesion', tempo: 'lento' }),
-  setup('racing', 80, 70, '4-4-2', { mentality: 'ofensiva', attackFocus: 'bandas', width: 'ancho' }),
-  setup('independiente', 79, 66, '4-2-3-1', { pressing: 'media' }),
-  setup('talleres', 78, 74, '4-1-4-1', { pressing: 'alta', tempo: 'rapido' }),
-  setup('sanlorenzo', 77, 68, '4-4-2', { mentality: 'equilibrada' }),
-  setup('estudiantes', 77, 72, '4-3-1-2', { passingStyle: 'posesion', attackFocus: 'centro' }),
-  setup('lanus', 76, 71, '4-3-3', { passingStyle: 'posesion', tempo: 'lento' }),
-  setup('rosario', 75, 64, '4-2-3-1', { mentality: 'equilibrada' }),
-  setup('huracan', 74, 69, '5-3-2', { mentality: 'defensiva', counterAttack: true, defensiveLine: 'baja' }),
-  setup('newells', 74, 66, '4-4-2', { attackFocus: 'bandas' }),
-  setup('argentinos', 73, 73, '4-1-4-1', { passingStyle: 'posesion' }),
-  setup('belgrano', 73, 62, '4-4-2', { passingStyle: 'directo', attackFocus: 'bandas' }),
-  setup('defensa', 72, 75, '4-3-3', { pressing: 'alta', mentality: 'equilibrada' }),
-  setup('gimnasia', 71, 60, '5-3-2', { mentality: 'defensiva', counterAttack: true }),
-  setup('tigre', 70, 64, '4-4-2', { passingStyle: 'directo', tempo: 'rapido' }),
-  setup('banfield', 70, 67, '4-1-4-1', { mentality: 'defensiva', defensiveLine: 'baja' }),
-  setup('platense', 68, 61, '4-5-1', { mentality: 'defensiva', counterAttack: true, defensiveLine: 'baja' }),
-  setup('godoycruz', 67, 58, '4-4-2', { mentality: 'defensiva', passingStyle: 'directo' }),
-];
+function tacticsFromPcf(club: Apertura98Club, formationId: string): Tactics {
+  const t = club.tactics;
+  const toque = t.toque ?? 50;
+  const counter = t.contragolpe ?? 0;
+
+  return createTactics({
+    formationId,
+    // Tipo de ataque del archivo: ofensivo, especulativo o mixto.
+    mentality:
+      t.ataque === 'ofensivo' ? 'ofensiva' : t.ataque === 'especulativo' ? 'defensiva' : 'equilibrada',
+    // Presion: propio (baja), medio (media), rival (alta).
+    pressing: t.presion === 'rival' ? 'alta' : t.presion === 'propio' ? 'baja' : 'media',
+    // Entradas: suave, media o agresiva.
+    aggression: t.entradas === 'agresiva' ? 'alta' : t.entradas === 'suave' ? 'baja' : 'media',
+    // Porcentaje de toque: mucho toque es posesion, poco es juego directo.
+    passingStyle: toque >= 70 ? 'posesion' : toque <= 55 ? 'directo' : 'mixto',
+    tempo: toque >= 70 ? 'lento' : toque <= 55 ? 'rapido' : 'equilibrado',
+    // Despejes largos empujan la linea atras.
+    defensiveLine: t.despejes === 'largo' ? 'baja' : 'media',
+    counterAttack: counter >= 55,
+  });
+}
+
+/** El once mas fuerte que permite el plantel, como medida del nivel del club. */
+function squadStrength(players: readonly Player[]): number {
+  const best = players
+    .map((p) => overallForPosition(p.attributes, p.position))
+    .sort((a, b) => b - a)
+    .slice(0, 11);
+  if (best.length === 0) return 60;
+  return Math.round(best.reduce((total, value) => total + value, 0) / best.length);
+}
+
+/**
+ * La reputacion del club, derivada de sus socios y su estadio.
+ *
+ * Los dos numeros estan en el archivo. El motor usa la reputacion para la
+ * presion del partido, no para decidir el resultado, asi que lo que importa
+ * es el orden relativo: River con 63.000 socios y 76.687 de capacidad pesa
+ * distinto que Platense con 7.500 y 12.657.
+ */
+function reputationFromClub(club: Apertura98Club): number {
+  const members = club.members ?? 2000;
+  const capacity = club.capacity ?? 15000;
+  const scale = Math.log10(Math.max(members, 100)) * 12 + Math.log10(Math.max(capacity, 1000)) * 8;
+  return Math.max(10, Math.min(95, Math.round(scale * 1.35 - 45)));
+}
+
+const SQUAD_CACHE = new Map<string, readonly Player[]>();
+
+function squadFor(clubId: string): readonly Player[] {
+  const cached = SQUAD_CACHE.get(clubId);
+  if (cached) return cached;
+  const players = apertura98Squad(clubId).map((raw) => playerFromApertura98(raw, clubId));
+  SQUAD_CACHE.set(clubId, players);
+  return players;
+}
+
+/**
+ * Los diecinueve rivales, armados desde el archivo.
+ *
+ * Ya no hay lista escrita a mano: los clubes, sus planteles, sus tacticas y
+ * su nivel salen todos de `apertura98.ts`.
+ */
+const RIVALS: readonly Setup[] = APERTURA98_CLUBS.filter((club) => club.id !== USER_CLUB_ID).map(
+  (club) => {
+    const players = squadFor(club.id);
+    const formationId = formationForSquad(players);
+    return {
+      clubId: club.id,
+      target: squadStrength(players),
+      chemistry: PCF_CHEMISTRY,
+      tactics: tacticsFromPcf(club, formationId),
+    };
+  },
+);
 
 export const LEAGUE_SETUP: readonly Setup[] = RIVALS;
 
@@ -88,23 +173,9 @@ export const LEAGUE_CLUB_IDS: readonly string[] = [
   ...RIVALS.map((entry) => entry.clubId),
 ];
 
-/** El plantel generado de un rival, con nombres inventados y estables. */
+/** El plantel real del rival, del archivo del juego. */
 function rivalSquad(entry: Setup): readonly Player[] {
-  const raw = buildSquad({
-    target: entry.target,
-    prefix: entry.clubId,
-    seed: `plantel:${entry.clubId}`,
-  });
-  const names = uniqueNames(raw.length, `nombres:${entry.clubId}`);
-
-  return raw.map((player, index) =>
-    createPlayer({
-      ...player,
-      name: names[index] as string,
-      attributes: player.attributes,
-      condition: player.condition,
-    }),
-  );
+  return squadFor(entry.clubId);
 }
 
 function rivalTeam(entry: Setup): Team {
@@ -116,9 +187,7 @@ function rivalTeam(entry: Setup): Team {
     players: rivalSquad(entry),
     chemistry: entry.chemistry,
     tactics: entry.tactics,
-    // La reputacion escala con el nivel del plantel: el motor la usa para la
-    // presion del partido, no para decidir el resultado.
-    reputation: Math.round((entry.target - 55) * 2.4),
+    reputation: reputationFromClub(apertura98Club(entry.clubId)),
   });
 }
 
@@ -142,7 +211,7 @@ export function userTeam(
     players: [...DEMO_SQUAD.map((entry) => entry.player), ...extra],
     chemistry,
     ...(tactics ? { tactics } : {}),
-    reputation: 78,
+    reputation: reputationFromClub(apertura98Club(USER_CLUB_ID)),
   });
 }
 

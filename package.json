@@ -22,7 +22,9 @@
     "clausura98": "node scripts/clausura-1998.ts",
     "torneo": "node scripts/torneo.ts",
     "crests": "node scripts/crests.mjs",
-    "import:planteles": "node scripts/import-squads.mjs"
+    "import:planteles": "node scripts/import-squads.mjs",
+    "apertura98": "node scripts/gen-apertura98.mjs",
+    "single": "npm run build && node scripts/single-html.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

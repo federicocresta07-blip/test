@@ -23,34 +23,36 @@ import { join } from 'node:path';
 // nuestro es el de Tucuman. Adivinarlo por nombre pondria el escudo de otro
 // club, que es un error que nadie notaria hasta verlo en pantalla.
 const MAPPING = {
+  // --- Los veinte de Primera del Apertura 98 ---
   boca: '001_Boca Juniors',
   river: '002_River Plate',
   argentinos: '004_Argentinos Juniors',
-  banfield: '006_Banfield',
   belgrano: '008_Belgrano',
-  defensa: '010_Defensa y Justicia',
+  colon: '031_Colón',
   estudiantes: '012_Estudiantes',
   gimnasia: '013_Gimnasia LP',
-  godoycruz: '014_Godoy Cruz',
   huracan: '015_Huracán',
   independiente: '016_Independiente',
   lanus: '019_Lanús',
   newells: "020_Newell's",
   platense: '021_Platense',
   racing: '022_Racing',
-  rosario: '023_Rosario Central',
+  central: '023_Rosario Central',
   sanlorenzo: '024_San Lorenzo',
   talleres: '027_Talleres',
-  tigre: '028_Tigre',
+  union: '029_Unión',
   velez: '030_Vélez',
+  // --- Del ascenso, que existen como club aunque su torneo no se simule ---
+  tigre: '028_Tigre',
 };
 
 /** Clubes que a proposito NO tienen escudo real, con el motivo. */
 const DELIBERATELY_MISSING = {
+  ferro: 'Ferro Carril Oeste no está en la carpeta de AFA del repo de origen',
+  jujuy: 'Gimnasia y Esgrima de Jujuy no está en el repo de origen',
+  quilmes: 'no está en la carpeta de AFA del repo de origen',
+  atlanta: 'no está en la carpeta de AFA del repo de origen',
   sanmartin: 'el repo de origen tiene el San Martín de San Juan, no el de Tucumán',
-  ferro: 'no está en el repo de origen',
-  atlanta: 'no está en el repo de origen',
-  quilmes: 'no está en el repo de origen',
 };
 
 /**

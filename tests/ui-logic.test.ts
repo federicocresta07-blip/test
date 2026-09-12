@@ -280,7 +280,11 @@ test('la navegacion no tiene rutas repetidas y toda ruta tiene fase', () => {
 // --- Puente con el motor (seccion 6.5) ---
 
 test('el overall efectivo baja al jugar fuera de posicion, y lo calcula el motor', () => {
-  const striker = DEMO_SQUAD.find((entry) => entry.player.id === 'riv-9')!;
+  // Se elige por PUESTO, no por id. El plantel sale de EQ003003.PKF y los ids
+  // cambian si se regenera desde otro archivo; el mejor delantero del plantel
+  // existe siempre.
+  const striker = DEMO_SQUAD.filter((entry) => entry.player.position === 'DC')
+    .sort((a, b) => naturalOverall(b.player) - naturalOverall(a.player))[0]!;
   const asStriker = overallInSlot(striker.player, 'DC');
   const asCentreBack = overallInSlot(striker.player, 'DFC');
 
@@ -294,11 +298,18 @@ test('el overall efectivo baja al jugar fuera de posicion, y lo calcula el motor
 });
 
 test('una posicion secundaria casi no penaliza en la interfaz', () => {
-  // Peralta es LD con ED como secundaria.
-  const fullBack = DEMO_SQUAD.find((entry) => entry.player.id === 'riv-4')!;
-  const asWinger = overallInSlot(fullBack.player, 'ED');
-  assert.equal(asWinger.label, 'secundaria');
-  assert.ok(asWinger.effective >= asWinger.natural - 4, 'la secundaria tiene que costar poco');
+  // Las posiciones secundarias salen de los seis roles que guarda el archivo:
+  // un lateral que el PKF marca tambien como central las tiene. Se toma el
+  // primero que tenga alguna.
+  const versatile = DEMO_SQUAD.find((entry) => entry.player.secondaryPositions.length > 0);
+  assert.ok(versatile, 'el plantel del archivo tiene que traer alguna posición secundaria');
+  const slot = versatile.player.secondaryPositions[0]!;
+  const inSecondary = overallInSlot(versatile.player, slot);
+  assert.equal(inSecondary.label, 'secundaria');
+  assert.ok(
+    inSecondary.effective >= inSecondary.natural - 4,
+    'la secundaria tiene que costar poco',
+  );
 });
 
 // --- Metricas del equipo (seccion 6.8) ---
@@ -327,11 +338,17 @@ test('cambiar un titular por un suplente peor baja las metricas', () => {
   const state = withProposedLineup();
   const before = teamMetrics(state, state.lineup);
 
-  // Se reemplaza al mejor delantero por un juvenil.
-  const strikerSlot = state.lineup.starters.findIndex((id) => id === 'riv-9');
-  assert.ok(strikerSlot >= 0, 'el 9 tiene que estar en el once propuesto');
+  // Se reemplaza al mejor titular por el peor jugador que quedo afuera.
+  const byId = new Map(DEMO_SQUAD.map((entry) => [entry.player.id, entry]));
+  const bestStarter = state.lineup.starters
+    .filter((id): id is string => id !== null)
+    .sort((a, b) => naturalOverall(byId.get(b)!.player) - naturalOverall(byId.get(a)!.player))[0]!;
+  const worstOutside = DEMO_SQUAD.filter((entry) => !state.lineup.starters.includes(entry.player.id))
+    .sort((a, b) => naturalOverall(a.player) - naturalOverall(b.player))[0]!;
+  const strikerSlot = state.lineup.starters.indexOf(bestStarter);
+  assert.ok(strikerSlot >= 0);
   const starters = [...state.lineup.starters];
-  starters[strikerSlot] = 'riv-28';
+  starters[strikerSlot] = worstOutside.player.id;
   const after = teamMetrics(state, { ...state.lineup, starters });
 
   assert.ok(after.ataque < before.ataque, `ataque ${before.ataque} -> ${after.ataque}`);
@@ -413,13 +430,36 @@ test('cambiar de formacion respeta al arquero', () => {
 // --- Alertas y preparacion (secciones 5.2, 5.3) ---
 
 test('las alertas detectan lesionados, suspendidos y ofertas', () => {
-  const state = withProposedLineup();
+  // El plantel del archivo arranca sano y sin ofertas: PC Futbol no guarda
+  // lesiones ni sanciones, y las ofertas las genera el mercado al jugar la
+  // primera fecha. Las tres condiciones se construyen aca, porque lo que se
+  // prueba es la deteccion y no el contenido del dataset.
+  const base = withProposedLineup();
+  const squad = base.squad.map((entry, index) => {
+    if (index === 0) return { ...entry, player: { ...entry.player, injuryDaysRemaining: 9 } };
+    if (index === 1) {
+      return { ...entry, player: { ...entry.player, suspensionMatchesRemaining: 1 } };
+    }
+    return entry;
+  });
+  const offer = {
+    id: 'test-1',
+    playerId: squad[3]!.player.id,
+    playerName: squad[3]!.player.name,
+    fromClubId: 'boca',
+    toClubId: 'river',
+    amount: 5_000_000,
+    status: 'enviada' as const,
+    expiresInDays: 3,
+    counterpartIsHuman: false,
+  };
+  const state = { ...base, squad, offersReceived: [offer] };
   const alerts = squadAlerts(state);
   const ids = alerts.map((alert) => alert.id);
 
-  assert.ok(ids.includes('injured'), 'hay un lesionado en el plantel demo');
-  assert.ok(ids.includes('suspended'), 'hay un suspendido en el plantel demo');
-  assert.ok(ids.includes('offers'), 'hay ofertas pendientes');
+  assert.ok(ids.includes('injured'), 'tiene que detectar al lesionado');
+  assert.ok(ids.includes('suspended'), 'tiene que detectar al suspendido');
+  assert.ok(ids.includes('offers'), 'tiene que detectar la oferta pendiente');
 
   // Toda alerta lleva a una ruta que existe.
   for (const alert of alerts) {
@@ -457,9 +497,18 @@ test('la preparacion avisa cuando la alineacion esta incompleta', () => {
 });
 
 test('la preparacion detecta titulares no disponibles', () => {
-  const state = withProposedLineup();
+  // PC Futbol no guarda lesiones, asi que el plantel del archivo arranca sano.
+  // El lesionado se construye aca: lo que se prueba es la deteccion, no que el
+  // dataset traiga a alguien lesionado.
+  const base = withProposedLineup();
+  const injuredId = base.lineup.starters[10] as string;
+  const squad = base.squad.map((entry) =>
+    entry.player.id === injuredId
+      ? { ...entry, player: { ...entry.player, injuryDaysRemaining: 12 } }
+      : entry,
+  );
+  const state = { ...base, squad };
   const starters = [...state.lineup.starters];
-  starters[10] = 'riv-15'; // lesionado
   const preparation = preparationStatus({ ...state, lineup: { ...state.lineup, starters } });
   assert.equal(preparation.level, 'incompleto');
   assert.ok(preparation.issues.some((issue) => issue.includes('no disponible')));
@@ -494,12 +543,26 @@ test('un equipo listo no tiene observaciones', () => {
 
 // --- Coherencia con el motor ---
 
-test('el plantel demo tiene el overall que declara', () => {
-  const expected: Record<string, number> = { 'riv-9': 87, 'riv-8': 84, 'riv-1': 84, 'riv-25': 62 };
-  for (const [id, overall] of Object.entries(expected)) {
-    const entry = DEMO_SQUAD.find((item) => item.player.id === id)!;
-    assert.equal(naturalOverall(entry.player), overall, entry.player.name);
+test('el plantel sale del archivo del juego, no de datos inventados', () => {
+  // Antes este test comparaba el overall del motor contra un overall declarado
+  // a mano en `squad.ts`. Ya no hay overall declarado: el plantel sale de
+  // EQ003003.PKF. Lo que se verifica ahora es esa procedencia y que el mapeo de
+  // los diez atributos de PC Futbol a los veintinueve del motor no deforme a
+  // los jugadores.
+  assert.ok(DEMO_SQUAD.length >= 20, 'el plantel del archivo tiene que estar completo');
+  for (const entry of DEMO_SQUAD) {
+    assert.ok(
+      entry.player.id.startsWith('pcf-river-'),
+      `${entry.player.name} no viene del archivo: ${entry.player.id}`,
+    );
+    const overall = naturalOverall(entry.player);
+    assert.ok(overall >= 1 && overall <= 100, `${entry.player.name}: overall ${overall}`);
   }
+
+  // Hay nombres reales del Apertura 98, con sus acentos decodificados.
+  const names = DEMO_SQUAD.map((entry) => entry.player.name).join(' | ');
+  assert.ok(names.includes('BURGOS'), 'Burgos tiene que estar en el plantel de River');
+  assert.ok(!names.includes('<'), 'ningún nombre puede traer bytes sin decodificar');
 });
 
 test('el plantel demo alcanza para cualquier formacion', () => {

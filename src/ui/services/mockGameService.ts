@@ -43,7 +43,7 @@ import {
 } from './development-store.ts';
 import type { ClubFacility, ClubPlayer, InboxMessage, StaffMember, StaffVacancy } from '../models/index.ts';
 import { SEASON_LABEL } from '../data/competition.ts';
-import { DEMO_OFFERS_RECEIVED, DEMO_OFFERS_SENT } from '../data/market.ts';
+import { offersFromMarket } from '../data/market.ts';
 import { DEMO_INBOX } from '../data/inbox.ts';
 import { staffMessages } from '../lib/staff-messages.ts';
 import { totalRounds } from '../../competition/fixtures.ts';
@@ -98,9 +98,26 @@ import {
 } from './season-store.ts';
 import type { GameService, OfferOutcome, PlayRoundReport } from './types.ts';
 
-/** Aviso visible en la interfaz: estos datos no son un dataset oficial. */
-export const DEMO_DATA_NOTICE =
-  'Datos de demostración: los clubes son reales, los jugadores y los números son inventados.';
+/**
+ * Aviso visible en la interfaz, y ahora dice otra cosa.
+ *
+ * Decia "los jugadores y los numeros son inventados", que era cierto mientras
+ * el plantel se generaba. Desde que sale de EQ003003.PKF ya no lo es, y dejar
+ * el cartel viejo seria mentir en la direccion contraria: declarar inventado
+ * un dato que es real.
+ *
+ * Lo que el cartel tiene que seguir marcando es la frontera: que sale del
+ * archivo del juego y que es nuestro.
+ */
+export const DATA_SOURCE_NOTICE =
+  'Jugadores, dorsales, atributos y tácticas extraídos de EQ003003.PKF (PC Apertura 6.0, 1998). ' +
+  'El valor, el salario, la forma y la moral los calcula este juego: el formato original no los guarda.';
+
+/** Nombre corto de la fuente, para el cartel de la barra superior. */
+export const DATA_SOURCE_LABEL = 'PC Apertura 98';
+
+/** @deprecated Se mantiene el nombre viejo para no romper importaciones. */
+export const DEMO_DATA_NOTICE = DATA_SOURCE_NOTICE;
 
 const CLUB_ID = 'river';
 
@@ -700,8 +717,10 @@ export function createMockGameService(): GameService {
         projects: DEMO_PROJECTS,
         fixtures: toUiFixtures(fixtures, save.records),
         table: toUiTable(table),
-        offersReceived: DEMO_OFFERS_RECEIVED,
-        offersSent: DEMO_OFFERS_SENT,
+        // Se derivan de las ofertas reales del mercado, no de una lista
+        // escrita a mano: una sola fuente de verdad.
+        offersReceived: offersFromMarket(save.offers ?? [], CLUB_ID).received,
+        offersSent: offersFromMarket(save.offers ?? [], CLUB_ID).sent,
         inbox: composeInbox(development, today),
         season: composeSeason(save),
         youth: composeYouth(development, save),

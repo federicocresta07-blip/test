@@ -1,53 +1,63 @@
 /**
- * DATOS DE DEMOSTRACION — clubes (seccion 19).
+ * LOS CLUBES DEL TORNEO — Apertura 1998.
  *
- * Los nombres de los clubes son reales porque son instituciones publicas y
- * sirven para que el prototipo se sienta creible. Todo lo demas (planteles,
- * finanzas, tabla) es INVENTADO y esta marcado como demo en la interfaz.
+ * Ya no son datos de demostracion: los veinte clubes de Primera, sus nombres
+ * largos, sus estadios y sus capacidades salen de `EQ003003.PKF`, el archivo
+ * de equipos de PC Apertura 6.0, via `src/data/apertura98.ts`.
+ *
+ * Lo unico que NO sale del archivo son los colores institucionales y las
+ * siglas del badge: el formato PKF no los guarda. Estan declarados en el
+ * generador y son dato nuestro.
+ *
+ * Los cuatro clubes de la Primera Nacional son entradas de club sin plantel.
+ * Existen para el mercado y los ascensos; su torneo no se simula, y la
+ * pantalla de tabla lo dice.
  */
 
 import type { Club } from '../models/index.ts';
+import { APERTURA98_CLUBS } from '../../data/apertura98.ts';
 
-function club(
-  id: string,
-  name: string,
-  shortName: string,
-  badge: string,
-  primaryColor: string,
-  secondaryColor: string,
-  stadiumName: string,
-  division: Club['division'] = 'Primera División',
-): Club {
-  return { id, name, shortName, badge, primaryColor, secondaryColor, division, stadiumName };
-}
+/** Los veinte de Primera, derivados del archivo del juego. */
+const PRIMERA: readonly Club[] = APERTURA98_CLUBS.map((club) => ({
+  id: club.id,
+  name: club.name,
+  shortName: club.shortName,
+  badge: club.badge,
+  primaryColor: club.primaryColor,
+  secondaryColor: club.secondaryColor,
+  division: 'Primera División' as const,
+  stadiumName: club.stadium ?? 'Estadio sin nombre en el archivo',
+}));
 
-export const CLUBS: readonly Club[] = [
-  club('river', 'River Plate', 'RIV', 'CARP', '#e2001a', '#ffffff', 'Estadio Más Monumental'),
-  club('boca', 'Boca Juniors', 'BOC', 'CABJ', '#0a3c8c', '#f2c500', 'La Bombonera'),
-  club('racing', 'Racing Club', 'RAC', 'RC', '#6cace4', '#ffffff', 'El Cilindro'),
-  club('independiente', 'Independiente', 'IND', 'CAI', '#d9202a', '#ffffff', 'Libertadores de América'),
-  club('sanlorenzo', 'San Lorenzo', 'SLO', 'CASLA', '#0d2c6b', '#c8102e', 'Nuevo Gasómetro'),
-  club('velez', 'Vélez Sarsfield', 'VEL', 'CAV', '#0b3c8d', '#ffffff', 'José Amalfitani'),
-  club('estudiantes', 'Estudiantes', 'EST', 'EDLP', '#e2001a', '#ffffff', 'Jorge Luis Hirschi'),
-  club('huracan', 'Huracán', 'HUR', 'CAH', '#e2001a', '#ffffff', 'Tomás Adolfo Ducó'),
-  club('lanus', 'Lanús', 'LAN', 'CAL', '#7b2033', '#ffffff', 'La Fortaleza'),
-  club('argentinos', 'Argentinos Juniors', 'ARG', 'AAAJ', '#e2001a', '#ffffff', 'Diego Maradona'),
-  club('talleres', 'Talleres', 'TAL', 'CAT', '#0b3c8d', '#ffffff', 'Mario Alberto Kempes'),
-  club('belgrano', 'Belgrano', 'BEL', 'CAB', '#6cace4', '#ffffff', 'Julio César Villagra'),
-  club('newells', "Newell's Old Boys", 'NOB', 'NOB', '#e2001a', '#000000', 'Marcelo Bielsa'),
-  club('rosario', 'Rosario Central', 'CEN', 'CARC', '#0b3c8d', '#f2c500', 'Gigante de Arroyito'),
-  club('godoycruz', 'Godoy Cruz', 'GOD', 'GCAT', '#0b3c8d', '#ffffff', 'Feliciano Gambarte'),
-  club('defensa', 'Defensa y Justicia', 'DYJ', 'DYJ', '#f2c500', '#0b7a3b', 'Norberto Tomaghello'),
-  club('platense', 'Platense', 'PLA', 'CAP', '#8b1a1a', '#ffffff', 'Ciudad de Vicente López'),
-  club('tigre', 'Tigre', 'TIG', 'CAT', '#0b3c8d', '#e2001a', 'José Dellagiovanna'),
-  club('banfield', 'Banfield', 'BAN', 'CAB', '#0b7a3b', '#ffffff', 'Florencio Sola'),
-  club('gimnasia', 'Gimnasia y Esgrima', 'GIM', 'GELP', '#0b3c8d', '#ffffff', 'Juan Carmelo Zerillo'),
-
-  club('sanmartin', 'San Martín de Tucumán', 'SMT', 'CASM', '#e2001a', '#ffffff', 'La Ciudadela', 'Primera Nacional'),
-  club('ferro', 'Ferro Carril Oeste', 'FER', 'FCO', '#0b7a3b', '#ffffff', 'Ricardo Etcheverri', 'Primera Nacional'),
-  club('atlanta', 'Atlanta', 'ATL', 'CAA', '#f2c500', '#0b3c8d', 'Don León Kolbowski', 'Primera Nacional'),
-  club('quilmes', 'Quilmes', 'QUI', 'QAC', '#0b3c8d', '#ffffff', 'Centenario', 'Primera Nacional'),
+/**
+ * Cuatro clubes del ascenso. Estan en el PKF como equipos de liga nacional
+ * —con plantel y todo— pero su torneo no se simula, asi que aca entran solo
+ * como club. Los nombres y estadios tambien salen del archivo.
+ */
+const NACIONAL: readonly Club[] = [
+  {
+    id: 'tigre', name: 'Club Atlético Tigre', shortName: 'Tigre', badge: 'CAT',
+    primaryColor: '#0b3c8d', secondaryColor: '#e2001a',
+    division: 'Primera Nacional', stadiumName: 'José Dellagiovanna',
+  },
+  {
+    id: 'quilmes', name: 'Quilmes Atlético Club', shortName: 'Quilmes', badge: 'QAC',
+    primaryColor: '#0b3c8d', secondaryColor: '#ffffff',
+    division: 'Primera Nacional', stadiumName: 'Centenario José Luis Meiszner',
+  },
+  {
+    id: 'atlanta', name: 'Club Atlético Atlanta', shortName: 'Atlanta', badge: 'CAA',
+    primaryColor: '#f2c500', secondaryColor: '#0b3c8d',
+    division: 'Primera Nacional', stadiumName: 'Don León Kolbowski',
+  },
+  {
+    id: 'sanmartin', name: 'Club Atlético San Martín de Tucumán', shortName: 'San Martín (Tuc)',
+    badge: 'CASM', primaryColor: '#e2001a', secondaryColor: '#ffffff',
+    division: 'Primera Nacional', stadiumName: 'La Ciudadela',
+  },
 ];
+
+export const CLUBS: readonly Club[] = [...PRIMERA, ...NACIONAL];
 
 export const CLUBS_BY_ID = new Map(CLUBS.map((c) => [c.id, c]));
 

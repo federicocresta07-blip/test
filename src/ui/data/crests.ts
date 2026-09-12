@@ -18,23 +18,22 @@ export const CLUBS_WITH_CREST: ReadonlySet<string> = new Set([
   'boca',
   'river',
   'argentinos',
-  'banfield',
   'belgrano',
-  'defensa',
+  'colon',
   'estudiantes',
   'gimnasia',
-  'godoycruz',
   'huracan',
   'independiente',
   'lanus',
   'newells',
   'platense',
   'racing',
-  'rosario',
+  'central',
   'sanlorenzo',
   'talleres',
-  'tigre',
+  'union',
   'velez',
+  'tigre',
 ]);
 
 /**
@@ -42,10 +41,11 @@ export const CLUBS_WITH_CREST: ReadonlySet<string> = new Set([
  * es lo que permite que un test verifique que no falta ninguno por descuido.
  */
 export const CRESTS_MISSING: Readonly<Record<string, string>> = {
+  ferro: 'Ferro Carril Oeste no está en la carpeta de AFA del repo de origen',
+  jujuy: 'Gimnasia y Esgrima de Jujuy no está en el repo de origen',
+  quilmes: 'no está en la carpeta de AFA del repo de origen',
+  atlanta: 'no está en la carpeta de AFA del repo de origen',
   sanmartin: 'el repo de origen tiene el San Martín de San Juan, no el de Tucumán',
-  ferro: 'no está en el repo de origen',
-  atlanta: 'no está en el repo de origen',
-  quilmes: 'no está en el repo de origen',
 };
 
 export function crestUrl(clubId: string): string | null {
