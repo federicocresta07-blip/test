@@ -3,3 +3,7 @@ dist/
 ui-shots/
 *.log
 .DS_Store
+
+# Cache de bytecode de Python (tools/pcf_extract)
+__pycache__/
+*.pyc
