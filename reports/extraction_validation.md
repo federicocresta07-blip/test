@@ -1,6 +1,6 @@
 # Validación de la extracción — PC Apertura 98
 
-Generado por `tools/pcf_extract/validate.py` el 2026-09-12 22:26 UTC. Todos los números de este informe salen del script; ninguno está escrito a mano.
+Generado por `tools/pcf_extract/validate.py` el 2026-09-12 22:38 UTC. Todos los números de este informe salen del script; ninguno está escrito a mano.
 
 ## Las diez comprobaciones de la fase 10
 

@@ -56,21 +56,40 @@ from pkf import (  # noqa: E402
 # Tablas auxiliares
 # ---------------------------------------------------------------------------
 
-# Codigos de pais. Extraidos de "Manuales/Punteros Paises.pdf" del repo del
-# editor. Verificacion cruzada: el codigo 3 (Argentina) es el que llevan los
-# jugadores argentinos del archivo, y el 22 (Espana) coincide con el ejemplo
-# de Real Madrid del README.
+# Codigos de pais: los 117 de "Manuales/Punteros Paises.pdf" del repo del
+# editor, completos. Verificacion cruzada: el codigo 3 (Argentina) es el que
+# llevan los jugadores argentinos del archivo, y el 22 (Espana) coincide con
+# el ejemplo de Real Madrid del README.
+#
+# La primera version de este archivo solo tenia las 44 primeras entradas y por
+# eso Chilavert salia sin nacionalidad. Se vio en pantalla, no en los tests:
+# un codigo que no esta en la tabla devuelve None y no rompe nada.
 COUNTRIES = {
-    1: "Albania", 2: "Alemania", 3: "Argentina", 4: "Australia", 5: "Austria",
-    6: "Azerbaiyan", 7: "Bielorusia", 8: "Bolivia", 9: "Bosnia", 10: "Brasil",
-    11: "Bulgaria", 12: "Belgica", 13: "Camerun", 14: "Chile", 15: "Chipre",
-    16: "Colombia", 17: "Croacia", 18: "Dinamarca", 19: "Escocia",
-    20: "Eslovaquia", 21: "Eslovenia", 22: "Espana", 23: "Finlandia",
-    24: "Francia", 25: "Ghana", 26: "Grecia", 27: "Holanda", 28: "Honduras",
-    29: "Hungria", 30: "Inglaterra", 31: "Irlanda", 32: "Irlanda del Norte",
-    33: "Islandia", 34: "Islas Feroe", 35: "Israel", 36: "Italia",
-    37: "Lituania", 38: "Luxemburgo", 39: "Macedonia", 40: "Malta",
-    41: "Marruecos", 42: "Moldavia", 43: "Nigeria", 44: "Noruega",
+   1: 'Albania', 2: 'Alemania', 3: 'Argentina', 4: 'Australia', 5: 'Austria',
+   6: 'Azerbaiyán', 7: 'Bielorusia', 8: 'Bolivia', 9: 'Bosnia', 10: 'Brasil',
+   11: 'Bulgaria', 12: 'Bélgica', 13: 'Camerún', 14: 'Chile', 15: 'Chipre', 16: 'Colombia',
+   17: 'Croacia', 18: 'Dinamarca', 19: 'Escocia', 20: 'Eslovaquia', 21: 'Eslovenia',
+   22: 'España', 23: 'Finlandia', 24: 'Francia', 25: 'Ghana', 26: 'Grecia', 27: 'Holanda',
+   28: 'Honduras', 29: 'Hungría', 30: 'Inglaterra', 31: 'Irlanda', 32: 'Irlanda del Norte',
+   33: 'Islandia', 34: 'Islas Feroe', 35: 'Israel', 36: 'Italia', 37: 'Lituania',
+   38: 'Luxemburgo', 39: 'Macedonia', 40: 'Malta', 41: 'Marruecos', 42: 'Moldavia',
+   43: 'Nigeria', 44: 'Noruega', 45: 'País de Gales', 46: 'Polonia', 47: 'Portugal',
+   48: 'Rep. Checa', 49: 'Rumania', 50: 'Rusia', 51: 'Serbia', 52: 'Sudáfrica',
+   53: 'Suecia', 54: 'Suiza', 55: 'Turquía', 56: 'Ucrania', 57: 'Uruguay',
+   58: 'Yugoslavia', 59: 'Perú', 60: 'Canadá', 61: 'Usa', 62: 'Georgia', 63: 'Costa Rica',
+   64: 'Paraguay', 65: 'Japón', 66: 'Argelia', 67: 'Trinidad Y Tobago', 68: 'Senegal',
+   69: 'Surinam', 70: 'Zambia', 71: 'Cabo Verde', 72: 'Venezuela', 73: 'Rodesia',
+   74: 'Singapur', 75: 'Andorra', 76: 'Mozambique', 77: 'Liechtenstein', 78: 'Liberia',
+   79: 'Panamá', 80: 'Zaire (actual República Democrática del Congo)', 81: 'Tadzhikistán',
+   82: 'Uzbekistán', 83: 'México', 84: 'Guinea', 85: 'Angola', 86: 'Zimbabwe',
+   87: 'Sierra Leona', 88: 'Guadalupe', 89: 'Ecuador', 90: 'Estonia', 91: 'Guinea Bissau',
+   92: 'Libia', 93: 'Egipto', 94: 'Jamaica', 95: 'Nueva Caledonia', 96: 'Bermudas',
+   97: 'Nueva Zelanda', 98: 'Guayana France', 99: 'San Vicente', 100: 'Chad', 101: 'Togo',
+   102: 'Guinea Conakry', 103: 'Tanzania', 104: 'Burkina Faso', 105: 'Gambia',
+   106: 'Ruanda', 107: 'Kenia', 108: 'Mauritania', 109: 'Mali', 110: 'Uganda',
+   111: 'Congo (República del Congo)', 112: 'Letonia',
+   113: 'Costa de Marfil o Costa de Ivori', 114: 'Armenia', 115: 'Nicaragua',
+   116: 'Cataluña', 117: 'Níger',
 }
 
 # La normalizacion que pide el juego destino. La granularidad fina NO se
