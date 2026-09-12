@@ -10,6 +10,14 @@
  */
 
 :root {
+  /*
+   * La interfaz es deliberadamente de un solo tema: un panel de control
+   * oscuro. `color-scheme` se declara para que los controles nativos
+   * (selects, barras de scroll) sigan el tema de la app y no el del entorno
+   * donde se la embeba.
+   */
+  color-scheme: dark;
+
   /* --- Superficies: fondo oscuro sobrio, tipo panel de control deportivo --- */
   --bg-base: #0e1116;
   --bg-sunken: #0a0d11;

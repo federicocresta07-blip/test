@@ -569,3 +569,37 @@
     flex: 1;
   }
 }
+
+@media (max-width: 820px) {
+  /* Plantel, cancha y métricas pasan a una sola columna. */
+  .lineup__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lineup__metricscol {
+    grid-column: auto;
+    flex-direction: column;
+  }
+
+  .lineup__actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-4);
+  }
+
+  .lineup__actions > .row {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 680px) {
+  .metrics__secondary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-3);
+  }
+
+  .playerselect {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-2);
+  }
+}

@@ -559,3 +559,48 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+@media (max-width: 680px) {
+  /* Los dos equipos y el horario dejan de caber en una fila. */
+  .matchcard__teams {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+  }
+
+  .matchcard__side,
+  .matchcard__side--right {
+    flex-direction: row;
+    text-align: left;
+  }
+
+  .matchcard__side--right .col {
+    align-items: flex-start;
+  }
+
+  .matchcard__center {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--sp-4);
+    padding: var(--sp-4) 0;
+    border-left: none;
+    border-right: none;
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    min-width: 0;
+  }
+
+  .matchcard__stadium {
+    max-width: none;
+    text-align: left;
+  }
+
+  .matchcard__prep {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-5);
+  }
+
+  .financegrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

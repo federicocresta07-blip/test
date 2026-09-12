@@ -509,3 +509,47 @@
     padding: 0;
   }
 }
+
+/*
+ * Pantallas angostas.
+ *
+ * La interfaz es desktop-first y está pensada para 1440x900 (sección 3.2):
+ * un manager vive de tablas densas y eso no se traduce a un teléfono. Lo que
+ * sí garantizamos es que en pantalla angosta se DEGRADE en lugar de romperse:
+ * nada de scroll horizontal en el cuerpo de la página, y lo que no entra se
+ * esconde antes que apretarse hasta volverse ilegible.
+ */
+@media (max-width: 680px) {
+  .topbar,
+  .clubheader {
+    gap: var(--sp-4);
+    padding: 0 var(--sp-4);
+  }
+
+  /* Del contexto solo queda el club: el resto está a un clic en su pantalla. */
+  .topbar__context {
+    display: none;
+  }
+
+  /*
+   * El escudo con las iniciales ya identifica al club, así que el nombre en
+   * texto cede el lugar. Lo que no cede es la insignia de datos demo: es una
+   * aclaración, no un adorno.
+   */
+  .topbar__club .col {
+    display: none;
+  }
+
+  .clubheader__title {
+    font-size: var(--fs-sm);
+  }
+
+  /* El estado de preparación se lee en el dashboard; acá gana el botón. */
+  .clubheader__ready {
+    display: none;
+  }
+
+  .shell__content {
+    padding: var(--sp-4);
+  }
+}

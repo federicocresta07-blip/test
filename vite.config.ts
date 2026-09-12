@@ -7,6 +7,9 @@ import react from '@vitejs/plugin-react';
  * copia ni datos inventados. El motor sigue sin dependencias propias.
  */
 export default defineConfig({
+  // Rutas relativas: asi el build funciona servido desde cualquier subruta,
+  // no solo desde la raiz del dominio.
+  base: './',
   plugins: [react()],
   server: { port: 5173 },
   build: { outDir: 'dist', sourcemap: true },
