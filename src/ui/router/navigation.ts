@@ -59,7 +59,7 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Buscar jugadores',
         path: '/mercado/buscar',
-        ready: false,
+        ready: true,
         phase: 5,
         summary:
           'Buscador por nombre, edad, posición, overall, nacionalidad, club, precio, salario y contrato.',
@@ -67,28 +67,28 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Transferibles',
         path: '/mercado/transferibles',
-        ready: false,
+        ready: true,
         phase: 5,
         summary: 'Jugadores que otros clubes pusieron en el mercado, humanos e IA.',
       },
       {
         label: 'Mis ofertas',
         path: '/mercado/enviadas',
-        ready: false,
+        ready: true,
         phase: 5,
         summary: 'Ofertas realizadas con su estado: enviada, vista, contraoferta, aceptada o rechazada.',
       },
       {
         label: 'Ofertas recibidas',
         path: '/mercado/recibidas',
-        ready: false,
+        ready: true,
         phase: 5,
         summary: 'Ofertas por tus jugadores, con aceptar, rechazar y contraofertar.',
       },
       {
         label: 'Historial',
         path: '/mercado/historial',
-        ready: false,
+        ready: true,
         phase: 5,
         summary: 'Todas las transferencias cerradas del universo del juego.',
       },

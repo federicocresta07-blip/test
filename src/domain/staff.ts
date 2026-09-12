@@ -189,10 +189,13 @@ export const STAFF_SPECS: Readonly<Record<StaffRole, StaffRoleSpec>> = {
     upgradeCost: [800_000, 1_400_000, 2_300_000, 3_700_000],
     upgradeWeeks: [3, 4, 5, 7],
     hireCost: [350_000, 800_000, 1_600_000, 2_800_000, 4_900_000],
-    // El scouting de jugadores de OTROS clubes va con el mercado, no con
-    // inferiores: hace falta que exista un mercado para informar sobre alguien
-    // que se puede comprar.
-    consumer: { kind: 'pendiente', module: 'Mercado', phase: 5 },
+    // Decide con cuanto margen se ve el nivel y el techo de un jugador de otro
+    // club. Lo consume `domain/market.ts` en `appraise`: sin ojeador, el
+    // margen es de catorce puntos y se puede pagar por un 80 y recibir un 68.
+    consumer: {
+      kind: 'implementado',
+      where: 'margen del informe sobre el nivel de un jugador del mercado',
+    },
   },
 
   'Ojeador juvenil': {
@@ -313,7 +316,13 @@ export const STAFF_SPECS: Readonly<Record<StaffRole, StaffRoleSpec>> = {
     upgradeCost: [1_200_000, 2_100_000, 3_400_000, 5_400_000],
     upgradeWeeks: [4, 5, 7, 9],
     hireCost: [550_000, 1_200_000, 2_400_000, 4_200_000, 7_300_000],
-    consumer: { kind: 'pendiente', module: 'Mercado', phase: 5 },
+    // Decide con cuanto error se tasa a un jugador del mercado. Lo consume
+    // `appraise`: sin secretario tecnico el error es del 30% y no se sabe si
+    // se esta pagando de mas.
+    consumer: {
+      kind: 'implementado',
+      where: 'error de la tasación de un jugador del mercado',
+    },
   },
 };
 

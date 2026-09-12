@@ -26,13 +26,7 @@ export const PHASES: readonly PhasePlan[] = [
   { phase: 2, label: 'Plantel, Alineación y Táctica', delivered: true },
   { phase: 3, label: 'Staff, Desarrollo e Instalaciones', delivered: true },
   { phase: 4, label: 'Inferiores, Scouting y Entrenamiento', delivered: true },
-  {
-    phase: 5,
-    label: 'Mercado y negociaciones',
-    delivered: false,
-    summary:
-      'Buscador de jugadores, transferibles, ofertas enviadas y recibidas, historial. Es la fase que va a consumir el ojeador y el secretario técnico.',
-  },
+  { phase: 5, label: 'Mercado y negociaciones', delivered: true },
   {
     phase: 6,
     label: 'Estadio y finanzas',

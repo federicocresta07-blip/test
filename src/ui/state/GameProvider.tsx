@@ -19,7 +19,7 @@ import type { FacilityId } from '../../domain/facilities.ts';
 import type { StaffRole } from '../../domain/staff.ts';
 import type { GameState, LineupSelection, TrainingPlan } from '../models/index.ts';
 import { gameService } from '../services/index.ts';
-import type { PlayRoundReport } from '../services/types.ts';
+import type { OfferOutcome, PlayRoundReport } from '../services/types.ts';
 
 export type SaveState = 'limpio' | 'sin-guardar' | 'guardando' | 'guardado' | 'error';
 
@@ -46,6 +46,14 @@ export type RoundState = {
   readonly report: PlayRoundReport | null;
 };
 
+/** Estado de la ultima operacion del mercado. */
+export type MarketState = {
+  readonly pending: boolean;
+  readonly error: string | null;
+  /** Lo que respondio el otro club. */
+  readonly outcome: OfferOutcome | null;
+};
+
 export type GameContextValue = {
   readonly state: GameState | null;
   readonly loading: boolean;
@@ -68,6 +76,17 @@ export type GameContextValue = {
   readonly saveTraining: (plan: TrainingPlan) => Promise<void>;
   readonly promoteYouth: (youthId: string, label: string) => Promise<void>;
 
+  /** Mercado (secciones 10, 11 — fase 5). */
+  readonly market: MarketState;
+  readonly sendOffer: (playerId: string, amount: number) => Promise<OfferOutcome | null>;
+  readonly respondToOffer: (
+    offerId: string,
+    action: 'aceptar' | 'rechazar' | 'contraofertar',
+    counter?: number,
+  ) => Promise<OfferOutcome | null>;
+  readonly setTransferListed: (playerId: string, listed: boolean) => Promise<void>;
+  readonly clearMarket: () => void;
+
   /** Competicion (seccion 13). */
   readonly round: RoundState;
   readonly playRound: () => Promise<void>;
@@ -89,6 +108,11 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
     done: null,
   });
   const [round, setRound] = useState<RoundState>({ playing: false, error: null, report: null });
+  const [market, setMarket] = useState<MarketState>({
+    pending: false,
+    error: null,
+    outcome: null,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -267,6 +291,67 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
     [invest, state],
   );
 
+  /**
+   * Corre una operacion del mercado y recarga el estado.
+   *
+   * Recarga siempre, tambien cuando la oferta se rechaza: la oferta queda
+   * anotada en el historial y la pantalla la tiene que mostrar.
+   */
+  const runMarket = useCallback(
+    async (action: () => Promise<OfferOutcome>): Promise<OfferOutcome | null> => {
+      if (!state) return null;
+      setMarket({ pending: true, error: null, outcome: null });
+      try {
+        const outcome = await action();
+        const refreshed = await gameService.loadGame();
+        setState(refreshed);
+        setMarket({ pending: false, error: null, outcome });
+        return outcome;
+      } catch (cause: unknown) {
+        setMarket({
+          pending: false,
+          error: cause instanceof Error ? cause.message : 'No se pudo completar la operación',
+          outcome: null,
+        });
+        return null;
+      }
+    },
+    [state],
+  );
+
+  const sendOffer = useCallback(
+    async (playerId: string, amount: number) => {
+      if (!state) return null;
+      return runMarket(() => gameService.sendOffer(state.club.id, playerId, amount));
+    },
+    [runMarket, state],
+  );
+
+  const respondToOffer = useCallback(
+    async (offerId: string, action: 'aceptar' | 'rechazar' | 'contraofertar', counter?: number) => {
+      if (!state) return null;
+      return runMarket(() =>
+        gameService.respondToOffer(state.club.id, offerId, action, counter),
+      );
+    },
+    [runMarket, state],
+  );
+
+  const setTransferListed = useCallback(
+    async (playerId: string, listed: boolean) => {
+      if (!state) return;
+      await gameService.setTransferListed(state.club.id, playerId, listed);
+      const refreshed = await gameService.loadGame();
+      setState(refreshed);
+    },
+    [state],
+  );
+
+  const clearMarket = useCallback(
+    () => setMarket({ pending: false, error: null, outcome: null }),
+    [],
+  );
+
   const resetSeason = useCallback(async () => {
     if (!state) return;
     setRound({ playing: true, error: null, report: null });
@@ -301,6 +386,11 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
       dismissInvestment,
       saveTraining,
       promoteYouth,
+      market,
+      sendOffer,
+      respondToOffer,
+      setTransferListed,
+      clearMarket,
       round,
       playRound,
       clearRound,
@@ -322,6 +412,11 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
       dismissInvestment,
       saveTraining,
       promoteYouth,
+      market,
+      sendOffer,
+      respondToOffer,
+      setTransferListed,
+      clearMarket,
       round,
       playRound,
       clearRound,

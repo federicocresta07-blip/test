@@ -47,6 +47,44 @@ export type SeasonSave = {
   readonly training?: TrainingPlan;
   /** Juveniles ya subidos al plantel profesional, por id (fase 4). */
   readonly promoted?: readonly string[];
+  /** Ofertas del mercado, enviadas y recibidas (fase 5). */
+  readonly offers?: readonly StoredOffer[];
+  /** Traspasos cerrados (fase 5). Definen quien juega en que club. */
+  readonly transfers?: readonly StoredTransfer[];
+  /** Jugadores del club del manager puestos en el mercado (fase 5). */
+  readonly listed?: readonly string[];
+};
+
+/**
+ * Una oferta del mercado.
+ *
+ * Guarda el motivo de la respuesta para poder mostrarlo: el club vendedor
+ * explica por que aceptó, contraofertó o rechazó, y eso no se recalcula porque
+ * depende del estado del plantel en el momento de la oferta.
+ */
+export type StoredOffer = {
+  readonly id: string;
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly fromClubId: string;
+  readonly toClubId: string;
+  readonly amount: number;
+  readonly status: 'enviada' | 'contraoferta' | 'aceptada' | 'rechazada' | 'vencida';
+  /** Fecha del torneo en la que se envio. */
+  readonly round: number;
+  /** Lo que pide el club vendedor, si contraoferto. */
+  readonly counter: number | null;
+  /** Por que respondio asi. */
+  readonly reason: string;
+};
+
+export type StoredTransfer = {
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly fromClubId: string;
+  readonly toClubId: string;
+  readonly amount: number;
+  readonly round: number;
 };
 
 export const SEASON_VERSION = 1;
@@ -63,6 +101,9 @@ export function emptySeason(seed = DEFAULT_SEASON_SEED): SeasonSave {
     chemistry: {},
     training: DEFAULT_TRAINING_PLAN,
     promoted: [],
+    offers: [],
+    transfers: [],
+    listed: [],
   };
 }
 
@@ -87,6 +128,9 @@ export function readSeason(): SeasonSave {
       chemistry: parsed.chemistry ?? {},
       training: parsed.training ?? DEFAULT_TRAINING_PLAN,
       promoted: parsed.promoted ?? [],
+      offers: parsed.offers ?? [],
+      transfers: parsed.transfers ?? [],
+      listed: parsed.listed ?? [],
     };
   } catch {
     return emptySeason();

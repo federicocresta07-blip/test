@@ -17,6 +17,7 @@ import type { MatchRecord } from '../../competition/season.ts';
 import type { SeasonTotals } from '../../competition/stats.ts';
 import type { ScoutingReport } from '../../domain/youth.ts';
 import type { TrainingPlan } from '../../domain/training.ts';
+import type { StoredOffer, StoredTransfer } from '../services/season-store.ts';
 
 export type Division = 'Primera División' | 'Primera Nacional';
 
@@ -266,6 +267,29 @@ export type ScoutedYouth = {
   readonly player: Player;
 };
 
+/**
+ * EL MERCADO TAL COMO LO VE EL CLUB (secciones 10, 11 — fase 5).
+ *
+ * El pool de jugadores no esta aca: son 418 y se arma en la pantalla con
+ * `marketPool`, que es determinista. Lo que si esta es lo que no se puede
+ * recalcular —las ofertas y los traspasos— y la precision con la que el club
+ * mira, que sale de su ojeador y su secretario tecnico.
+ */
+export type MarketView = {
+  readonly offers: readonly StoredOffer[];
+  readonly transfers: readonly StoredTransfer[];
+  /** Jugadores propios que el manager puso en el mercado. */
+  readonly listed: readonly string[];
+  /** Jugadores de OTROS clubes que estan publicados en el mercado. */
+  readonly listedElsewhere: readonly string[];
+  /** Margen del ojeador, en puntos de overall. */
+  readonly scoutMargin: number;
+  /** Error del secretario tecnico sobre el valor, en porcentaje. */
+  readonly valuerError: number;
+  readonly hasScout: boolean;
+  readonly hasValuer: boolean;
+};
+
 export type AlertSeverity = 'danger' | 'warn' | 'info';
 
 /** Alerta accionable del plantel (seccion 5.3). */
@@ -300,6 +324,8 @@ export type GameState = {
   readonly youth: readonly ScoutedYouth[];
   /** El plan de entrenamiento del plantel (fase 4). */
   readonly training: TrainingPlan;
+  /** El mercado (fase 5). */
+  readonly market: MarketView;
   readonly currentRound: number;
   readonly seasonLabel: string;
   readonly today: string;
@@ -316,6 +342,8 @@ export type {
   Position,
   ScoutingReport,
   SeasonTotals,
+  StoredOffer,
+  StoredTransfer,
   StaffLevel,
   StaffRole,
   Tactics,

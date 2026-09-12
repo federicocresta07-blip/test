@@ -40,6 +40,7 @@ import {
 import { advanceDays } from '../src/progression/after-match.ts';
 import { developPlayer } from '../src/progression/development.ts';
 import { scoutPotential } from '../src/domain/youth.ts';
+import { appraise } from '../src/domain/market.ts';
 import { scoutingDetail } from '../src/ui/lib/scouting.ts';
 import { createPlayer } from '../src/domain/player.ts';
 import { createTeam } from '../src/domain/team.ts';
@@ -48,6 +49,16 @@ import { navigationPhaseMismatches } from '../src/ui/router/navigation.ts';
 import { phasePlan } from '../src/ui/router/plan.ts';
 
 const LEVELS: readonly StaffLevel[] = [1, 2, 3, 4, 5];
+
+/** Un jugador del mercado, para probar los informes del ojeador. */
+const marketTarget = createPlayer({
+  id: 'objetivo',
+  name: 'Objetivo',
+  position: 'DC',
+  age: 24,
+  potential: 88,
+  attributes: attributesFor('DC', 80),
+});
 const FACILITY_LEVELS: readonly FacilityLevel[] = [1, 2, 3, 4, 5];
 
 // ============================================================
@@ -275,6 +286,9 @@ const CONSUMED_BY: Readonly<Record<string, readonly StaffRole[]>> = {
   ],
   // Informes: el ancho del rango de un juvenil y el detalle de un rival.
   informes: ['Ojeador juvenil', 'Analista de rivales'],
+  // Mercado: con cuanta precision se ve a un jugador de otro club y cuanto se
+  // cree que vale.
+  mercado: ['Ojeador', 'Secretario técnico'],
 };
 
 test('HONESTIDAD: todo rol implementado tiene un consumidor de verdad', () => {
@@ -315,6 +329,29 @@ test('HONESTIDAD: todo rol implementado tiene un consumidor de verdad', () => {
       `${role} no hace crecer mas rapido a sus jugadores`,
     );
   }
+
+  // El ojeador del mercado angosta el informe sobre un jugador ajeno y el
+  // secretario tecnico afina la tasacion.
+  const rough = appraise({
+    player: marketTarget,
+    contractMonths: 24,
+    scoutMargin: staffEffect('Ojeador', 1, 1).actual,
+    valuerError: staffEffect('Secretario técnico', 1, 1).actual,
+  });
+  const sharp = appraise({
+    player: marketTarget,
+    contractMonths: 24,
+    scoutMargin: staffEffect('Ojeador', 5, 5).actual,
+    valuerError: staffEffect('Secretario técnico', 5, 5).actual,
+  });
+  assert.ok(
+    sharp.overallHigh - sharp.overallLow < rough.overallHigh - rough.overallLow,
+    'un mejor ojeador tiene que informar un rango de nivel mas angosto',
+  );
+  assert.ok(
+    sharp.valueMargin < rough.valueMargin,
+    'un mejor secretario tecnico tiene que tasar con menos error',
+  );
 
   // El ojeador juvenil angosta el rango; el analista sube el detalle.
   const poor = scoutPotential(80, staffEffect('Ojeador juvenil', 1, 1).actual, 'x');

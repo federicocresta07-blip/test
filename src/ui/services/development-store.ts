@@ -16,7 +16,14 @@ import type { StaffLevel, StaffRole } from '../../domain/staff.ts';
 /** Una inversión ya hecha, para que el usuario vea en qué gastó. */
 export type InvestmentRecord = {
   readonly id: string;
-  readonly kind: 'mejora de staff' | 'contratación' | 'mejora de instalación';
+  readonly kind:
+    | 'mejora de staff'
+    | 'contratación'
+    | 'mejora de instalación'
+    /** Compra de un jugador: sale de la misma caja (fase 5). */
+    | 'fichaje'
+    /** Venta de un jugador: entra a la misma caja, con coste negativo. */
+    | 'venta';
   readonly label: string;
   readonly cost: number;
   /** Cuánto sumó al gasto mensual recurrente. */

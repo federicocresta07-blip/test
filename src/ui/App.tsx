@@ -20,6 +20,10 @@ import { RivalsPage } from './pages/RivalsPage.tsx';
 import { NewsPage } from './pages/NewsPage.tsx';
 import { TrainingPage } from './pages/TrainingPage.tsx';
 import { YouthPage } from './pages/YouthPage.tsx';
+import { MarketSearchPage } from './pages/MarketSearchPage.tsx';
+import { TransferListPage } from './pages/TransferListPage.tsx';
+import { OffersPage } from './pages/OffersPage.tsx';
+import { TransferHistoryPage } from './pages/TransferHistoryPage.tsx';
 import { NotFoundPage, PlaceholderPage } from './pages/PlaceholderPage.tsx';
 
 /** Resuelve la pantalla que corresponde a la ruta actual. */
@@ -68,6 +72,16 @@ function Screen(): ReactNode {
       return <TrainingPage />;
     case '/club/inferiores':
       return <YouthPage />;
+    case '/mercado/buscar':
+      return <MarketSearchPage />;
+    case '/mercado/transferibles':
+      return <TransferListPage />;
+    case '/mercado/enviadas':
+      return <OffersPage side="enviadas" />;
+    case '/mercado/recibidas':
+      return <OffersPage side="recibidas" />;
+    case '/mercado/historial':
+      return <TransferHistoryPage />;
     default:
       return findNavItem(path) ? <PlaceholderPage /> : <NotFoundPage />;
   }

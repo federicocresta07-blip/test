@@ -154,6 +154,20 @@ const POTENTIAL_HEADROOM: readonly { readonly maxAge: number; readonly min: numb
 ];
 
 /**
+ * Cuanto puede crecer como maximo un jugador de esta edad.
+ *
+ * Lo usa el informe del ojeador para no decir barbaridades: un jugador de 33
+ * anios no tiene techo 100 por mas impreciso que sea el informe, y un ojeador
+ * lo sabe con solo mirarle el documento.
+ */
+export function maxHeadroomForAge(age: number): number {
+  const band =
+    POTENTIAL_HEADROOM.find((entry) => age <= entry.maxAge) ??
+    (POTENTIAL_HEADROOM[POTENTIAL_HEADROOM.length - 1] as { max: number });
+  return band.max;
+}
+
+/**
  * El potencial de un jugador, cuando no se declara uno.
  *
  * Antes el potencial era, por defecto, el overall actual: nadie tenia margen y

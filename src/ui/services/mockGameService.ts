@@ -11,7 +11,7 @@ import { createTactics } from '../../domain/tactics.ts';
 import { createTeam } from '../../domain/team.ts';
 import type { GameState, LineupSelection } from '../models/index.ts';
 import { CLUBS, clubById } from '../data/clubs.ts';
-import { DEMO_SQUAD } from '../data/squad.ts';
+import { DEMO_SQUAD, withMarketValues } from '../data/squad.ts';
 import {
   DEMO_FACILITIES,
   DEMO_FINANCES,
@@ -60,10 +60,19 @@ import {
 } from '../../domain/staff.ts';
 import { LEAGUE_CLUB_IDS, leagueTeams } from '../data/league.ts';
 import { buildYouthSquad } from '../data/youth.ts';
+import { autoTransferList, negotiate, squadNeed, valuePlayer } from '../../domain/market.ts';
+import {
+  applyTransfers,
+  findLeaguePlayer,
+  marketPrecision,
+  RIVAL_CONTRACT_MONTHS,
+} from '../lib/market-bridge.ts';
 import { canPromote, scoutPotential } from '../../domain/youth.ts';
 import { focusFor, DEFAULT_TRAINING_PLAN, type TrainingPlan } from '../../domain/training.ts';
 import { overallForPosition } from '../../ratings/overall.ts';
+import { clamp } from '../../core/math.ts';
 import type { Player } from '../../domain/player.ts';
+import type { Team } from '../../domain/team.ts';
 import type { Position } from '../../domain/positions.ts';
 import type { ScoutedYouth } from '../models/index.ts';
 import {
@@ -85,8 +94,9 @@ import {
   withCondition,
   writeSeason,
   type SeasonSave,
+  type StoredOffer,
 } from './season-store.ts';
-import type { GameService, PlayRoundReport } from './types.ts';
+import type { GameService, OfferOutcome, PlayRoundReport } from './types.ts';
 
 /** Aviso visible en la interfaz: estos datos no son un dataset oficial. */
 export const DEMO_DATA_NOTICE =
@@ -203,18 +213,40 @@ function composeFacilities(development: DevelopmentState): readonly ClubFacility
   });
 }
 
-/** Las finanzas con lo invertido descontado y el gasto recurrente sumado. */
-function composeFinances(development: DevelopmentState): typeof DEMO_FINANCES {
+/**
+ * La caja disponible, sin recomponer el plantel.
+ *
+ * Las acciones de inversion solo necesitan saber si alcanza la plata, y
+ * recomponer el plantel para eso seria trabajo de mas.
+ */
+function availableCash(development: DevelopmentState): number {
+  return Math.max(0, DEMO_FINANCES.cash - investmentTotals(development).spent);
+}
+
+/**
+ * Las finanzas del club.
+ *
+ * La masa salarial NO se declara: es la suma de los salarios del plantel, que
+ * salen del mercado, mas los del cuerpo tecnico. Antes era un numero escrito a
+ * mano en `club-development.ts` que no tenia nada que ver con el plantel: se
+ * podia vender a medio equipo y la masa salarial no se movia.
+ */
+function composeFinances(
+  development: DevelopmentState,
+  squad: readonly ClubPlayer[],
+): typeof DEMO_FINANCES {
   const totals = investmentTotals(development);
+  const playerWages = squad.reduce((total, entry) => total + entry.salary, 0);
+  const staffWages = composeStaff(development).reduce(
+    (total, member) => total + staffSalary(member.role, member.level),
+    0,
+  );
+
   return {
     ...DEMO_FINANCES,
     cash: Math.max(0, DEMO_FINANCES.cash - totals.spent),
     monthlyExpenses: DEMO_FINANCES.monthlyExpenses + totals.recurring,
-    wageBill:
-      DEMO_FINANCES.wageBill +
-      development.investments
-        .filter((entry) => entry.kind !== 'mejora de instalación')
-        .reduce((total, entry) => total + entry.recurring, 0),
+    wageBill: playerWages + staffWages,
   };
 }
 
@@ -348,6 +380,208 @@ function roundTraining(development: DevelopmentState, plan: TrainingPlan): Round
   };
 }
 
+
+// ============================================================
+// Mercado (fase 5)
+// ============================================================
+
+/** Plata en formato corto, para los mensajes del mercado. */
+function formatMoney(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1).replace('.', ',')} M`;
+  return `$${Math.round(value / 1_000)} k`;
+}
+
+/**
+ * Anota un fichaje en la caja del club.
+ *
+ * Sale de la MISMA caja que las mejoras de staff y las obras: hay una sola
+ * caja y comprar un jugador compite con mejorar el centro medico. Eso es lo
+ * que hace que el presupuesto sea una decision.
+ */
+function recordTransferSpend(amount: number, label: string): void {
+  const development = readDevelopment();
+  writeDevelopment({
+    ...development,
+    investments: [
+      ...development.investments,
+      { id: `fichaje-${Date.now()}`, kind: 'fichaje', label, cost: amount, recurring: 0 },
+    ],
+  });
+}
+
+/** Anota una venta: entra a la misma caja, con coste negativo. */
+function recordTransferIncome(amount: number, label: string): void {
+  const development = readDevelopment();
+  writeDevelopment({
+    ...development,
+    investments: [
+      ...development.investments,
+      { id: `venta-${Date.now()}`, kind: 'venta', label, cost: -amount, recurring: 0 },
+    ],
+  });
+}
+
+/**
+ * Quienes estan en el mercado, por id.
+ *
+ * De los clubes de IA se calcula con `autoTransferList`, asi que la lista se
+ * mantiene coherente con su plantel sin que nadie la escriba: vender un
+ * suplente cambia a quien publica el club. Del club del manager sale de lo que
+ * el manager marco.
+ */
+function listedIds(save: SeasonSave): readonly string[] {
+  const teams = applyTransfers(leagueTeams(), save.transfers ?? []);
+  const ids: string[] = [...(save.listed ?? [])];
+  for (const [clubId, team] of teams) {
+    if (clubId === CLUB_ID) continue;
+    for (const player of autoTransferList(team.players)) ids.push(player.id);
+  }
+  return ids;
+}
+
+/** El mercado como lo ve la interfaz. */
+function composeMarket(development: DevelopmentState, save: SeasonSave): GameState['market'] {
+  const precision = marketPrecision(
+    composeStaff(development),
+    composeFacilities(development),
+  );
+  return {
+    offers: save.offers ?? [],
+    transfers: save.transfers ?? [],
+    listed: save.listed ?? [],
+    listedElsewhere: listedIds(save).filter((id) => !(save.listed ?? []).includes(id)),
+    scoutMargin: precision.scoutMargin,
+    valuerError: precision.valuerError,
+    hasScout: precision.hasScout,
+    hasValuer: precision.hasValuer,
+  };
+}
+
+/** Los jugadores que el club del manager compro. */
+function signedPlayers(save: SeasonSave): readonly Player[] {
+  const incoming = (save.transfers ?? []).filter((entry) => entry.toClubId === CLUB_ID);
+  if (incoming.length === 0) return [];
+
+  return incoming
+    .map((entry) => findLeaguePlayer(entry.playerId))
+    .filter((found): found is { player: Player; clubId: string } => found !== null)
+    .map((found) => withCondition(found.player, save.conditions[found.player.id]));
+}
+
+/**
+ * Las ofertas que los clubes de IA hacen por los jugadores del manager.
+ *
+ * Se generan al jugar una fecha, por calculo: un club ofrece por un jugador
+ * ajeno cuando le conviene —le falta en ese puesto y el jugador es mejor que
+ * lo que tiene— y ofrece un porcentaje del valor de mercado segun cuanto lo
+ * necesite. Nada de sortear "aparece una oferta".
+ */
+function generateIncomingOffers(
+  save: SeasonSave,
+  squad: readonly ClubPlayer[],
+  round: number,
+): readonly StoredOffer[] {
+  const teams = applyTransfers(leagueTeams(), save.transfers ?? []);
+  const alreadyOffered = new Set(
+    (save.offers ?? [])
+      .filter((entry) => entry.toClubId === CLUB_ID && entry.status === 'enviada')
+      .map((entry) => entry.playerId),
+  );
+  const sold = soldIds(save);
+  const listed = new Set(save.listed ?? []);
+  /** El mejor jugador del manager que le mejora un puesto a este club. */
+  const bestTargetFor = (
+    team: Team,
+    excluded: ReadonlySet<string>,
+  ): { target: ClubPlayer; gain: number } | null => {
+    let best: { target: ClubPlayer; gain: number } | null = null;
+    for (const entry of squad) {
+      if (sold.has(entry.player.id) || alreadyOffered.has(entry.player.id)) continue;
+      if (excluded.has(entry.player.id)) continue;
+      const ownBest = Math.max(
+        0,
+        ...team.players
+          .filter((other) => other.position === entry.player.position)
+          .map((other) => overallForPosition(other.attributes, other.position)),
+      );
+      const gain =
+        overallForPosition(entry.player.attributes, entry.player.position) - ownBest;
+      // Menos de tres puntos de mejora no mueve a nadie a hacer una oferta.
+      if (gain >= 3 && (!best || gain > best.gain)) best = { target: entry, gain };
+    }
+    return best;
+  };
+
+  // Los clubes ofrecen por orden de billetera, y cada uno elige entre los que
+  // quedan libres.
+  //
+  // Las dos reglas importan. Sin el tope, los diecinueve clubes ofrecian por
+  // el MISMO jugador en la misma fecha y por el mismo monto, porque todos
+  // evaluan igual. Y sin dejar que cada club busque su segunda opcion, el
+  // primero se llevaba el objetivo y los demas no ofrecian nada.
+  const contenders = [...teams]
+    .filter(([clubId]) => clubId !== CLUB_ID)
+    .sort(([, a], [, b]) => b.reputation - a.reputation);
+
+  const offers: StoredOffer[] = [];
+  const taken = new Set<string>();
+
+  for (const [clubId, team] of contenders) {
+    if (offers.length >= MAX_INCOMING_PER_ROUND) break;
+    const wish = bestTargetFor(team, taken);
+    if (!wish) continue;
+    taken.add(wish.target.player.id);
+
+    // Ofrece por debajo del valor si no lo necesita tanto, y mas si el jugador
+    // esta en la lista de transferibles del manager: sabe que se vende. Y un
+    // club grande estira mas la oferta que uno chico.
+    const value = valuePlayer({
+      player: wish.target.player,
+      contractMonths: RIVAL_CONTRACT_MONTHS,
+    }).value;
+    const eagerness = clamp(wish.gain / 12, 0.2, 1);
+    const wealth = clamp((team.reputation - 30) / 60, 0, 1);
+    const base = listed.has(wish.target.player.id) ? 0.85 : 0.7;
+    const factor = base + eagerness * 0.3 + wealth * 0.2;
+    const amount = Math.round((value * factor) / 10_000) * 10_000;
+
+    offers.push({
+      id: `in-${round}-${clubId}-${wish.target.player.id}`,
+      playerId: wish.target.player.id,
+      playerName: wish.target.player.name,
+      fromClubId: clubId,
+      toClubId: CLUB_ID,
+      amount,
+      status: 'enviada',
+      round,
+      counter: null,
+      reason:
+        wish.gain >= 8
+          ? `${clubById(clubId).name} lo ve como un salto de calidad para su puesto.`
+          : `${clubById(clubId).name} quiere mejorar ese puesto y lo tiene en carpeta.`,
+    });
+  }
+
+  return offers;
+}
+
+/**
+ * Cuantas ofertas recibe el manager por fecha.
+ *
+ * Dos o tres. Diecinueve ofertas simultaneas —una por club— no es un mercado,
+ * es ruido.
+ */
+const MAX_INCOMING_PER_ROUND = 3;
+
+/** Los jugadores propios que se vendieron, por id. */
+function soldIds(save: SeasonSave): ReadonlySet<string> {
+  return new Set(
+    (save.transfers ?? [])
+      .filter((entry) => entry.fromClubId === CLUB_ID)
+      .map((entry) => entry.playerId),
+  );
+}
+
 /**
  * El dia de hoy.
  *
@@ -371,7 +605,11 @@ function todayOf(save: SeasonSave, rounds: number): string {
  * fecha 1 todos tienen cero, que es la verdad, y el aviso de riesgo de
  * suspension aparece cuando de verdad hay riesgo.
  */
-function composeSquad(development: DevelopmentState, save: SeasonSave): readonly ClubPlayer[] {
+function composeSquad(
+  development: DevelopmentState,
+  save: SeasonSave,
+  today: string,
+): readonly ClubPlayer[] {
   const base = DEMO_SQUAD.map((entry) => ({
     ...entry,
     player: withCondition(entry.player, save.conditions[entry.player.id]),
@@ -392,7 +630,28 @@ function composeSquad(development: DevelopmentState, save: SeasonSave): readonly
     unhappy: false,
   }));
 
-  return [...base, ...promoted];
+  // Los fichajes del mercado (fase 5). Entran con el contrato tipico de un
+  // pase: tres anios. El dorsal lo asigna el club, no el jugador.
+  const signed: ClubPlayer[] = signedPlayers(save).map((player) => ({
+    player,
+    shirtNumber: 0,
+    nationality: 'Argentina',
+    value: 0,
+    salary: 0,
+    contractUntil: '2029-06-30',
+    yellowCards: save.totals[player.id]?.yellowCards ?? 0,
+    unhappy: false,
+  }));
+
+  // Y los que se vendieron ya no estan.
+  const sold = soldIds(save);
+
+  // El valor y el salario los pone el mercado: se calculan al final, cuando el
+  // plantel ya tiene su estado, sus juveniles promovidos y sus fichajes.
+  return withMarketValues(
+    [...base, ...promoted, ...signed].filter((entry) => !sold.has(entry.player.id)),
+    today,
+  );
 }
 
 /** La temporada como la ve la interfaz. */
@@ -422,6 +681,7 @@ export function createMockGameService(): GameService {
       const fixtures = seasonFixtures(save.seed);
       const table = seasonTable(save.records);
       const today = todayOf(save, totalRounds(fixtures));
+      const squad = composeSquad(development, save, today);
       return {
         manager: {
           id: 'mgr-1',
@@ -431,9 +691,9 @@ export function createMockGameService(): GameService {
         },
         club,
         clubs: CLUBS,
-        squad: composeSquad(development, save),
+        squad,
         lineup: readStoredLineup() ?? initialLineup(),
-        finances: composeFinances(development),
+        finances: composeFinances(development, squad),
         staff: composeStaff(development),
         vacancies: composeVacancies(development),
         facilities: composeFacilities(development),
@@ -446,6 +706,7 @@ export function createMockGameService(): GameService {
         season: composeSeason(save),
         youth: composeYouth(development, save),
         training: save.training ?? DEFAULT_TRAINING_PLAN,
+        market: composeMarket(development, save),
         currentRound: save.round,
         seasonLabel: SEASON_LABEL,
         today,
@@ -476,8 +737,7 @@ export function createMockGameService(): GameService {
       if (cost === null) throw new Error(`${member.name} ya está en el nivel máximo`);
 
       const nextLevel = (member.level + 1) as StaffLevel;
-      const finances = composeFinances(development);
-      if (finances.cash < cost) {
+      if (availableCash(development) < cost) {
         throw new Error('No hay caja suficiente para pagar la mejora');
       }
 
@@ -506,8 +766,7 @@ export function createMockGameService(): GameService {
       if (!candidate) throw new Error('Ese candidato ya no está disponible');
 
       const cost = staffHireCost(role, candidate.level);
-      const finances = composeFinances(development);
-      if (finances.cash < cost) {
+      if (availableCash(development) < cost) {
         throw new Error('No hay caja suficiente para pagar la contratación');
       }
 
@@ -542,8 +801,7 @@ export function createMockGameService(): GameService {
       const cost = facilityUpgradeCost(facilityId, facility.level);
       if (cost === null) throw new Error('Esa instalación ya está en el nivel máximo');
 
-      const finances = composeFinances(development);
-      if (finances.cash < cost) {
+      if (availableCash(development) < cost) {
         throw new Error('No hay caja suficiente para encarar la obra');
       }
 
@@ -587,10 +845,13 @@ export function createMockGameService(): GameService {
         save.chemistry[CLUB_ID] ?? INITIAL_CHEMISTRY,
         promotedPlayers(development, save),
       );
-      const teams = restoreTeams(base, save);
+      // Los traspasos mueven jugadores entre planteles antes de jugar: el que
+      // se vendio el jueves no juega el domingo.
+      const teams = restoreTeams(applyTransfers(base, save.transfers ?? []), save);
 
       const table = seasonTable(save.records);
       const position = table.findIndex((row) => row.clubId === CLUB_ID) + 1;
+      const squadForOffers = composeSquad(development, save, todayOf(save, rounds));
 
       const outcome = playSeasonRound({
         fixtures,
@@ -613,6 +874,11 @@ export function createMockGameService(): GameService {
         ...(position > 0 ? { tableMood: tableMood(position, LEAGUE_CLUB_IDS.length) } : {}),
       });
 
+      // Las ofertas de los clubes de IA por los jugadores del manager se
+      // generan al jugar: el mercado se mueve cuando pasa el tiempo, no
+      // cuando uno entra a la pantalla.
+      const incoming = generateIncomingOffers(save, squadForOffers, save.round);
+
       const next: SeasonSave = {
         ...save,
         round: save.round + 1,
@@ -620,6 +886,7 @@ export function createMockGameService(): GameService {
         totals: accumulateRound(save.totals, outcome.records),
         conditions: snapshotConditions(outcome.teams),
         chemistry: snapshotChemistry(outcome.teams),
+        offers: [...(save.offers ?? []), ...incoming],
       };
       const written = writeSeason(next);
 
@@ -662,6 +929,164 @@ export function createMockGameService(): GameService {
         throw new Error(`${youth.name} tiene ${youth.age} años: todavía no puede subir al plantel`);
       }
       writeSeason({ ...save, promoted: [...(save.promoted ?? []), youthId] });
+    },
+    // ============================================================
+    // Mercado (fase 5)
+    // ============================================================
+
+    async sendOffer(_clubId: string, playerId: string, amount: number): Promise<OfferOutcome> {
+      const save = readSeason();
+      const development = readDevelopment();
+
+      const teams = applyTransfers(leagueTeams(), save.transfers ?? []);
+      const found = [...teams].find(([clubId, team]) =>
+        clubId !== CLUB_ID && team.players.some((entry) => entry.id === playerId),
+      );
+      if (!found) throw new Error('Ese jugador ya no está en el club al que le ofreciste');
+      const [sellerId, sellerTeam] = found;
+      const player = sellerTeam.players.find((entry) => entry.id === playerId) as Player;
+
+      const squad = composeSquad(development, save, todayOf(save, 19));
+      const cash = composeFinances(development, squad).cash;
+      if (amount > cash) {
+        throw new Error(
+          `La oferta es de ${formatMoney(amount)} y en caja hay ${formatMoney(cash)}.`,
+        );
+      }
+
+      const listed = new Set(autoTransferList(sellerTeam.players).map((entry) => entry.id));
+      const result = negotiate({
+        player,
+        contractMonths: RIVAL_CONTRACT_MONTHS,
+        amount,
+        need: squadNeed(player, sellerTeam.players),
+        listed: listed.has(playerId),
+      });
+
+      const offer: StoredOffer = {
+        id: `of-${Date.now()}-${playerId}`,
+        playerId,
+        playerName: player.name,
+        fromClubId: CLUB_ID,
+        toClubId: sellerId,
+        amount,
+        status: result.verdict,
+        round: save.round,
+        counter: result.counter,
+        reason: result.reason,
+      };
+
+      const transfers =
+        result.verdict === 'aceptada'
+          ? [
+              ...(save.transfers ?? []),
+              {
+                playerId,
+                playerName: player.name,
+                fromClubId: sellerId,
+                toClubId: CLUB_ID,
+                amount,
+                round: save.round,
+              },
+            ]
+          : (save.transfers ?? []);
+
+      writeSeason({ ...save, offers: [...(save.offers ?? []), offer], transfers });
+      // La plata sale de la caja de desarrollo, que es la unica caja que hay.
+      if (result.verdict === 'aceptada') {
+        recordTransferSpend(amount, `${player.name} — compra a ${clubById(sellerId).name}`);
+      }
+
+      return {
+        verdict: result.verdict,
+        counter: result.counter,
+        reason: result.reason,
+        closed: result.verdict === 'aceptada',
+      };
+    },
+
+    async respondToOffer(
+      _clubId: string,
+      offerId: string,
+      action: 'aceptar' | 'rechazar' | 'contraofertar',
+      counter?: number,
+    ): Promise<OfferOutcome> {
+      const save = readSeason();
+      const offer = (save.offers ?? []).find((entry) => entry.id === offerId);
+      if (!offer) throw new Error('Esa oferta ya no está');
+      if (offer.toClubId !== CLUB_ID) throw new Error('Esa oferta no es por un jugador tuyo');
+      if (offer.status !== 'enviada' && offer.status !== 'contraoferta') {
+        throw new Error('Esa oferta ya está resuelta');
+      }
+
+      const update = (status: StoredOffer['status'], patch: Partial<StoredOffer> = {}): SeasonSave => ({
+        ...save,
+        offers: (save.offers ?? []).map((entry) =>
+          entry.id === offerId ? { ...entry, status, ...patch } : entry,
+        ),
+      });
+
+      if (action === 'rechazar') {
+        writeSeason(update('rechazada', { reason: 'Rechazaste la oferta.' }));
+        return { verdict: 'rechazada', counter: null, reason: 'Rechazaste la oferta.', closed: false };
+      }
+
+      if (action === 'contraofertar') {
+        const asked = counter ?? Math.round(offer.amount * 1.3);
+        // El club comprador acepta si lo que pedis no se pasa mucho de lo que
+        // ofrecio. Es una cuenta, no un sorteo: hasta un 25% mas paga.
+        const accepts = asked <= offer.amount * 1.25;
+        if (!accepts) {
+          const reason = `${clubById(offer.fromClubId).name} se bajó: ${formatMoney(asked)} le parece demasiado.`;
+          writeSeason(update('rechazada', { counter: asked, reason }));
+          return { verdict: 'rechazada', counter: asked, reason, closed: false };
+        }
+
+        const reason = `${clubById(offer.fromClubId).name} aceptó tu contraoferta de ${formatMoney(asked)}.`;
+        const next = update('aceptada', { amount: asked, counter: asked, reason });
+        writeSeason({
+          ...next,
+          transfers: [
+            ...(save.transfers ?? []),
+            {
+              playerId: offer.playerId,
+              playerName: offer.playerName,
+              fromClubId: CLUB_ID,
+              toClubId: offer.fromClubId,
+              amount: asked,
+              round: save.round,
+            },
+          ],
+        });
+        recordTransferIncome(asked, `${offer.playerName} — venta a ${clubById(offer.fromClubId).name}`);
+        return { verdict: 'aceptada', counter: asked, reason, closed: true };
+      }
+
+      const reason = `Aceptaste la oferta de ${clubById(offer.fromClubId).name}.`;
+      writeSeason({
+        ...update('aceptada', { reason }),
+        transfers: [
+          ...(save.transfers ?? []),
+          {
+            playerId: offer.playerId,
+            playerName: offer.playerName,
+            fromClubId: CLUB_ID,
+            toClubId: offer.fromClubId,
+            amount: offer.amount,
+            round: save.round,
+          },
+        ],
+      });
+      recordTransferIncome(offer.amount, `${offer.playerName} — venta a ${clubById(offer.fromClubId).name}`);
+      return { verdict: 'aceptada', counter: null, reason, closed: true };
+    },
+
+    async setTransferListed(_clubId: string, playerId: string, listed: boolean): Promise<void> {
+      const save = readSeason();
+      const current = new Set(save.listed ?? []);
+      if (listed) current.add(playerId);
+      else current.delete(playerId);
+      writeSeason({ ...save, listed: [...current] });
     },
   };
 }

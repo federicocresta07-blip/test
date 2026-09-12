@@ -27,7 +27,7 @@ npm run season     # 10 fechas seguidas con evolución del plantel
 npm run calibrate  # miles de partidos y distribución de resultados
 npm run clausura98 # estado del dataset histórico del Clausura 1998
 
-npm test           # 265 tests
+npm test           # 294 tests
 npm run typecheck  # motor + interfaz
 ```
 
@@ -260,7 +260,8 @@ src/
   config/engine-config.ts      TODOS los parámetros del motor
   core/                        azar con semilla, utilidades numéricas
   domain/                      atributos, posiciones, jugador, equipo,
-                               formaciones, tácticas, alineación
+                               formaciones, tácticas, alineación, staff,
+                               inferiores, entrenamiento y mercado
   ratings/                     overall por posición, adecuación a la posición,
                                rendimiento efectivo, fuerza por dimensiones
   engine/                      las cinco etapas, balón parado, disciplina,
@@ -273,7 +274,7 @@ src/
   data/                        generador de planteles y equipos de ejemplo
   data/clausura-1998/          dataset histórico real (ver docs/clausura-1998.md)
   ui/                          la interfaz web (ver docs/ui.md)
-tests/                         265 tests
+tests/                         294 tests
 scripts/                       demo, temporada, torneo completo, calibración,
                                dataset histórico y humo de la UI
 ```

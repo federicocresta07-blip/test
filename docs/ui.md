@@ -1,7 +1,7 @@
 # Interfaz web — diseño y estado
 
 Prototipo de la interfaz del juego, construido sobre el master prompt de UI
-v0.2. El plan es incremental y por fases: **entregadas las fases 0 a 4 y la
+v0.2. El plan es incremental y por fases: **entregadas las fases 0 a 5 y la
 7**. La sección 22 pedía empezar por las fases 0 a 2; el resto avanza de a una
 fase por entrega. La 7 se adelantó a pedido: es la que permite jugar los
 partidos, y sin ella el resto del juego no se puede probar.
@@ -21,12 +21,12 @@ tres lugares y se desincronizó: ver más abajo.
 | **2** | Plantel y Alineación estilo PC Fútbol | **Entregada** (incluye drag & drop, ficha rápida, táctica y autoselección) |
 | **3** | Staff, desarrollo e instalaciones | **Entregada** (incluye contratación y mejora reales, y la bandeja completa) |
 | **4** | Inferiores, Scouting y Entrenamiento | **Entregada** (el motor ya hace crecer los atributos de un jugador) |
+| **5** | Mercado y negociaciones | **Entregada** (buscador, transferibles, ofertas en los dos sentidos e historial; el valor y el sueldo se calculan) |
 | **7** | Competición y resultado de partido | **Entregada** (el torneo se juega de verdad: fixture, tabla, goleadores, ficha de partido, rivales y noticias) |
-| 5 | Mercado y negociaciones | Pendiente |
 | 6 | Estadio y finanzas | Pendiente |
 | 8 | Hardening y preparación para backend real | Pendiente |
 
-Los 7 módulos pendientes están en la navegación con su página propia, que
+Los 2 módulos pendientes están en la navegación con su página propia, que
 dice qué va a hacer y en qué fase se construye. Ninguno tiene botones que
 finjan funcionar: la página pendiente no tiene un solo botón.
 
@@ -39,7 +39,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 265 tests
+npm test           # 294 tests
 ```
 
 Requiere Node 22.18 o superior.
@@ -142,6 +142,10 @@ src/ui/
     alerts.ts          alertas derivadas del plantel
     preparation.ts     estado de preparación del equipo
     fixtures.ts        consultas del calendario
+    season-bridge.ts   fixture, fechas y tabla del torneo
+    market-bridge.ts   pool del mercado, precisión del informe y filtros
+    scouting.ts        cuánto del rival muestra el analista
+    news.ts            noticias derivadas de los resultados
     format.ts          plata, fechas y números
   components/
     AppShell · Sidebar · TopBar · ClubHeader · ClubBadge · Icon
@@ -157,12 +161,14 @@ src/ui/
                        CompetitionWidget
     match/             Scoreboard, ProjectionStrip, MatchTimeline,
                        MatchStats, MatchRatings
+    market/            PlayerReport, OfferDialog
     youth/             PotentialRange
   pages/               DashboardPage, SquadPage, LineupPage, StaffPage,
                        FacilitiesPage, MessagesPage, CalendarPage,
                        ResultsPage, TablePage, StatsPage, MatchPage,
                        RivalsPage, NewsPage, TrainingPage, YouthPage,
-                       PlaceholderPage
+                       MarketSearchPage, TransferListPage, OffersPage,
+                       TransferHistoryPage, PlaceholderPage
   data/                dataset de demostración, desacoplado de los componentes
 ```
 
@@ -293,10 +299,119 @@ Tres arreglos:
   está en la tabla; con nivel 3, las nueve dimensiones; con nivel 5, el plantel
   completo. Antes la pantalla mostraba todo siempre.
 
-Quedan cuatro roles pendientes, y ahora sus fases son verificables: el ojeador y
-el secretario técnico esperan el mercado (fase 5) y el fisioterapeuta espera que
-el motor acepte un riesgo de lesión por equipo (fase 8), que hoy toma de forma
-global.
+Queda **un** rol pendiente, y su fase es verificable: el fisioterapeuta espera
+que el motor acepte un riesgo de lesión por equipo (fase 8), que hoy toma de
+forma global. El ojeador y el secretario técnico se aplicaron en la fase 5 —son
+los que fijan el margen del informe de mercado— y el test de honestidad no los
+habría dejado pasar a `implementado` sin un consumidor real.
+
+---
+
+## El mercado no te dice el número
+
+La decisión central de la fase 5. Un mercado donde ves el overall exacto y el
+valor exacto de cualquier jugador ajeno no necesita ojeador ni secretario
+técnico: los dos roles quedarían como adornos de la pantalla de staff. Así que
+el juego conoce el número real y el club ve un **informe**, cuyo margen sale de
+lo que su staff es capaz de medir.
+
+```
+Buscador, sin ojeador ni secretario técnico:   nivel 72±14   valor 4,2 M ±30%
+Con los dos en nivel 5:                        nivel 79±1    valor 8,7 M ±3%
+```
+
+Dos invariantes lo gobiernan, y las dos están en tests:
+
+- **la verdad siempre cae dentro del rango informado** — el informe puede ser
+  impreciso, no puede mentir;
+- **la verdad nunca está en el centro del rango** — si estuviera, el margen no
+  significaría nada: bastaría con leer el punto medio para saber el número
+  exacto y el ojeador volvería a ser un adorno.
+
+El desplazamiento sale de un `Rng` sembrado con el id del jugador, así que el
+informe es el mismo entre recargas: el mercado no se reordena al volver a
+entrar.
+
+### El valor estaba escrito a mano y contradecía al mercado
+
+`data/squad.ts` declaraba un `value` y un `salary` por jugador. En cuanto el
+mercado empezó a tasar, los dos números se contradijeron: un lateral de 80
+figuraba en 6,8 M y el mercado lo tasaba en 18. Un dato escrito a mano al lado
+de uno calculado es siempre el dato escrito a mano el que está mal.
+
+Se borraron las 26 declaraciones. Ahora `valuePlayer` deriva el valor de nivel,
+edad, puesto y **meses de contrato restantes** —un jugador a seis meses del
+final vale una fracción de lo mismo—, y la masa salarial de las Finanzas se
+suma de los sueldos derivados en lugar de estar declarada.
+
+Calibrar la curva llevó dos intentos: la primera versión tasaba a todos ~3×
+por encima, y una estrella salía 400 M en un torneo donde la caja del club son
+decenas de millones. La curva final es cúbica sobre el nivel, no lineal, porque
+la diferencia entre 85 y 90 no es la misma que entre 60 y 65.
+
+### La lista de transferibles no está cargada: se calcula
+
+Ningún club declara a quién pone en el mercado. `squadNeed` mide **cuánto
+extrañaría el club a cada jugador**, que es la caída de nivel hasta su
+reemplazo en el plantel, y `autoTransferList` publica a los que menos necesita.
+Un 9 con un suplente de 83 es prescindible; el mismo 9 con un suplente de 68 es
+insustituible, aunque en los dos casos sea el mejor de su puesto.
+
+Que se calcule la mantiene coherente: cuando le compras un jugador a un club,
+su lista cambia sola.
+
+Llegar ahí llevó tres iteraciones, y las dos primeras fallaron de maneras
+opuestas y visibles:
+
+1. una `squadNeed` por escalones dejó la lista **vacía** —ningún jugador caía
+   justo en el escalón que publicaba—;
+2. al hacerla continua, la lista pasó a ser **todos arqueros**: son los que
+   siempre tienen un suplente del mismo puesto, y el desempate por orden de
+   plantel los agrupaba;
+3. sin tope por club, la lista llegó al **45% de la liga**.
+
+La versión final es continua, desempata por nivel descendente —cada club
+prefiere publicar al mejor de los que le sobran, que es el que alguien le va a
+comprar— y publica **hasta tres**.
+
+### Los diecinueve clubes ofertaban por el mismo jugador
+
+La primera versión de las ofertas recibidas elegía, para cada club, a tu mejor
+jugador. Los veinte elegían al mismo, al mismo precio: la bandeja mostraba
+diecinueve ofertas idénticas.
+
+El arreglo tiene dos partes. Un tope de tres ofertas por fecha, y un
+`bestTargetFor(club, yaTomados)` que se evalúa **club por club en orden de
+reputación**: el más grande elige primero y el siguiente elige entre los que
+quedan. Cuando solo puse el tope, la bandeja pasó a mostrar **una** oferta,
+porque los clubes cuyo objetivo ya estaba tomado no buscaban un segundo.
+
+### El techo informado no podía pasarse de la edad
+
+El último bug de la fase, y lo encontré leyendo una captura del buscador: un
+jugador de 33 años figuraba con techo estimado **78–100**. El margen del
+informe se aplicaba a ciegas, y a ciegas cualquiera puede llegar a 100.
+
+Pero hay un límite que el ojeador **sí** conoce con solo mirarle el documento:
+la edad. El techo informado se acota ahora con la banda de crecimiento por
+edad. Y el arreglo tuvo una segunda mitad que apareció cuando cayó un test: al
+recortar el borde de arriba, el rango de un jugador con el techo justo en el
+máximo de su edad se angostaba, y **parecía mejor medido que los demás**. La
+banda no se recorta, se **corre** hacia abajo: la incertidumbre del ojeador es
+la misma, lo único que cambia es hacia dónde puede equivocarse.
+
+```
+edad 22, nivel 85  ->  techo 70–94
+edad 33, nivel 85  ->  techo 61–85
+```
+
+### Lo que este mercado todavía no hace
+
+Los otros diecinueve clubes no fichan entre ellos: sus planteles solo cambian
+cuando vos les compras o les vendés. La pantalla de historial lo dice en lugar
+de llenar la tabla de movimientos inventados que no afectan a nada. Los
+contratos de los jugadores ajenos se asumen en 24 meses, porque el dataset de
+los rivales se genera y no los declara.
 
 ---
 
@@ -539,12 +654,19 @@ test también salió de un error real en los datos escritos a mano.
 
 ## Verificación
 
-**Tests automatizados** (`npm test`, 162 en total):
+**Tests automatizados** (`npm test`, 294 en total):
 
 - `tests/ui-logic.test.ts` — el puente con el motor, las alertas derivadas,
   el estado de preparación, la autoselección, el cambio de formación sin
   perder la selección, y la coherencia del dataset demo.
 - `tests/pitch-layout.test.ts` — la disposición de la cancha.
+- `tests/market.test.ts` — la valuación, las dos invariantes del informe, la
+  negociación y el cálculo de la lista de transferibles.
+- `tests/season.test.ts` — el fixture, la tabla y las estadísticas del torneo.
+- `tests/staff.test.ts` — entre otras cosas, el test de **honestidad**: un rol
+  no puede declararse `implementado` sin un consumidor real que se mueva, y la
+  fase que promete un rol pendiente tiene que existir en `plan.ts` y no estar
+  entregada.
 
 **Flujos en el navegador** (`scripts/ui-smoke.mjs`, 20 comprobaciones): la
 navegación, el once completo, el cambio de formación conservando jugadores, el
@@ -564,10 +686,11 @@ para correrlo. Convertirlo en tests automatizados es la fase 8.
 
 ## Lo que sigue
 
-Con las fases 4 y 7 el prototipo se juega y los planteles evolucionan: se
-prepara el equipo, se juega la fecha, el torneo avanza y los jugadores crecen o
-se caen. Lo próximo es la fase 5 (mercado), después la 6 (estadio y finanzas) y
-la 8 (backend real y el riesgo de lesión por equipo).
+Con las fases 4, 5 y 7 el prototipo se juega, se arma y los planteles
+evolucionan: se prepara el equipo, se juega la fecha, el torneo avanza, los
+jugadores crecen o se caen, y el plantel se puede cambiar comprando y vendiendo.
+Lo próximo es la fase 6 (estadio y finanzas) y después la 8 (backend real y el
+riesgo de lesión por equipo, que es lo que falta para el último rol del staff).
 
 Deuda anotada, no escondida:
 

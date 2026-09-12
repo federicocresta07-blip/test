@@ -14,6 +14,7 @@ import './pages/squad.css';
 import './pages/lineup.css';
 import './pages/club.css';
 import './pages/competition.css';
+import './pages/market.css';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Falta el contenedor #root en index.html');

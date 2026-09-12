@@ -1,0 +1,434 @@
+/*
+ * Mercado (fase 5).
+ *
+ * Lo que distingue estas pantallas del resto: casi ningun numero es exacto.
+ * El nivel y el valor de un jugador ajeno son estimaciones, y el estilo tiene
+ * que dejarlo ver — de ahi el margen chico al lado de cada numero.
+ */
+
+/* --- Numeros informados, no exactos --- */
+.reported {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.reported__value {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+
+.reported--sm .reported__value {
+  font-size: var(--fs-sm);
+}
+
+/* El margen del informe: chico, y siempre presente cuando existe. */
+.reported__margin,
+.reportedvalue__margin {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  cursor: help;
+}
+
+.reportedvalue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  cursor: help;
+}
+
+.reportedpot {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  cursor: help;
+  border-bottom: 1px dotted var(--border-strong);
+}
+
+/* --- Buscador --- */
+.msearch {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--sp-5);
+}
+
+.msearch__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.msearch__field > span {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.msearch__input {
+  height: 26px;
+  padding: 0 var(--sp-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+  min-width: 0;
+}
+
+.msearch__input:focus-visible {
+  border-color: var(--accent);
+}
+
+.msearch__positions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.msearch__poslabel {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-right: var(--sp-3);
+}
+
+.msearch__pos {
+  min-width: 34px;
+  height: 22px;
+  padding: 0 var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  transition: background var(--transition-fast);
+}
+
+.msearch__pos:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.msearch__pos.is-active {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.msearch__check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+/* --- Ofertar --- */
+.offerdialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.offerdialog__who {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.offerdialog__report {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-5);
+  margin: 0;
+  padding: var(--sp-5);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-md);
+}
+
+.offerdialog__report dt {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.offerdialog__report dd {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+}
+
+.offerdialog__context {
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.offerdialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.offerdialog__label {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.offerdialog__input {
+  height: 34px;
+  padding: 0 var(--sp-5);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  font-family: inherit;
+  width: 100%;
+}
+
+.offerdialog__hint {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+.offerdialog__shortcuts {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.offerdialog__shortcut {
+  height: 22px;
+  padding: 0 var(--sp-5);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--fs-2xs);
+}
+
+.offerdialog__shortcut:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.offerdialog__cash {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.offerdialog__cash.is-short {
+  color: var(--danger);
+}
+
+.offerdialog__answer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.offerdialog__answer.is-aceptada {
+  background: var(--ok-subtle);
+  border-color: var(--ok);
+}
+
+.offerdialog__answer.is-contraoferta {
+  background: var(--warn-subtle);
+  border-color: var(--warn);
+}
+
+.offerdialog__answer.is-rechazada {
+  background: var(--danger-subtle);
+  border-color: var(--danger);
+}
+
+.offerdialog__verdict {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+}
+
+.offerdialog__reason,
+.offerdialog__closed {
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* --- Ofertas --- */
+.offerlist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--sp-5);
+}
+
+.offercard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  min-width: 0;
+  align-self: start;
+}
+
+.offercard__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-5);
+}
+
+.offercard__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.offercard__player {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+
+.offercard__club {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+.offercard__amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.offercard__money {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  line-height: 1.1;
+}
+
+.offercard__counter {
+  font-size: var(--fs-2xs);
+  color: var(--warn);
+}
+
+.offercard__reason {
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.offercard__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.offercard__actions .offerdialog__input {
+  width: 130px;
+  height: 26px;
+  font-size: var(--fs-sm);
+}
+
+.offercard__hint {
+  flex: 1;
+  min-width: 120px;
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+.offerhistory {
+  display: flex;
+  flex-direction: column;
+}
+
+.offerhistory__row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 60px 80px 72px minmax(0, 1.4fr);
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--fs-sm);
+}
+
+.offerhistory__row:last-child {
+  border-bottom: none;
+}
+
+.offerhistory__reason {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+/* --- Cuanto lo necesitas --- */
+.needbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  cursor: help;
+}
+
+.needbar__track {
+  flex: 1;
+  height: 4px;
+  min-width: 48px;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.needbar__fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.needbar__label {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+@media (max-width: 880px) {
+  .offerlist {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .offerhistory__row {
+    grid-template-columns: 92px minmax(0, 1fr) 80px;
+    row-gap: var(--sp-2);
+  }
+
+  .offerhistory__reason {
+    grid-column: 1 / -1;
+  }
+}

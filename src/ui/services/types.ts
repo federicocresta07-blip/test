@@ -84,4 +84,38 @@ export type GameService = {
    * informaba mal se descubre jugando.
    */
   promoteYouth(clubId: string, youthId: string): Promise<void>;
+
+  // ============================================================
+  // Mercado (secciones 10, 11 — fase 5)
+  // ============================================================
+
+  /**
+   * Ofrece por un jugador de otro club.
+   *
+   * El club vendedor responde en el acto y por calculo: valua al jugador,
+   * mira cuanto lo necesita y compara. Devuelve lo que respondio.
+   */
+  sendOffer(clubId: string, playerId: string, amount: number): Promise<OfferOutcome>;
+
+  /** Acepta, rechaza o contraoferta una oferta recibida por un jugador propio. */
+  respondToOffer(
+    clubId: string,
+    offerId: string,
+    action: 'aceptar' | 'rechazar' | 'contraofertar',
+    counter?: number,
+  ): Promise<OfferOutcome>;
+
+  /** Pone o saca a un jugador propio de la lista de transferibles. */
+  setTransferListed(clubId: string, playerId: string, listed: boolean): Promise<void>;
+};
+
+/** Lo que dejo una operacion del mercado. */
+export type OfferOutcome = {
+  readonly verdict: 'aceptada' | 'contraoferta' | 'rechazada';
+  /** Lo que pide el club vendedor, si contraoferto. */
+  readonly counter: number | null;
+  /** Lo que dijo el club vendedor, en sus palabras. */
+  readonly reason: string;
+  /** El traspaso se cerro. */
+  readonly closed: boolean;
 };
