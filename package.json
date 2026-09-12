@@ -20,7 +20,9 @@
     "demo": "node scripts/demo.ts",
     "season": "node scripts/season.ts",
     "clausura98": "node scripts/clausura-1998.ts",
-    "torneo": "node scripts/torneo.ts"
+    "torneo": "node scripts/torneo.ts",
+    "crests": "node scripts/crests.mjs",
+    "import:planteles": "node scripts/import-squads.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

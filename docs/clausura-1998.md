@@ -30,12 +30,25 @@ el dataset, no quedar escondido detrás de datos inventados.
 
 ### Por qué faltan 18
 
-La política de egreso de red de esta sesión bloquea las páginas de referencia
-—Wikipedia, bdfa.com.ar, footballdatabase.eu, rsssf.org, ceroacero y los
-sitios de los clubes—. Solo funciona el buscador, que devuelve resúmenes, no
-las tablas de plantel.
+La política de egreso de red de estas sesiones bloquea las páginas de
+referencia. Se volvió a intentar, con más vías que la primera vez, y el
+resultado fue el mismo:
 
-Y esos resúmenes **mezclan los dos torneos de 1998**, que es el riesgo real.
+| Vía | Resultado |
+|---|---|
+| `curl` a Wikipedia (es/en), bdfa.com.ar, rsssf.org, footballdatabase.eu, livefutbol.com, worldfootball.net, transfermarkt | **403** del proxy, en los quince hosts |
+| `curl` a Wikimedia Commons, Wikidata, dbpedia, archive.org, web.archive.org, kaggle, huggingface | **403** |
+| `WebFetch` | bloqueado en **todos** los dominios, no solo en los de referencia |
+| `WebSearch` | responde, pero devuelve **resúmenes** generados, no las tablas |
+| `openfootball/south-america` (clonable, dominio público) | Argentina va **desde 2018-19**, y son resultados, no planteles |
+| Datasets de fútbol en GitHub y en el registry de npm | ninguno con planteles argentinos de 1998 |
+
+Lo único que sí se alcanza es GitHub y los registries de paquetes. Sirvió para
+los escudos —ver más abajo— y no para los planteles.
+
+Y los resúmenes del buscador **mezclan los dos torneos de 1998**, que es el
+riesgo real.
+
 Ejemplo concreto: al buscar el plantel de Boca del Clausura 1998, la búsqueda
 devolvió el once de Bianchi con Riquelme, Palermo y Barros Schelotto, más los
 20 goles de Palermo en 19 partidos. Nada de eso corresponde a este torneo:
@@ -110,6 +123,41 @@ salió, el dataset queda completo y auditable.
 Si preferís que lo busque yo, alcanza con que un administrador habilite en la
 política de egreso uno de estos dominios para la sesión: `es.wikipedia.org`,
 `bdfa.com.ar` o `footballdatabase.eu`.
+
+### El importador
+
+Para que cargarlos no sea trabajo manual hay un importador que toma texto
+plano y lo convierte en entradas del dataset, validando contra el motor:
+
+```bash
+node scripts/import-squads.mjs planteles.txt             # valida y muestra
+node scripts/import-squads.mjs planteles.txt --escribir   # genera el TypeScript
+```
+
+El formato es un bloque por club:
+
+```
+# boca
+DT: Héctor Veira
+fuente: https://...
+nota: las últimas seis fechas las dirigió Carlos García Cambón
+
+POR | Carlos Navarro Montoya | 1 | 33
+DFC | Jorge Bermúdez         | 2 | 27
+DC  | Martín Palermo         | 9 | 24
+```
+
+Obligatorios: **puesto** y **nombre**. El dorsal y la edad pueden ir vacíos.
+
+Lo que rechaza antes de escribir nada: un id de club que no jugó el torneo, un
+código de puesto que el motor no conoce, un dorsal que no es entero y una edad
+inverosímil. Lo que avisa sin frenar: un plantel sin arquero, con menos de
+once, con dorsales o nombres repetidos, o sin fuente declarada.
+
+**El overall no se pide.** Es valoración nuestra, no dato histórico, y pedirlo
+en el mismo archivo que los nombres invita a confundir las dos cosas. Los
+jugadores importados entran con el overall por defecto y el plantel queda como
+`parcial` declarando cuántos lo tienen, para que se vea que falta valorarlos.
 
 ---
 

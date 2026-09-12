@@ -203,6 +203,18 @@
   letter-spacing: -0.02em;
 }
 
+/*
+ * El escudo real no lleva ni fondo ni borde: ya trae su propia forma, y
+ * encuadrarlo en un cuadrado con borde lo hace parecer un boton. `contain`
+ * respeta los que no son cuadrados sin deformarlos.
+ */
+.clubbadge--crest {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  object-fit: contain;
+}
+
 .topbar__clubname {
   font-size: var(--fs-md);
   font-weight: var(--fw-semibold);

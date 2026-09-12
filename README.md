@@ -26,8 +26,9 @@ npm run demo       # simula un partido y muestra todo lo que el motor sabe conta
 npm run season     # 10 fechas seguidas con evolución del plantel
 npm run calibrate  # miles de partidos y distribución de resultados
 npm run clausura98 # estado del dataset histórico del Clausura 1998
+npm run crests     # ingesta de los escudos oficiales (ver docs/ui.md)
 
-npm test           # 294 tests
+npm test           # 299 tests
 npm run typecheck  # motor + interfaz
 ```
 
@@ -274,7 +275,7 @@ src/
   data/                        generador de planteles y equipos de ejemplo
   data/clausura-1998/          dataset histórico real (ver docs/clausura-1998.md)
   ui/                          la interfaz web (ver docs/ui.md)
-tests/                         294 tests
+tests/                         299 tests
 scripts/                       demo, temporada, torneo completo, calibración,
                                dataset histórico y humo de la UI
 ```

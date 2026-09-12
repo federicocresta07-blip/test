@@ -39,7 +39,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 294 tests
+npm test           # 299 tests
 ```
 
 Requiere Node 22.18 o superior.
@@ -637,8 +637,9 @@ modificadores de suma cero como el resto de las formaciones.
 Siguiendo la sección 19:
 
 - **Los clubes son reales** porque son instituciones públicas y hacen creíble
-  el prototipo. No se usan escudos: el badge se dibuja con las iniciales y
-  los colores institucionales.
+  el prototipo. Desde la ingesta de escudos, los **veinte de Primera llevan su
+  escudo oficial**; los cuatro de la Primera Nacional siguen con el badge
+  dibujado con iniciales y colores institucionales. Ver más abajo.
 - **Los jugadores son inventados.** No representan a futbolistas reales.
 - **Todo está marcado como demo** con una insignia visible en la barra
   superior.
@@ -652,9 +653,72 @@ test también salió de un error real en los datos escritos a mano.
 
 ---
 
+## Los escudos son los de verdad
+
+Los veinte clubes de Primera llevan su escudo oficial, en vectorial. Los
+cuatro de la Primera Nacional no, y eso es una línea explícita, no un olvido:
+no están en el repo de origen, y un `<img>` roto se ve peor que un escudo
+dibujado.
+
+### De dónde salen
+
+De [FCLOGO](https://github.com/FCLOGO/fclogo.top) (MIT), que tiene los
+escudos de la AFA en SVG y —lo más interesante— **versionados por año**: hay
+un Boca `v1996`, un River `v1993` y un `v1998`, un Independiente `v1987`. Para
+el dataset del Clausura 1998 eso permitiría usar el escudo de la época.
+
+Fue la única fuente alcanzable. Wikimedia Commons, que es donde uno iría a
+buscar esto, responde 403 como todo el resto; GitHub y los registries de
+paquetes son lo único que la política de red permite. Los escudos se
+consiguieron por ahí; los planteles de 1998 no, porque no existen en ningún
+repo de código (ver `docs/clausura-1998.md`).
+
+### Cómo entran
+
+`node scripts/crests.mjs <clone de fclogo.top>` elige por club la versión en
+color más reciente, la optimiza y escribe `public/crests/<id>.svg` más el
+manifiesto `src/ui/data/crests.ts`. Se corre a mano: los escudos cambian una
+vez por década.
+
+Son **archivos estáticos, no van en el bundle**: 143 kB entre los veinte, que
+el navegador cachea por separado del código y pide sólo cuando los ve.
+
+El mapeo club → carpeta es a mano a propósito. Hay homónimos reales: el
+`025_San Martín` del repo es el de San Juan y el nuestro es el de Tucumán.
+Adivinar por nombre habría puesto el escudo de otro club, que es el error que
+nadie nota hasta verlo en pantalla.
+
+### El optimizador me rompió dos escudos
+
+Los SVG son exports de Illustrator con coordenadas de cuatro decimales sobre
+un lienzo de 800 unidades. Redondear a entero bajaba el total un 40% más, y el
+razonamiento parecía sólido: una unidad de 800 es 0,08 px en el escudo más
+grande que dibujamos.
+
+Estaba mal. Los trazos usan comandos **relativos**: cada número es un delta,
+no una coordenada, así que el error se acumula a lo largo del trazo y todo
+delta menor a 0,5 colapsa a cero. El `d` de Vélez quedó con cosas como
+`c00-1-1-1`.
+
+Huracán y Vélez se dibujaban como una mancha. **No dio un solo error**: el SVG
+era válido, sólo describía otra figura, y los tests pasaban —verifican que el
+archivo exista y que el `<img>` cargue, y las dos cosas eran ciertas—. Lo
+encontré mirando la captura de la tabla. Quedó en dos decimales.
+
+### Una nota que corresponde
+
+Los escudos son **marcas registradas de cada club**. Se usan acá para
+identificarlo, que es para lo que existen, y el juego no se presenta como
+oficial ni afiliado a ninguno. Si en algún momento conviene sacarlos, es un
+solo paso: borrar `public/crests/` y correr el script sin fuente, y los
+veinticuatro clubes vuelven al badge dibujado sin tocar una línea de la
+interfaz.
+
+---
+
 ## Verificación
 
-**Tests automatizados** (`npm test`, 294 en total):
+**Tests automatizados** (`npm test`, 299 en total):
 
 - `tests/ui-logic.test.ts` — el puente con el motor, las alertas derivadas,
   el estado de preparación, la autoselección, el cambio de formación sin
@@ -662,6 +726,9 @@ test también salió de un error real en los datos escritos a mano.
 - `tests/pitch-layout.test.ts` — la disposición de la cancha.
 - `tests/market.test.ts` — la valuación, las dos invariantes del informe, la
   negociación y el cálculo de la lista de transferibles.
+- `tests/crests.test.ts` — que el manifiesto de escudos no se desincronice de
+  los clubes: ningún id inventado, ningún club en las dos listas ni en
+  ninguna, y el archivo de cada escudo declarado existe.
 - `tests/season.test.ts` — el fixture, la tabla y las estadísticas del torneo.
 - `tests/staff.test.ts` — entre otras cosas, el test de **honestidad**: un rol
   no puede declararse `implementado` sin un consumidor real que se mueva, y la
