@@ -43,9 +43,9 @@ export const NAVIGATION: readonly NavSection[] = [
         label: 'Entrenamiento',
         path: '/equipo/entrenamiento',
         ready: false,
-        phase: 3,
+        phase: 4,
         summary:
-          'Planes de entrenamiento por puesto y por jugador, con el efecto del staff y de las instalaciones sobre el desarrollo.',
+          'Planes de entrenamiento por puesto y por jugador, con el efecto del staff y de las instalaciones sobre el desarrollo. Va con inferiores porque las dos cosas necesitan lo mismo: que el motor sepa hacer crecer los atributos de un jugador, que hoy no lo hace.',
       },
     ],
   },
@@ -100,7 +100,7 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Staff',
         path: '/club/staff',
-        ready: false,
+        ready: true,
         phase: 3,
         summary:
           'Los trece roles del cuerpo técnico con nivel en estrellas, salario, efecto actual y coste de mejora.',
@@ -124,7 +124,7 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Instalaciones',
         path: '/club/instalaciones',
-        ready: false,
+        ready: true,
         phase: 3,
         summary:
           'Centro de entrenamiento, academia, centro médico, scouting y oficinas, de una a cinco estrellas.',
@@ -188,7 +188,7 @@ export const NAVIGATION: readonly NavSection[] = [
       {
         label: 'Mensajes',
         path: '/informacion/mensajes',
-        ready: false,
+        ready: true,
         phase: 3,
         summary: 'Bandeja completa con el historial de mensajes del cuerpo técnico y la dirigencia.',
       },
@@ -212,4 +212,16 @@ export function findNavItem(path: string): NavItem | undefined {
 /** Cuantos modulos quedan pendientes: la sidebar lo informa sin esconderlo. */
 export function pendingModuleCount(): number {
   return ALL_ITEMS.filter((item) => !item.ready).length;
+}
+
+/**
+ * Hasta que fase llega lo entregado. Se deriva de las propias entradas, asi
+ * que agregar una pantalla alcanza para que la sidebar lo diga: no hay un
+ * numero escrito a mano que se pueda quedar viejo.
+ */
+export function deliveredThroughPhase(): number {
+  return ALL_ITEMS.filter((item) => item.ready).reduce(
+    (highest, item) => Math.max(highest, item.phase),
+    0,
+  );
 }

@@ -11,6 +11,8 @@
 import type { Player } from '../../domain/player.ts';
 import type { Position } from '../../domain/positions.ts';
 import type { Tactics } from '../../domain/tactics.ts';
+import type { FacilityId, FacilityLevel } from '../../domain/facilities.ts';
+import type { StaffLevel, StaffRole } from '../../domain/staff.ts';
 
 export type Division = 'Primera División' | 'Primera Nacional';
 
@@ -73,44 +75,65 @@ export type LineupSelection = {
   readonly roles: MatchRoles;
 };
 
-export type StaffRole =
-  | 'Entrenador de arqueros'
-  | 'Entrenador defensivo'
-  | 'Entrenador de mediocampistas'
-  | 'Entrenador ofensivo'
-  | 'Preparador físico'
-  | 'Ojeador'
-  | 'Ojeador juvenil'
-  | 'Entrenador juvenil'
-  | 'Médico'
-  | 'Fisioterapeuta'
-  | 'Psicólogo deportivo'
-  | 'Analista de rivales'
-  | 'Secretario técnico';
-
+/**
+ * Un profesional del cuerpo técnico.
+ *
+ * El salario y el efecto NO se guardan acá: se derivan del rol y del nivel
+ * con el modelo de dominio (`src/domain/staff.ts`). Así no puede pasar que
+ * lo que muestra la pantalla no coincida con lo que aplica el juego.
+ */
 export type StaffMember = {
   readonly id: string;
   readonly name: string;
   readonly role: StaffRole;
-  /** Nivel 1..5 estrellas. */
-  readonly stars: number;
-  readonly salary: number;
+  readonly level: StaffLevel;
   readonly yearsAtClub: number;
-  readonly currentEffect: string;
-  readonly nextEffect: string;
-  readonly upgradeCost: number;
 };
 
-export type Facility = {
+/** Un candidato disponible para un puesto vacante (seccion 7). */
+export type StaffCandidate = {
   readonly id: string;
   readonly name: string;
-  readonly stars: number;
-  readonly description: string;
-  readonly upgradeCost: number;
-  readonly upgradeWeeks: number;
-  /** Obra en curso: 0..1, o null si no hay obra. */
-  readonly progress: number | null;
+  readonly level: StaffLevel;
+  /** De dónde viene o qué hizo. Da contexto a la decisión. */
+  readonly background: string;
 };
+
+/** Puesto sin cubrir, con los candidatos que ofrece el mercado. */
+export type StaffVacancy = {
+  readonly role: StaffRole;
+  readonly candidates: readonly StaffCandidate[];
+};
+
+/**
+ * Una instalación del club. Igual que con el staff, el coste de mejora y el
+ * mantenimiento se derivan del modelo de dominio.
+ */
+export type ClubFacility = {
+  readonly id: FacilityId;
+  readonly level: FacilityLevel;
+};
+
+/** Obra o mejora en curso (secciones 5.5, 8, 9). */
+export type DevelopmentProject = {
+  readonly id: string;
+  readonly kind: 'estadio' | 'instalación' | 'staff';
+  /** Qué se está haciendo, listo para mostrar. */
+  readonly label: string;
+  /** A qué apunta: id de instalación o de profesional. Vacío para el estadio. */
+  readonly targetId: string | null;
+  readonly fromLevel: number | null;
+  readonly toLevel: number | null;
+  readonly weeksTotal: number;
+  readonly weeksLeft: number;
+  readonly cost: number;
+};
+
+/** Avance de una obra, 0..1. Derivado, nunca guardado. */
+export function projectProgress(project: DevelopmentProject): number {
+  if (project.weeksTotal <= 0) return 1;
+  return Math.max(0, Math.min(1, 1 - project.weeksLeft / project.weeksTotal));
+}
 
 export type Finances = {
   readonly cash: number;
@@ -194,15 +217,6 @@ export type SquadAlert = {
   readonly actionLabel: string;
 };
 
-/** Obra o mejora en curso (seccion 5.5). */
-export type DevelopmentProject = {
-  readonly id: string;
-  readonly name: string;
-  readonly kind: 'estadio' | 'instalación' | 'staff';
-  readonly progress: number;
-  readonly weeksLeft: number;
-};
-
 /** Estado completo del juego que consume la UI. */
 export type GameState = {
   readonly manager: Manager;
@@ -212,7 +226,8 @@ export type GameState = {
   readonly lineup: LineupSelection;
   readonly finances: Finances;
   readonly staff: readonly StaffMember[];
-  readonly facilities: readonly Facility[];
+  readonly vacancies: readonly StaffVacancy[];
+  readonly facilities: readonly ClubFacility[];
   readonly projects: readonly DevelopmentProject[];
   readonly fixtures: readonly Fixture[];
   readonly table: readonly LeagueRow[];
@@ -227,4 +242,4 @@ export type GameState = {
 /** Grupo de posiciones para los filtros rapidos del plantel (seccion 6.2). */
 export type PositionGroup = 'POR' | 'DEF' | 'MED' | 'ATA';
 
-export type { Player, Position, Tactics };
+export type { FacilityId, FacilityLevel, Player, Position, StaffLevel, StaffRole, Tactics };

@@ -8,6 +8,9 @@ import { findNavItem } from './router/navigation.ts';
 import { DashboardPage } from './pages/DashboardPage.tsx';
 import { SquadPage } from './pages/SquadPage.tsx';
 import { LineupPage } from './pages/LineupPage.tsx';
+import { StaffPage } from './pages/StaffPage.tsx';
+import { FacilitiesPage } from './pages/FacilitiesPage.tsx';
+import { MessagesPage } from './pages/MessagesPage.tsx';
 import { NotFoundPage, PlaceholderPage } from './pages/PlaceholderPage.tsx';
 
 /** Resuelve la pantalla que corresponde a la ruta actual. */
@@ -25,6 +28,12 @@ function Screen(): ReactNode {
     // panel abierto: la seccion 6.10 pide mantener el foco en la formacion.
     case '/equipo/tactica':
       return <LineupPage openPanel="tactica" />;
+    case '/club/staff':
+      return <StaffPage />;
+    case '/club/instalaciones':
+      return <FacilitiesPage />;
+    case '/informacion/mensajes':
+      return <MessagesPage />;
     default:
       return findNavItem(path) ? <PlaceholderPage /> : <NotFoundPage />;
   }

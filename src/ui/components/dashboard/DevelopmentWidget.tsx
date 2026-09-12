@@ -6,6 +6,8 @@ import { Button } from '../ui/Button.tsx';
 import { EmptyState } from '../ui/EmptyState.tsx';
 import { Link } from '../../router/router.tsx';
 import { useGameState } from '../../state/GameProvider.tsx';
+import { facilitySpec } from '../../../domain/facilities.ts';
+import { projectProgress } from '../../models/index.ts';
 
 /**
  * DESARROLLO DEL CLUB (seccion 5.5).
@@ -36,12 +38,12 @@ export function DevelopmentWidget(): ReactNode {
             <li key={project.id} className="projectrow">
               <span className="col">
                 <span className="projectrow__top">
-                  <span className="projectrow__name truncate">{project.name}</span>
+                  <span className="projectrow__name truncate">{project.label}</span>
                   <span className="projectrow__weeks tnum muted">
                     {project.weeksLeft} {project.weeksLeft === 1 ? 'semana' : 'semanas'}
                   </span>
                 </span>
-                <ProgressBar value={project.progress} tone="accent" height={5} />
+                <ProgressBar value={projectProgress(project)} tone="accent" height={5} />
               </span>
             </li>
           ))}
@@ -53,8 +55,8 @@ export function DevelopmentWidget(): ReactNode {
         <ul>
           {facilities.map((facility) => (
             <li key={facility.id} className="row row--between">
-              <span className="truncate secondary">{facility.name}</span>
-              <Stars value={facility.stars} size="sm" />
+              <span className="truncate secondary">{facilitySpec(facility.id).name}</span>
+              <Stars value={facility.level} size="sm" />
             </li>
           ))}
         </ul>

@@ -15,10 +15,23 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import type { FacilityId } from '../../domain/facilities.ts';
+import type { StaffRole } from '../../domain/staff.ts';
 import type { GameState, LineupSelection } from '../models/index.ts';
 import { gameService } from '../services/index.ts';
 
 export type SaveState = 'limpio' | 'sin-guardar' | 'guardando' | 'guardado' | 'error';
+
+/**
+ * Resultado de una inversion (mejora o contratacion).
+ * Cuando falla, `error` explica por que en palabras del usuario.
+ */
+export type InvestmentState = {
+  readonly pending: boolean;
+  readonly error: string | null;
+  /** Lo ultimo que se hizo bien, para confirmarlo en pantalla. */
+  readonly done: string | null;
+};
 
 export type GameContextValue = {
   readonly state: GameState | null;
@@ -30,6 +43,13 @@ export type GameContextValue = {
   readonly saveLineup: () => Promise<void>;
   readonly markMessageRead: (messageId: string) => void;
   readonly reload: () => void;
+
+  /** Desarrollo del club (secciones 7, 8). */
+  readonly investment: InvestmentState;
+  readonly upgradeStaff: (staffId: string, label: string) => Promise<void>;
+  readonly hireStaff: (role: StaffRole, candidateId: string, label: string) => Promise<void>;
+  readonly upgradeFacility: (facilityId: FacilityId, label: string) => Promise<void>;
+  readonly dismissInvestment: () => void;
 };
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -40,6 +60,11 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('limpio');
   const [reloadToken, setReloadToken] = useState(0);
+  const [investment, setInvestment] = useState<InvestmentState>({
+    pending: false,
+    error: null,
+    done: null,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -99,9 +124,95 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 
+  /**
+   * Ejecuta una inversion y recarga el estado.
+   *
+   * La recarga es a proposito: el servicio recompone salarios, efectos y
+   * finanzas desde el modelo de dominio, asi que despues de invertir la
+   * pantalla muestra numeros recalculados y no una copia parcheada a mano.
+   */
+  const invest = useCallback(
+    async (action: () => Promise<void>, label: string) => {
+      setInvestment({ pending: true, error: null, done: null });
+      try {
+        await action();
+        const refreshed = await gameService.loadGame();
+        setState(refreshed);
+        setInvestment({ pending: false, error: null, done: label });
+        window.setTimeout(() => {
+          setInvestment((current) => (current.done === label ? { ...current, done: null } : current));
+        }, 3200);
+      } catch (cause: unknown) {
+        setInvestment({
+          pending: false,
+          error: cause instanceof Error ? cause.message : 'No se pudo completar la operación',
+          done: null,
+        });
+      }
+    },
+    [],
+  );
+
+  const upgradeStaff = useCallback(
+    async (staffId: string, label: string) => {
+      if (!state) return;
+      await invest(() => gameService.upgradeStaff(state.club.id, staffId), label);
+    },
+    [invest, state],
+  );
+
+  const hireStaff = useCallback(
+    async (role: StaffRole, candidateId: string, label: string) => {
+      if (!state) return;
+      await invest(() => gameService.hireStaff(state.club.id, role, candidateId), label);
+    },
+    [invest, state],
+  );
+
+  const upgradeFacility = useCallback(
+    async (facilityId: FacilityId, label: string) => {
+      if (!state) return;
+      await invest(() => gameService.upgradeFacility(state.club.id, facilityId), label);
+    },
+    [invest, state],
+  );
+
+  const dismissInvestment = useCallback(
+    () => setInvestment({ pending: false, error: null, done: null }),
+    [],
+  );
+
   const value = useMemo<GameContextValue>(
-    () => ({ state, loading, error, saveState, updateLineup, saveLineup, markMessageRead, reload }),
-    [state, loading, error, saveState, updateLineup, saveLineup, markMessageRead, reload],
+    () => ({
+      state,
+      loading,
+      error,
+      saveState,
+      updateLineup,
+      saveLineup,
+      markMessageRead,
+      reload,
+      investment,
+      upgradeStaff,
+      hireStaff,
+      upgradeFacility,
+      dismissInvestment,
+    }),
+    [
+      state,
+      loading,
+      error,
+      saveState,
+      updateLineup,
+      saveLineup,
+      markMessageRead,
+      reload,
+      investment,
+      upgradeStaff,
+      hireStaff,
+      upgradeFacility,
+      dismissInvestment,
+    ],
   );
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

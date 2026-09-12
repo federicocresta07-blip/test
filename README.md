@@ -27,7 +27,7 @@ npm run season     # 10 fechas seguidas con evolución del plantel
 npm run calibrate  # miles de partidos y distribución de resultados
 npm run clausura98 # estado del dataset histórico del Clausura 1998
 
-npm test           # 186 tests
+npm test           # 210 tests
 npm run typecheck  # motor + interfaz
 ```
 
@@ -271,7 +271,7 @@ src/
   data/                        generador de planteles y equipos de ejemplo
   data/clausura-1998/          dataset histórico real (ver docs/clausura-1998.md)
   ui/                          la interfaz web (ver docs/ui.md)
-tests/                         186 tests
+tests/                         210 tests
 scripts/                       demo, temporada, calibración, dataset histórico
                                y humo de la UI
 ```

@@ -1,9 +1,9 @@
 # Interfaz web — diseño y estado
 
 Prototipo de la interfaz del juego, construido sobre el master prompt de UI
-v0.2. El plan es incremental y por fases; **esta entrega cubre la fase 0, la
-fase 1 y la estructura inicial de la fase 2**, como pide la sección 22 de ese
-documento.
+v0.2. El plan es incremental y por fases: **entregadas las fases 0, 1, 2 y
+3**. La sección 22 pedía empezar por las fases 0 a 2; el resto avanza de a
+una fase por entrega.
 
 ---
 
@@ -14,14 +14,23 @@ documento.
 | **0** | Fundaciones: tokens, AppShell, Sidebar, TopBar, routing, componentes base, modelos y mocks | **Entregada** |
 | **1** | Despacho del Manager: próximo partido, situación del plantel, bandeja, widgets | **Entregada** |
 | **2** | Plantel y Alineación estilo PC Fútbol | **Entregada** (incluye drag & drop, ficha rápida, táctica y autoselección) |
-| 3 | Staff, desarrollo e instalaciones | Pendiente |
-| 4 | Inferiores y scouting | Pendiente |
+| **3** | Staff, desarrollo e instalaciones | **Entregada** (incluye contratación y mejora reales, y la bandeja completa) |
+| 4 | Inferiores, scouting y entrenamiento | Pendiente |
 | 5 | Mercado y negociaciones | Pendiente |
 | 6 | Estadio y finanzas | Pendiente |
 | 7 | Competición y resultado de partido | Pendiente |
 | 8 | Hardening y preparación para backend real | Pendiente |
 
-Los 18 módulos pendientes están en la navegación con su página propia, que
+La pantalla de **Entrenamiento** se movió de la fase 3 a la fase 4. No es un
+recorte de alcance disimulado: los planes de entrenamiento necesitan que el
+motor sepa hacer crecer los atributos de un jugador con el tiempo, y eso hoy
+no existe —`progression/after-match.ts` mueve forma, moral, fatiga y cohesión,
+pero no toca los atributos—. Es la misma pieza que necesita inferiores, así
+que las dos van juntas. Las fichas de los cuatro entrenadores por línea dicen
+"Entrenamiento, fase 4", y un test verifica que esa fase sea exactamente la
+que declara la navegación: si alguien mueve una, la otra falla.
+
+Los 15 módulos pendientes están en la navegación con su página propia, que
 dice qué va a hacer y en qué fase se construye. Ninguno tiene botones que
 finjan funcionar: la página pendiente no tiene un solo botón.
 
@@ -34,7 +43,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 162 tests
+npm test           # 210 tests
 ```
 
 Requiere Node 22.18 o superior.
@@ -145,12 +154,84 @@ src/ui/
     dashboard/         NextMatchCard, SquadSituation, ManagerInbox,
                        MarketWidget, FinanceWidget, DevelopmentWidget,
                        CompetitionWidget
-  pages/               DashboardPage, SquadPage, LineupPage, PlaceholderPage
+  pages/               DashboardPage, SquadPage, LineupPage, StaffPage,
+                       FacilitiesPage, MessagesPage, PlaceholderPage
   data/                dataset de demostración, desacoplado de los componentes
 ```
 
-`StaffCard` y `UpgradeCard` del listado de la sección 16 no están: los usa la
-fase 3 y construirlos ahora sería código sin usar.
+    club/              EffectReadout, StaffCard, UpgradeCard, FacilityCard,
+                       VacancyCard, InvestmentBanner
+
+El listado de la sección 16 está completo: `StaffCard` y `UpgradeCard` se
+construyeron en la fase 3, que es cuando aparecieron sus primeros usos.
+
+---
+
+## Staff e instalaciones: el problema de los boosts mágicos
+
+El criterio de aceptación de la fase 3 dice *"no hay boosts mágicos o
+ambiguos"*. Lo que había antes era exactamente eso: el staff de demostración
+guardaba `currentEffect: '+12% velocidad de entrenamiento'`, un **string
+escrito a mano**. Nada lo calculaba y nada lo consumía.
+
+Ahora el efecto es un número que sale de `src/domain/staff.ts`, y la pantalla
+solo lo muestra. Tres reglas ordenan el módulo:
+
+**1. El efecto no se guarda, se calcula.** `StaffMember` guarda quién es y en
+qué nivel está, nada más. El salario, el efecto, el coste de mejora y el
+mantenimiento se derivan del modelo de dominio, así que no puede pasar que la
+pantalla diga una cosa y el juego aplique otra. Cambiar un número de balance
+se refleja en una partida ya empezada en lugar de quedar congelado.
+
+**2. Las instalaciones limitan al staff, y se ve de los dos lados.**
+
+```
+utilisation = 0,55 + 0,45 × (nivel de instalación / nivel del profesional)
+```
+
+Acotado a 1: **una instalación mejor de lo necesario nunca potencia**, solo
+deja de limitar. Al revés sí recorta. Un preparador físico ★5 en un centro de
+entrenamiento ★2 tiene un nominal de 26% y entrega 19%, y la ficha dice las
+dos cosas más el 73% que las explica. La ficha del profesional muestra el
+acople desde su lado ("esta instalación me limita al 73%") y la ficha de la
+instalación desde el otro ("está frenando a 1 de los 2 que respalda"). Sin
+esa segunda mitad, la decisión entre invertir en personas o en ladrillo se
+toma a ciegas.
+
+Para los roles que se leen como una reducción hay un detalle que ya nos
+confundió una vez: el aprovechamiento se aplica sobre **lo que el nivel agrega
+respecto de un nivel 1**, no sobre el número crudo. Y `direction` dice cómo se
+*lee* el efecto (+21% o −32%), no para dónde se mueve la tabla al subir de
+nivel: el médico "reduce" y su número **crece** con el nivel (reduce más),
+mientras que el margen de error del ojeador **baja**. Eso no se declara dos
+veces: `higherIsBetter(role)` se deriva de la tabla del rol, así que no puede
+contradecirla.
+
+**3. Cada efecto dice quién lo consume.** Tres roles tienen contraparte real
+hoy —preparador físico, médico y psicólogo, vía
+`progressionEffects()` → `updateAfterMatch`/`advanceDays`— y su ficha dice "se
+aplica hoy". Los otros diez declaran el módulo que los va a usar y en qué fase
+se construye, y su ficha lo dice tal cual: *"Todavía no se aplica · Scouting y
+mercado, fase 4"*. Un test (`HONESTIDAD` en `tests/staff.test.ts`) verifica que
+ningún rol se declare implementado si la progresión no lo consume de verdad, y
+que cada pendiente apunte a una fase futura. Es lo que hace que el criterio
+siga siendo cierto dentro de seis meses y no solo el día que se escribió.
+
+Medido de punta a punta, la fatiga de un titular después de un partido y tres
+días de descanso: **14** sin staff, **9** con staff ★5 en instalaciones ★1,
+**5** con staff ★5 en instalaciones ★5.
+
+### Los mensajes de la bandeja se derivan del estado
+
+Parte de la Bandeja del Manager ya no son datos fijos: `lib/staff-messages.ts`
+los calcula desde el cuerpo técnico y las instalaciones que hay ahora. El
+profesional más limitado se queja con su propio porcentaje, la dirigencia
+enumera los puestos vacantes con el coste real del candidato más accesible, y
+el informe del ojeador juvenil trae el rango de potencial con el ancho que le
+da su efecto (±8 puntos con la academia en ★2). Si mejorás la instalación que
+frena a alguien, su mensaje **desaparece solo**; si el puesto de ojeador
+juvenil está vacante, su informe no existe. Nadie tiene que acordarse de
+borrarlo.
 
 ---
 
@@ -230,8 +311,11 @@ para correrlo. Convertirlo en tests automatizados es la fase 8.
 
 ## Lo que sigue
 
-La fase 2 está completa en lo que se refiere a armar el equipo. Lo próximo
-según el plan es la fase 3 (staff, desarrollo e instalaciones).
+La fase 3 está completa: staff, instalaciones, la interacción entre ambos y la
+bandeja. Lo próximo según el plan es la fase 4 (inferiores, scouting y
+entrenamiento), que empieza por el motor: hacer crecer los atributos de un
+jugador con el tiempo, que es lo que hoy falta y lo que desbloquea de una vez
+los cuatro entrenadores por línea, el entrenador juvenil y los dos ojeadores.
 
 Vale una nota sobre la fase 7: el resultado de partido ya está resuelto del
 lado del motor —`simulateMatch` devuelve marcador, eventos minuto a minuto,

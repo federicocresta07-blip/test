@@ -17,6 +17,7 @@ import { Rng } from '../core/rng.ts';
 import type { Player } from '../domain/player.ts';
 import { isAvailable } from '../domain/player.ts';
 import type { Position } from '../domain/positions.ts';
+import { NO_STAFF_EFFECTS, type ProgressionStaffEffects } from '../domain/staff.ts';
 import { fatigueRatePerMinute } from '../engine/live-team.ts';
 import type { Team } from '../domain/team.ts';
 import type { MatchResult, PlayerMatchStats } from '../engine/match-types.ts';
@@ -33,6 +34,11 @@ export type ProgressionInput = {
   readonly tableMood?: number;
   /** Cuantos jugadores llegaron en el ultimo mercado (seccion 39). */
   readonly newSignings?: number;
+  /**
+   * Efectos del cuerpo tecnico (seccion 7): recuperacion fisica, tiempo de
+   * lesion y recuperacion de moral. Sin staff, el plantel evoluciona solo.
+   */
+  readonly staff?: ProgressionStaffEffects;
   readonly config?: EngineConfig;
 };
 
@@ -106,10 +112,18 @@ function fatigueFromMinutes(
   return fatigueRatePerMinute(player.attributes.resistencia, position, config) * minutes;
 }
 
-/** Cuanto se recupera un jugador con los dias de descanso. */
-function recovery(player: Player, restDays: number, minutes: number): number {
+/**
+ * Cuanto se recupera un jugador con los dias de descanso.
+ * El preparador fisico acelera esta recuperacion (seccion 7).
+ */
+function recovery(
+  player: Player,
+  restDays: number,
+  minutes: number,
+  staffRecovery = 0,
+): number {
   const stamina = player.attributes.resistencia;
-  const perDay = 7 + (stamina / 100) * 6;
+  const perDay = (7 + (stamina / 100) * 6) * (1 + staffRecovery / 100);
   // El que no jugo recupera mas rapido.
   const bonus = minutes <= 0 ? 6 : 0;
   return perDay * Math.max(0, restDays) + bonus;
@@ -122,6 +136,7 @@ export function updateAfterMatch(input: ProgressionInput): ProgressionResult {
   const goalsAgainst = input.side === 'local' ? input.result.score.away : input.result.score.home;
   const outcome = goalsFor > goalsAgainst ? 'victoria' : goalsFor === goalsAgainst ? 'empate' : 'derrota';
   const restDays = input.restDays ?? 4;
+  const staff = input.staff ?? NO_STAFF_EFFECTS;
   const notes: string[] = [];
   const injuries: InjuryReport[] = [];
   const suspensions: { playerId: string; playerName: string; matches: number }[] = [];
@@ -141,7 +156,7 @@ export function updateAfterMatch(input: ProgressionInput): ProgressionResult {
     const fatigue = clamp(
       player.condition.fatigue +
         fatigueFromMinutes(player, line?.position ?? player.position, minutes, config) -
-        recovery(player, restDays, minutes),
+        recovery(player, restDays, minutes, staff.recovery),
       0,
       100,
     );
@@ -167,7 +182,10 @@ export function updateAfterMatch(input: ProgressionInput): ProgressionResult {
       if (line.goals > 0) moraleShift += 2 * line.goals;
       if (line.redCard) moraleShift -= 4;
     }
-    const morale = approachLimit(player.condition.morale, moraleShift);
+    // El psicologo deportivo ayuda a levantar la moral, no a blindarla: el
+    // efecto se aplica a lo que sube, no a lo que baja (seccion 7).
+    const moraleWithStaff = moraleShift > 0 ? moraleShift * (1 + staff.morale / 100) : moraleShift;
+    const morale = approachLimit(player.condition.morale, moraleWithStaff);
 
     // --- Puesta a punto ---
     const sharpness = clamp(
@@ -180,7 +198,10 @@ export function updateAfterMatch(input: ProgressionInput): ProgressionResult {
     let injuryDaysRemaining = Math.max(0, player.injuryDaysRemaining - restDays);
     if (line?.injured) {
       const severity = drawInjury(player.id, input.result.seed, player.injuryProneness);
-      const daysOut = injuryDays(severity, player.id, input.result.seed);
+      const rawDays = injuryDays(severity, player.id, input.result.seed);
+      // El medico acorta la recuperacion (seccion 7). Nunca por debajo de dos
+      // dias: una lesion siempre saca del partido siguiente.
+      const daysOut = Math.max(2, Math.round(rawDays * (1 - staff.injuryRecovery / 100)));
       injuryDaysRemaining = Math.max(injuryDaysRemaining, daysOut);
       injuries.push({ playerId: player.id, playerName: player.name, severity, daysOut });
       notes.push(`${player.name} se lesionó (${severity}): ${daysOut} días afuera`);
@@ -245,13 +266,18 @@ export function updateAfterMatch(input: ProgressionInput): ProgressionResult {
  * Hace pasar el tiempo sin jugar: recupera fatiga y descuenta dias de lesion.
  * Sirve para parones, pretemporada o cuando el equipo no tiene partido.
  */
-export function advanceDays(team: Team, days: number, config: EngineConfig = DEFAULT_CONFIG): Team {
+export function advanceDays(
+  team: Team,
+  days: number,
+  staff: ProgressionStaffEffects = NO_STAFF_EFFECTS,
+  config: EngineConfig = DEFAULT_CONFIG,
+): Team {
   void config;
   const players = team.players.map((player): Player => ({
     ...player,
     condition: {
       ...player.condition,
-      fatigue: clamp(player.condition.fatigue - recovery(player, days, 0), 0, 100),
+      fatigue: clamp(player.condition.fatigue - recovery(player, days, 0, staff.recovery), 0, 100),
       sharpness: clamp(player.condition.sharpness - days * 0.4, 20, 100),
     },
     injuryDaysRemaining: Math.max(0, player.injuryDaysRemaining - days),

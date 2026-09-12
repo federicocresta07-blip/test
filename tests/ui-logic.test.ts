@@ -17,9 +17,17 @@ import { attributesFor } from '../src/data/squad-builder.ts';
 import { DEMO_SQUAD } from '../src/ui/data/squad.ts';
 import { clubById, CLUBS } from '../src/ui/data/clubs.ts';
 import { DEMO_TABLE, CURRENT_ROUND, DEMO_FIXTURES, SEASON_LABEL, TODAY } from '../src/ui/data/competition.ts';
-import { DEMO_FINANCES, DEMO_FACILITIES, DEMO_PROJECTS, DEMO_STAFF } from '../src/ui/data/club-development.ts';
+import {
+  DEMO_FACILITIES,
+  DEMO_FINANCES,
+  DEMO_PROJECTS,
+  DEMO_STAFF,
+  DEMO_VACANCIES,
+} from '../src/ui/data/club-development.ts';
 import { DEMO_OFFERS_RECEIVED, DEMO_OFFERS_SENT } from '../src/ui/data/market.ts';
 import { DEMO_INBOX } from '../src/ui/data/inbox.ts';
+import { staffMessages } from '../src/ui/lib/staff-messages.ts';
+import { staffEffect, staffSpec } from '../src/domain/staff.ts';
 import {
   naturalOverall,
   overallInSlot,
@@ -51,6 +59,7 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
     },
     finances: DEMO_FINANCES,
     staff: DEMO_STAFF,
+    vacancies: DEMO_VACANCIES,
     facilities: DEMO_FACILITIES,
     projects: DEMO_PROJECTS,
     fixtures: DEMO_FIXTURES,
@@ -401,4 +410,92 @@ test('un jugador generado con attributesFor entra sin romper nada', () => {
   });
   assert.equal(naturalOverall(extra), 85);
   assert.equal(extra.attributes.vision, 90);
+});
+
+// ============================================================
+// Desarrollo del club: mensajes derivados y coherencia del plan (fase 3)
+// ============================================================
+
+test('la bandeja avisa cuando una instalacion esta frenando a alguien', () => {
+  const derived = staffMessages(DEMO_STAFF, DEMO_VACANCIES, DEMO_FACILITIES, TODAY);
+  const bottleneck = derived.find((message) => message.id === 'staff-cuello-botella');
+  assert.ok(bottleneck, 'con las instalaciones de demo hay alguien limitado');
+
+  // El mensaje lo firma el profesional limitado, no una voz generica, y lleva
+  // a la pantalla donde se resuelve.
+  assert.ok(DEMO_STAFF.some((member) => member.name === bottleneck.authorName));
+  assert.equal(bottleneck.action?.route, '/club/instalaciones');
+});
+
+test('el aviso desaparece solo cuando las instalaciones dejan de limitar', () => {
+  const maxed = DEMO_FACILITIES.map((facility) => ({ ...facility, level: 5 as const }));
+  const derived = staffMessages(DEMO_STAFF, DEMO_VACANCIES, maxed, TODAY);
+  assert.equal(
+    derived.find((message) => message.id === 'staff-cuello-botella'),
+    undefined,
+    'sin nadie limitado el mensaje no tiene razon de existir',
+  );
+  // Los otros mensajes siguen: no se cae la bandeja entera.
+  assert.ok(derived.some((message) => message.id === 'staff-recuperacion'));
+});
+
+test('un informe de scouting juvenil solo existe si el puesto esta cubierto', () => {
+  const vacant = staffMessages(DEMO_STAFF, DEMO_VACANCIES, DEMO_FACILITIES, TODAY);
+  assert.equal(vacant.find((message) => message.id === 'staff-informe-juvenil'), undefined);
+  assert.ok(vacant.some((message) => message.id === 'staff-vacantes'));
+
+  const hired = [
+    ...DEMO_STAFF,
+    { id: 'hire-x', name: 'Walter Sandoval', role: 'Ojeador juvenil' as const, level: 3 as const, yearsAtClub: 0 },
+  ];
+  const covered = staffMessages(hired, [], DEMO_FACILITIES, TODAY);
+  const report = covered.find((message) => message.id === 'staff-informe-juvenil');
+  assert.ok(report, 'con el puesto cubierto el informe aparece');
+  assert.equal(covered.find((message) => message.id === 'staff-vacantes'), undefined);
+
+  // El ancho del rango sale del efecto real del ojeador, no de un texto fijo:
+  // con la academia en 2 y un ojeador de 3, se equivoca por mas de 4 puntos.
+  const spread = Math.round(staffEffect('Ojeador juvenil', 3, 2).actual);
+  assert.ok(report.body.includes(String(79 - spread)));
+  assert.ok(report.body.includes(String(79 + spread)));
+});
+
+test('los mensajes derivados no chocan con los fijos', () => {
+  const derived = staffMessages(DEMO_STAFF, DEMO_VACANCIES, DEMO_FACILITIES, TODAY);
+  const ids = new Set([...DEMO_INBOX, ...derived].map((message) => message.id));
+  assert.equal(ids.size, DEMO_INBOX.length + derived.length);
+
+  // Y todos apuntan a una ruta que existe en la navegacion.
+  for (const message of derived) {
+    if (!message.action) continue;
+    assert.ok(findNavItem(message.action.route), `${message.id} lleva a una ruta inexistente`);
+  }
+});
+
+test('las pantallas de la fase 3 estan marcadas como listas', () => {
+  for (const path of ['/club/staff', '/club/instalaciones', '/informacion/mensajes']) {
+    const item = findNavItem(path);
+    assert.ok(item, path);
+    assert.equal(item.ready, true, `${path} deberia estar entregada en la fase 3`);
+    assert.equal(item.phase, 3);
+  }
+});
+
+test('HONESTIDAD: la fase que promete un efecto pendiente es la que dice la navegacion', () => {
+  // Los cuatro entrenadores por linea dicen "Entrenamiento, fase N". Si la
+  // navegacion mueve esa pantalla de fase y nadie actualiza el rol, la ficha
+  // del profesional queda mintiendo. Este test lo impide.
+  const training = findNavItem('/equipo/entrenamiento');
+  assert.ok(training);
+  assert.equal(training.ready, false);
+
+  const consumer = staffSpec('Entrenador defensivo').consumer;
+  assert.equal(consumer.kind, 'pendiente');
+  if (consumer.kind !== 'pendiente') return;
+  assert.equal(consumer.module, 'Entrenamiento');
+  assert.equal(
+    consumer.phase,
+    training.phase,
+    'la ficha del entrenador y la navegacion prometen fases distintas',
+  );
 });

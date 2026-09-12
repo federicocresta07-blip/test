@@ -3,6 +3,11 @@
  *
  * El staff le habla al manager: cada mensaje viene de un rol concreto y
  * lleva a la pantalla donde se resuelve.
+ *
+ * Aca van solo los mensajes que el prototipo NO puede derivar: cuentan cosas
+ * del plantel y del calendario que todavia no se simulan. Los que dependen
+ * del cuerpo tecnico y de las instalaciones se calculan en
+ * `lib/staff-messages.ts` desde el estado real, asi que se actualizan solos.
  */
 
 import type { InboxMessage } from '../models/index.ts';
@@ -37,16 +42,6 @@ export const DEMO_INBOX: readonly InboxMessage[] = [
     date: '2026-05-08',
     unread: true,
     action: { label: 'Ver ofertas', route: '/mercado/recibidas' },
-  },
-  {
-    id: 'msg-4',
-    author: 'Ojeador juvenil',
-    authorName: 'Fabián Cardozo',
-    subject: 'Volante zurdo en la séptima de Quilmes',
-    body: 'Vi tres partidos de un volante zurdo de 16 años. Con nuestro nivel de scouting le estimo un potencial entre 72 y 86, que es un rango ancho: si mejoramos el departamento te lo puedo afinar bastante. Juega de interior y tiene pausa, no es solo físico.',
-    date: '2026-05-06',
-    unread: false,
-    action: { label: 'Ver inferiores', route: '/club/inferiores' },
   },
   {
     id: 'msg-5',
