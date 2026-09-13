@@ -150,7 +150,124 @@ de la fecha de una vez, así que no hay dónde esperar la alineación de otro
 humano. Una liga compartida pide que la fecha espere a todos los clubes
 humanos, y eso es una fase entera, no un parámetro.
 
-## 5. Neon: dos URLs, y no es redundancia
+## 5. PONERLO ONLINE, PASO A PASO
+
+Esta es la receta completa, desde una cuenta de Neon recién creada hasta la
+URL funcionando. Son unos diez minutos y no hace falta instalar nada: todo se
+hace desde el navegador.
+
+### PARTE 1 — Neon: la base de datos (3 minutos)
+
+**1.1** En [console.neon.tech](https://console.neon.tech), creá un proyecto.
+
+- **Name**: lo que quieras (`argentina-manager`).
+- **Postgres version**: la que venga por defecto.
+- **Region**: la más cercana. Para Argentina, *AWS South America (São Paulo)*
+  `sa-east-1`. La región importa porque cada consulta viaja: con la base en
+  Virginia y el jugador en Buenos Aires se pierden ~120 ms por consulta.
+
+**1.2** Copiá **DOS** cadenas de conexión, no una. Neon muestra un panel
+*Connection string* (o un botón **Connect**) con un selector de *branch*,
+*database* y *role*, y un interruptor de **connection pooling**.
+
+- Con el pooling **ACTIVADO** → esa es `DATABASE_URL`.
+- Con el pooling **DESACTIVADO** → esa es `DIRECT_URL`.
+
+**Cómo saber cuál es cuál sin depender de dónde esté el botón:** mirá el host.
+La que lleva `-pooler` en el nombre del host es la del pool.
+
+```
+DATABASE_URL   postgresql://USER:PASS@ep-algo-123-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require
+                                              ^^^^^^^ con pooler
+DIRECT_URL     postgresql://USER:PASS@ep-algo-123.sa-east-1.aws.neon.tech/neondb?sslmode=require
+                                              sin pooler
+```
+
+Son el MISMO host con y sin `-pooler`: si tenés una, la otra sale de sacarle o
+agregarle esa palabra. Dejá el `?sslmode=require` en las dos.
+
+Si la cadena muestra la contraseña como `****`, usá el botón de mostrar u
+*Reset password* en el role. Sin la contraseña real la cadena no sirve.
+
+### PARTE 2 — Vercel: el despliegue (5 minutos)
+
+**2.1** En [vercel.com](https://vercel.com) → **Sign Up** → **Continue with
+GitHub**, con la misma cuenta de GitHub que tiene el repositorio.
+
+**2.2** **Add New…** → **Project**. Buscá `test` (el repositorio
+`federicocresta07-blip/test`) y tocá **Import**.
+
+> Si el repositorio no aparece en la lista, es permiso de GitHub, no un error:
+> **Adjust GitHub App Permissions** → dale acceso a ese repositorio → volvé.
+
+**2.3** **NO toques el Framework Preset ni el Build Command.** El repositorio
+trae `vercel.json`, que ya define el build (`npm run vercel-build`), la carpeta
+de salida (`dist`) y la función (`api/index.mjs`). Aunque Vercel detecte "Vite"
+solo, lo de `vercel.json` manda. *Root Directory* se deja en la raíz.
+
+**2.4** Abrí **Environment Variables** y agregá **TRES**. Los nombres van
+exactos, respetando mayúsculas:
+
+| Name | Value |
+|---|---|
+| `DATABASE_URL` | la cadena **con** `-pooler` |
+| `DIRECT_URL` | la cadena **sin** `-pooler` |
+| `SESSION_SECRET` | una cadena al azar, mínimo 16 caracteres |
+
+Para generar el secreto, cualquiera de las dos:
+
+```bash
+# con el repositorio a mano
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+```js
+// o en la consola del navegador (F12 → Console), sin instalar nada
+crypto.getRandomValues(new Uint8Array(32)).reduce((s,b)=>s+b.toString(16).padStart(2,'0'),'')
+```
+
+Ese secreto **no se commitea y no se comparte**: con él se pueden firmar
+sesiones de cualquiera de los cuatro usuarios. Cambiarlo cierra todas las
+sesiones abiertas, que es justamente el botón de pánico.
+
+**2.5** **Deploy**. El build hace, en este orden: validar el schema, generar el
+cliente, **aplicar las migraciones**, construir la interfaz y empaquetar la
+función. Si falta alguna de las tres variables **corta ahí** en lugar de
+desplegar algo roto.
+
+**2.6** Cuando termina, Vercel da la URL: `https://<proyecto>.vercel.app`.
+
+El repositorio tiene UNA sola rama y es la rama por defecto, así que Vercel la
+trata como producción: cada `git push` vuelve a desplegar solo.
+
+### PARTE 3 — Probar que quedó bien (2 minutos)
+
+1. Abrí la URL. Tiene que aparecer la **pantalla de entrada**, no el juego.
+2. Entrá con un usuario y su contraseña. Tiene que pedir **elegir club** (los
+   veinte del Apertura 98).
+3. Elegí uno y jugá una fecha.
+4. **La prueba que vale**: cerrá el navegador, abrí la URL desde el celular,
+   entrá con el mismo usuario. La carrera tiene que estar donde la dejaste.
+   Eso es lo que la base de datos vino a hacer; sin ella, el paso 4 falla.
+
+### Si algo falla
+
+Los errores que corta el build dicen exactamente qué falta. En el log de Vercel
+(**Deployments** → el último → **Building**):
+
+| Lo que dice el log | Qué pasa | Cómo se arregla |
+|---|---|---|
+| `[migraciones] falta DATABASE_URL en producción` | no cargaste la variable, o está vacía | Settings → Environment Variables |
+| `[migraciones] falta DIRECT_URL en producción` | idem, o le pusiste la del pooler a las dos | revisá el `-pooler` |
+| `[migraciones] falta SESSION_SECRET en producción (mínimo 16 caracteres)` | falta, o es más corta que 16 | generá una nueva |
+| `P1001: Can't reach database server` | el host está mal escrito, o falta `?sslmode=require` | volvé a copiar la cadena de Neon |
+| `P1000: Authentication failed` | la contraseña de la cadena no es la real | *Reset password* en el role de Neon |
+| el juego carga pero al jugar da **503** | la base no responde en tiempo de ejecución | revisá que `DATABASE_URL` sea la del **pooler** |
+
+Después de cambiar una variable hay que **volver a desplegar** para que la tome:
+**Deployments** → el último → **⋯** → **Redeploy**.
+
+## 6. Neon: dos URLs, y no es redundancia
 
 Neon da dos endpoints para la misma base. Hacen falta los dos:
 
@@ -195,7 +312,7 @@ proxy WebSocket de Neon y contra cualquier otra base falla con `Received
 network error or non-101 status code`, que no dice que el problema es el
 adaptador. De ahí la elección por host.
 
-## 6. Las migraciones
+## 7. Las migraciones
 
 Todo cambio de estructura es un archivo en `prisma/migrations/`, commiteado y
 revisado como cualquier código. **Nunca a mano contra producción.**
@@ -242,7 +359,7 @@ marcado en `scripts/migrate-deploy.ts`, en la rama del `if (!isProduction)`:
 habría que pasarle la URL de la rama y migrar **esa**. Mientras eso no exista,
 no migrar es lo correcto y lo seguro.
 
-## 7. Vercel
+## 8. Vercel
 
 `vercel.json` define un sitio estático más **una** función:
 
@@ -293,7 +410,7 @@ producción, así que se comprueba antes de desplegar.
 `production` haría que una preview migre la base de producción, que es
 exactamente lo que el gate existe para impedir.
 
-## 8. Qué está comprobado, y con qué
+## 9. Qué está comprobado, y con qué
 
 `tests/persistence.test.ts` — 9 tests, **sin base de datos**, dentro de
 `npm test`. Contrato del almacén contra un doble que registra las consultas
@@ -344,7 +461,7 @@ y una pantalla de entrada mostrada contra un servidor sin login.
 El camino UI → API → Postgres se verificó a mano, con los cuatro usuarios
 entrando, eligiendo cuatro clubes distintos y jugando fechas sin pisarse.
 
-## 9. Los secretos
+## 10. Los secretos
 
 En `.gitignore`: `.env`, `.env.*` (menos `.env.example`), `src/generated/`,
 `api/index.mjs`, `api/index.mjs.map`, `api/assets/`, `.vercel`.

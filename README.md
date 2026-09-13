@@ -298,11 +298,11 @@ se nota sin que un crack tape a diez jugadores flojos.
   calibración, los valores objetivo y cómo recalibrar.
 - [`docs/ui.md`](docs/ui.md) — diseño de la interfaz: estado por fases,
   decisiones de arquitectura, cómo se conecta con el motor y qué se verificó.
-- [`docs/deployment.md`](docs/deployment.md) — persistencia y despliegue: las
-  tres formas de guardar, por qué el schema no modela el fútbol, quiénes
-  entran y cómo funciona la sesión, cómo se elige club, Neon y sus dos URLs,
-  cómo se generan y aplican las migraciones, y por qué una preview no toca
-  producción.
+- [`docs/deployment.md`](docs/deployment.md) — persistencia y despliegue: **el
+  paso a paso para ponerlo online** (sección 5), las tres formas de guardar,
+  por qué el schema no modela el fútbol, quiénes entran y cómo funciona la
+  sesión, cómo se elige club, Neon y sus dos URLs, cómo se generan y aplican
+  las migraciones, y por qué una preview no toca producción.
 - [`docs/clausura-1998.md`](docs/clausura-1998.md) — dataset histórico del
   Torneo Clausura 1998: qué está verificado, qué falta y en qué formato
   pasar los planteles que faltan.
