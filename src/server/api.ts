@@ -28,12 +28,24 @@
  * managers no pueden dirigir dos clubes del mismo torneo. Eso pide que la
  * fecha espere a que todos los clubes humanos manden su alineacion, y esta
  * declarado como lo que falta en lugar de disfrazado.
+ *
+ * UNA PETICION A LA VEZ POR PROCESO. `setStorage` es global al proceso, asi
+ * que el servicio lee el almacen de la peticion que este en curso. Entre el
+ * `setStorage` y el final de `fn(...)` hay `await`s, y si dos peticiones de
+ * DISTINTAS partidas se solapan en el mismo proceso, la segunda le cambia el
+ * almacen a la primera y una carrera puede leer el estado de otra.
+ *
+ * No es nuevo —el servicio siempre leyo un global y `fn` siempre fue async—
+ * pero en serverless es mas facil que pase: una instancia puede atender
+ * varias peticiones a la vez. Arreglarlo de verdad es pasar el almacen por
+ * parametro hasta el servicio, no un candado acá: un candado por proceso no
+ * sirve cuando hay varias instancias. Queda declarado, sin disfraz.
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createMockGameService } from '../ui/services/mockGameService.ts';
-import { memoryStore, setStorage } from '../ui/services/storage.ts';
-import { openGameStore, isValidGameId } from './file-store.ts';
+import { memoryStore, setStorage, type KeyValueStore } from '../ui/services/storage.ts';
+import { openGameStore as openFileStore, isValidGameId } from './file-store.ts';
 
 /** Los metodos que la API expone. Salen del contrato, no de una lista aparte. */
 const service = createMockGameService();
@@ -42,10 +54,41 @@ const METHODS = new Set(Object.keys(service));
 const COOKIE = 'partida';
 const MAX_BODY = 2_000_000;
 
-export type ApiOptions = {
-  /** Carpeta donde viven los archivos de partida. */
-  readonly dataDir: string;
-};
+/**
+ * Un almacen de partida abierto, listo para usar y para volcar.
+ *
+ * Es la union de lo que devuelven las dos implementaciones: el de archivos
+ * vuelca sincronicamente y el de Postgres devuelve una promesa. La API espera
+ * el resultado en los dos casos —`await` sobre un `void` es un no-op— asi que
+ * no le hace falta saber cual tiene.
+ */
+export type OpenStore = KeyValueStore & { readonly flush: () => void | Promise<void> };
+
+/**
+ * De donde sale el almacen de una partida.
+ *
+ * Es una FUNCION y no una carpeta ni una conexion: la API no tiene que saber
+ * si detras hay archivos, Postgres o memoria. Fue lo unico que hubo que
+ * cambiarle para agregar la base de datos.
+ */
+export type StoreFactory = (gameId: string) => OpenStore | Promise<OpenStore>;
+
+export type ApiOptions =
+  | {
+      /** Carpeta donde viven los archivos de partida. */
+      readonly dataDir: string;
+    }
+  | {
+      /** Almacen propio: Postgres, memoria, lo que sea. */
+      readonly openStore: StoreFactory;
+    };
+
+/** El almacen que corresponde a estas opciones. */
+function storeFactoryOf(options: ApiOptions): StoreFactory {
+  if ('openStore' in options) return options.openStore;
+  const dataDir = options.dataDir;
+  return (gameId) => openFileStore(dataDir, gameId);
+}
 
 export type ApiHandler = (
   request: IncomingMessage,
@@ -53,12 +96,14 @@ export type ApiHandler = (
 ) => Promise<boolean>;
 
 export function createApi(options: ApiOptions): ApiHandler {
+  const openStore = storeFactoryOf(options);
+
   return async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
     if (!url.pathname.startsWith('/api/')) return false;
 
     if (url.pathname === '/api/rpc' && request.method === 'POST') {
-      await handleRpc(request, response, options);
+      await handleRpc(request, response, openStore);
       return true;
     }
 
@@ -75,7 +120,7 @@ export function createApi(options: ApiOptions): ApiHandler {
 async function handleRpc(
   request: IncomingMessage,
   response: ServerResponse,
-  options: ApiOptions,
+  openStore: StoreFactory,
 ): Promise<void> {
   let body: string;
   try {
@@ -103,21 +148,48 @@ async function handleRpc(
   const args = Array.isArray(call.args) ? call.args : [];
 
   const gameId = resolveGameId(request);
-  const store = openGameStore(options.dataDir, gameId);
+
+  // ABRIR EL ALMACEN PUEDE FALLAR, y con Postgres detras falla distinto: la
+  // base puede estar caida o la conexion agotada. Eso es un 503 —el servidor
+  // anda, el almacenamiento no— y no un 409, que significa "la accion no se
+  // puede hacer con este estado del juego".
+  let store: OpenStore;
+  try {
+    store = await openStore(gameId);
+  } catch (cause) {
+    send(response, 503, {
+      error: `No se pudo abrir la partida: ${cause instanceof Error ? cause.message : 'error de almacenamiento'}`,
+    });
+    return;
+  }
+
   const previous = setStorage(store);
   try {
     const fn = (service as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[
       method
     ] as (...a: unknown[]) => Promise<unknown>;
     const result = await fn(...args);
-    store.flush();
+    await store.flush();
     send(response, 200, { result: result ?? null }, gameId);
   } catch (cause) {
     // El servicio lanza errores con mensajes pensados para el manager ("no hay
     // caja suficiente"), asi que el mensaje se pasa tal cual. El 409 es
     // deliberado: no es un error del servidor ni una peticion mal formada, es
     // una accion que el estado del juego no permite.
-    store.flush();
+    //
+    // Se vuelca IGUAL: una accion puede haber escrito algo antes de fallar
+    // —jugar la fecha guarda el desarrollo del club y despues la temporada— y
+    // perder esa mitad seria peor que guardarla. Si el volcado tambien falla,
+    // gana ese error: no se puede decir "no alcanza la caja" cuando ademas no
+    // se guardo nada.
+    try {
+      await store.flush();
+    } catch (flushError) {
+      send(response, 503, {
+        error: `La partida no se pudo guardar: ${flushError instanceof Error ? flushError.message : 'error de almacenamiento'}`,
+      });
+      return;
+    }
     send(
       response,
       409,

@@ -79,7 +79,18 @@ export async function loadPlaywright(): Promise<{
   readonly chromium: { launch(options?: unknown): Promise<Browser> };
 } | null> {
   try {
-    return (await import('playwright')) as never;
+    // EL ESPECIFICADOR VA EN UNA VARIABLE a proposito, y no es una
+    // complicacion gratuita: con `import('playwright')` literal, TypeScript
+    // resuelve el modulo en tiempo de compilacion y `npm run typecheck` falla
+    // en cualquier maquina donde Playwright no este instalado. Como se
+    // instala aparte (`npm i --no-save playwright`), eso es TODA maquina
+    // recien clonada: el typecheck estaba roto desde el primer `git clone` y
+    // solo se veia despues de instalarlo y borrarlo.
+    //
+    // Con la variable, el import se resuelve en tiempo de ejecucion, que es
+    // donde el `catch` de abajo puede hacer algo al respecto.
+    const specifier = 'playwright';
+    return (await import(specifier)) as never;
   } catch {
     return null;
   }

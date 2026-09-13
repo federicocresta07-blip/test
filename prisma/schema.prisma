@@ -1,0 +1,117 @@
+// ============================================================
+// EL SCHEMA MODELA EL GUARDADO, NO EL FUTBOL
+// ============================================================
+//
+// Es la decision mas importante de este archivo, asi que va primero.
+//
+// Acá NO hay tablas de jugadores, equipos, atributos, posiciones ni ligas, y
+// eso no es una version incompleta del schema: es el schema correcto para
+// ESTE repositorio.
+//
+// POR QUE. El juego no guarda su modelo, lo DERIVA. Los veinte clubes y sus
+// 462 jugadores salen de `EQ003003.PKF`, el archivo de equipos de PC Apertura
+// 98, que se extrajo y quedó commiteado como código generado en
+// `src/data/apertura98.ts`. Ese archivo es el origen de verdad de los
+// planteles, con los diez atributos que el juego guarda de verdad
+// (velocidad, resistencia, agresividad, calidad, remate, regate, pase, tiro,
+// entradas, portero). Copiarlos a Postgres crearía un segundo origen de
+// verdad para el mismo dato: el que el repositorio documenta y el que la base
+// tenga. Cuando los dos se separen —y se separan— no habría forma de saber
+// cuál manda.
+//
+// Lo mismo con todo lo derivado, que en este proyecto es casi todo: la tabla
+// de posiciones sale de los partidos jugados, las finanzas de los socios y
+// los contratos, la masa salarial de la suma de los sueldos, la reputación
+// del aforo y los socios. El proyecto borró esos datos de su código a
+// propósito, y hay tests de honestidad que fallan si un número aparece sin
+// explicar de dónde sale. Volverlos a declarar en una tabla sería deshacer
+// eso.
+//
+// QUE SI SE GUARDA. Lo que no se puede recalcular: los partidos que se
+// jugaron, la condición con la que quedó cada jugador, los atributos que
+// desarrolló, lo que se recaudó en cada partido de local, los traspasos, los
+// retirados y cuántas temporadas se cerraron. Eso ya tenía un límite de
+// persistencia en el código —`KeyValueStore`, en
+// `src/ui/services/storage.ts`— con tres claves por partida:
+//
+//     manager:temporada:v1    la temporada (partidos, condición, atributos…)
+//     manager:desarrollo:v1   el desarrollo del club (staff, obras, entrada…)
+//     manager:lineup:v1       la alineación elegida
+//
+// Este schema es ese límite, en Postgres. Tres filas por partida, cuyo `value`
+// es el mismo JSON que hoy va a `localStorage` en el navegador y a un archivo
+// en el servidor. Nada nuevo, nada duplicado.
+//
+// SI ALGUN DIA HACE FALTA CONSULTAR A TRAVES DE LAS PARTIDAS —una tabla de
+// posiciones entre managers, un ranking de clubes— ahí sí conviene normalizar
+// lo que esa consulta necesite, y el lugar para hacerlo es este archivo. Pero
+// se agrega cuando la consulta exista, no antes: una tabla de jugadores que
+// nadie consulta es sólo una copia que se puede desincronizar.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// En Prisma 7 el bloque `datasource` YA NO LLEVA LA URL: las cadenas de
+// conexión viven en `prisma.config.ts` (para las migraciones) y en el
+// adaptador que recibe `PrismaClient` (para la aplicación). Es mejor así —el
+// schema deja de tener un `env()` que sólo significaba algo en tiempo de CLI—
+// pero es un cambio de forma respecto de Prisma 6, y esta nota está para que
+// nadie vuelva a poner `url` acá pensando que falta.
+datasource db {
+  provider = "postgresql"
+}
+
+/// Una partida. Es la unidad que el jugador abre y retoma.
+///
+/// El `id` es el nombre de partida que ya usaba el servidor de archivos, con
+/// la misma validación (`^[A-Za-z0-9_-]{1,64}$`, en `src/server/file-store.ts`):
+/// así una partida guardada en archivos y la misma en Postgres se llaman
+/// igual, y mover una de un lado al otro es copiar tres valores.
+///
+/// NO tiene club, ni temporada, ni posición en la tabla. Todo eso está dentro
+/// del guardado y se deriva de ahí; tenerlo también como columna sería un
+/// segundo origen de verdad para el mismo dato.
+model Game {
+  id        String   @id
+  createdAt DateTime @default(now())
+  /// Se toca en cada escritura. Es lo único que hace falta para listar
+  /// partidas por actividad, y no duplica nada: el guardado no tiene fecha.
+  updatedAt DateTime @updatedAt
+
+  state GameStateEntry[]
+
+  @@index([updatedAt])
+  @@map("games")
+}
+
+/// Un valor del guardado, por partida y por clave.
+///
+/// Es `KeyValueStore` tal como está declarado en el código, sin agregarle ni
+/// quitarle nada. La clave es la misma cadena que usa el navegador
+/// (`manager:temporada:v1`), no un enum: si mañana el juego sube la versión de
+/// un guardado a `:v2`, eso pasa a ser un valor nuevo y no una migración de
+/// schema. El versionado del guardado ya existe y vive en el código
+/// (`SEASON_VERSION`), que es donde se decide qué hacer con un formato viejo.
+model GameStateEntry {
+  gameId String
+  key    String
+  /// El JSON serializado, tal cual. Se guarda como texto y no como `Json`
+  /// a propósito: el juego lo escribe y lo lee con `JSON.stringify` y
+  /// `JSON.parse`, y Postgres normalizando el JSON —reordenando claves,
+  /// perdiendo el formato exacto— haría que lo que vuelve no sea byte por byte
+  /// lo que se guardó. Con los atributos desarrollados, que se guardan CON
+  /// DECIMALES para no morir por redondeo, eso importa.
+  ///
+  /// Una temporada completa pesa unos 750 kB (648 de ellos son los partidos
+  /// jugados). Postgres lo mueve a TOAST solo y comprimido.
+  value String @db.Text
+
+  updatedAt DateTime @updatedAt
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@id([gameId, key])
+  @@map("game_state")
+}

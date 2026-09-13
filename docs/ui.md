@@ -40,7 +40,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 369 tests
+npm test           # 378 tests (387 con una base de datos configurada)
 npm run test:ui    # 22 tests de navegador (pide Playwright)
 npm run serve      # servidor de partida en http://localhost:8787
 ```
@@ -870,9 +870,28 @@ declararla es más útil que esconderla.
   ya existe para el estadio.
 - **El servidor no tiene usuarios.** Quien tenga el nombre de una partida la
   abre. Alcanza para un prototipo y no alcanza para nada más: un servidor
-  público necesita autenticación, y eso es un sistema, no un parámetro.
-- **Los archivos de partida no se limpian.** Cada partida nueva escribe un
-  archivo y nadie los borra.
+  público necesita autenticación, y eso es un sistema, no un parámetro. Con
+  base de datos esto no mejora: mejora la durabilidad del guardado, no quién
+  puede leerlo.
+- **Las partidas viejas no se limpian.** Cada partida nueva escribe un archivo
+  —o dos filas— y nadie los borra. En Postgres `Game.updatedAt` está indexado
+  justamente para poder barrer las abandonadas, pero la tarea que lo haga no
+  existe.
+- **Una preview de Vercel comparte la base de producción** si le das las mismas
+  variables. No la migra nunca (el gate lo impide), pero lee y escribe las
+  mismas partidas. Aislarla es cargarle otro `DATABASE_URL` a mano; automático
+  sería una rama de Neon por preview, y el lugar donde engancharla está
+  marcado en `scripts/migrate-deploy.ts`.
+- **Dos peticiones simultáneas de distintas partidas pueden cruzarse.** El
+  servicio lee el almacén de un global del proceso (`setStorage`), y entre que
+  se pone y que termina la acción hay `await`s. No es nuevo, pero en serverless
+  una instancia atiende varias peticiones a la vez, así que es más fácil que
+  pase. Arreglarlo es pasar el almacén por parámetro hasta el servicio; un
+  candado por proceso no sirve con varias instancias.
+- **Los tests de navegador no pasan por Postgres.** Usan siempre el almacén de
+  archivos, a propósito, para no depender de que haya una base. El camino
+  completo hasta Postgres lo cubren `tests/persistence-live.test.ts` y una
+  verificación a mano; ver [`deployment.md`](deployment.md).
 
 ### Del contenido
 

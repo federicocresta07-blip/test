@@ -1,0 +1,8 @@
+# Este archivo lo necesita Prisma: fija a qué motor pertenecen las migraciones
+# de esta carpeta. El SQL de `migration.sql` es PostgreSQL y sólo corre ahí;
+# sin este archivo, `prisma migrate deploy` no sabe contra qué conector aplicar
+# lo que hay y falla ("missing migration_lock.toml").
+#
+# No se edita a mano. Cambiarlo no convierte las migraciones a otro motor: las
+# dejaría apuntando a un conector que su SQL no habla.
+provider = "postgresql"

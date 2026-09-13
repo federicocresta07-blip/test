@@ -26,17 +26,31 @@
     "apertura98": "node scripts/gen-apertura98.mjs",
     "single": "npm run build && node scripts/single-html.mjs",
     "test:ui": "node --test \"tests-browser/**/*.test.ts\"",
-    "serve": "node scripts/server.ts"
+    "serve": "node scripts/server.ts",
+    "build:api": "vite build --config vite.config.api.ts",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "node scripts/migrate-deploy.ts",
+    "db:status": "prisma migrate status",
+    "db:studio": "prisma studio",
+    "vercel-build": "npm run db:validate && npm run db:generate && npm run db:deploy && npm run build && npm run build:api",
+    "postinstall": "prisma generate"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.1",
     "@vitejs/plugin-react": "5.0.4",
+    "prisma": "^7.10.0",
     "typescript": "^5.9.0",
     "vite": "7.3.6"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-neon": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   }

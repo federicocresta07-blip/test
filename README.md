@@ -30,19 +30,31 @@ npm run crests     # ingesta de los escudos oficiales (ver docs/ui.md)
 npm run apertura98 # regenera los planteles del Apertura 98 desde el PKF extraido
 npm run single     # empaqueta el juego en UN solo HTML autocontenido
 
-npm test           # 369 tests
+npm test           # 378 tests (387 con una base de datos configurada)
 npm run typecheck  # motor + interfaz + tests de navegador
 
 npm run serve      # servidor de partida en http://localhost:8787
 npm run test:ui    # 22 tests de interfaz en un navegador (pide Playwright)
+
+npm run db:deploy  # aplica las migraciones (sólo en producción, ver docs)
+npm run db:migrate # genera una migración nueva (desarrollo)
+npm run db:status  # qué migraciones están aplicadas
 ```
 
 Con `npm run serve` la partida se guarda **en el servidor** y sobrevive a
 cambiar de navegador o de máquina; abierto como archivo, se guarda en el
 navegador. La misma build hace las dos cosas y la barra superior dice cuál.
 
-El motor no tiene **ninguna dependencia de runtime**. La interfaz agrega solo
-React; el drag & drop es HTML5 nativo y el router son 60 líneas propias.
+Con `DATABASE_URL` configurada se guarda en **PostgreSQL** y sobrevive también
+a reinstalar el servidor. Las tres formas usan la misma interfaz de guardado,
+así que el juego no sabe cuál está usando: ver
+[`docs/deployment.md`](docs/deployment.md).
+
+El motor no tiene **ninguna dependencia de runtime**, y eso sigue siendo
+cierto: el HTML autocontenido no carga nada. La interfaz agrega solo React —el
+drag & drop es HTML5 nativo y el router son 60 líneas propias—, y Prisma con
+sus drivers entran sólo en el camino del servidor con base de datos, que es
+opcional y no toca ni el motor ni la interfaz.
 
 ## Las dos mitades del proyecto
 
@@ -278,6 +290,10 @@ se nota sin que un crack tape a diez jugadores flojos.
   calibración, los valores objetivo y cómo recalibrar.
 - [`docs/ui.md`](docs/ui.md) — diseño de la interfaz: estado por fases,
   decisiones de arquitectura, cómo se conecta con el motor y qué se verificó.
+- [`docs/deployment.md`](docs/deployment.md) — persistencia y despliegue: las
+  tres formas de guardar, por qué el schema no modela el fútbol, Neon y sus dos
+  URLs, cómo se generan y aplican las migraciones, y por qué una preview no
+  toca producción.
 - [`docs/clausura-1998.md`](docs/clausura-1998.md) — dataset histórico del
   Torneo Clausura 1998: qué está verificado, qué falta y en qué formato
   pasar los planteles que faltan.
@@ -303,10 +319,14 @@ src/
   presentation/                marcador, tabla de estadísticas, notas
   data/                        generador de planteles y equipos de ejemplo
   data/clausura-1998/          dataset histórico real (ver docs/clausura-1998.md)
-  server/                      servidor de partida: API y archivos estáticos
+  server/                      servidor de partida: API, archivos estáticos,
+                               almacén de archivos y almacén de PostgreSQL
   ui/                          la interfaz web (ver docs/ui.md)
-tests/                         369 tests
+prisma/                        schema y migraciones (ver docs/deployment.md)
+api/                           la función serverless de Vercel
+tests/                         378 tests (9 más con base de datos)
 tests-browser/                 22 tests de interfaz en un navegador real
 scripts/                       demo, temporada, torneo completo, calibración,
-                               dataset histórico y humo de la UI
+                               dataset histórico, humo de la UI y el gate de
+                               migraciones del despliegue
 ```

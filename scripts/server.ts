@@ -12,20 +12,27 @@
  * falta para servir una carpeta y un endpoint.
  *
  * VARIABLES DE ENTORNO
- *   PORT        puerto, por defecto 8787
- *   DATA_DIR    donde se guardan las partidas, por defecto ./partidas
+ *   PORT          puerto, por defecto 8787
+ *   DATABASE_URL  Neon (endpoint con pool). Si esta, la partida va a Postgres.
+ *   DATA_DIR      carpeta de partidas cuando NO hay base, por defecto ./partidas
+ *
+ * NINGUNA CREDENCIAL SE COMMITEA. Ver `.env.example` y `docs/deployment.md`.
  */
 
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { createApi } from '../src/server/api.ts';
 import { serveStatic } from '../src/server/static-files.ts';
+import { resolveStore } from '../src/server/store-factory.ts';
 
 const port = Number(process.env['PORT'] ?? 8787);
-const dataDir = resolve(process.env['DATA_DIR'] ?? 'partidas');
 const dist = resolve('dist');
 
-const api = createApi({ dataDir });
+// Postgres si hay `DATABASE_URL`, archivos si no. La decision y su porque
+// estan en `store-factory.ts`, y es la misma que toma la funcion de Vercel.
+const store = await resolveStore();
+
+const api = createApi({ openStore: store.openStore });
 const files = serveStatic(dist);
 
 const server = createServer((request, response) => {
@@ -54,8 +61,13 @@ const server = createServer((request, response) => {
 server.listen(port, () => {
   console.log(`Argentina Manager en http://localhost:${port}`);
   console.log(`  interfaz   ${dist}`);
-  console.log(`  partidas   ${dataDir}`);
+  console.log(`  partidas   ${store.describe}`);
   console.log('');
   console.log('La partida se guarda en el servidor, no en el navegador: cada');
-  console.log('cookie de partida es un archivo y no se cruzan entre sí.');
+  console.log('cookie de partida es una partida y no se cruzan entre sí.');
+  if (store.kind === 'archivos') {
+    console.log('');
+    console.log('Sin DATABASE_URL la partida va a disco local, que en un');
+    console.log('despliegue serverless es efímero. Ver docs/deployment.md.');
+  }
 });

@@ -8,3 +8,28 @@ ui-shots/
 __pycache__/
 *.pyc
 partidas/
+
+# ============================================================
+# SECRETOS Y CREDENCIALES: nunca se commitean
+# ============================================================
+#
+# `DATABASE_URL` y `DIRECT_URL` de Neon llevan usuario y contraseña adentro.
+# La forma de la configuración está documentada en `.env.example`, que sí se
+# commitea porque no tiene ningún valor real.
+.env
+.env.*
+!.env.example
+
+# Cliente de Prisma GENERADO. Se produce con `prisma generate`, que corre en
+# `postinstall` y en el build. Commitearlo sería tener dos versiones del mismo
+# cliente —la generada y la del schema— y desincronizarlas en el primer cambio.
+src/generated/
+
+# La funcion serverless EMPAQUETADA, que produce `npm run build:api`. Es un
+# artefacto de build como `dist/`.
+api/index.mjs
+api/index.mjs.map
+api/assets/
+
+# Cache de Vercel
+.vercel
