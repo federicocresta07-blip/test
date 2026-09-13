@@ -102,6 +102,13 @@ export type MarketPoolInput = {
   /** Quien puso a quien en la lista, por id de jugador. */
   readonly listedIds: readonly string[];
   /**
+   * El club dirigido, cuyos jugadores NO son mercado.
+   *
+   * Por defecto River, que es el club por defecto. Sin esto, quien dirige Boca
+   * veía a sus propios jugadores en el mercado y a los de River fuera de él.
+   */
+  readonly clubId?: string;
+  /**
    * Temporadas cerradas (fase 8).
    *
    * Hace falta porque los planteles rivales envejecen: sin esto el mercado
@@ -120,13 +127,14 @@ export type MarketPoolInput = {
  * imposible de usar.
  */
 export function marketPool(input: MarketPoolInput): readonly MarketPlayer[] {
-  const teams = leagueTeams(undefined, undefined, [], 0, input.seasonsClosed ?? 0);
+  const userClubId = input.clubId ?? USER_CLUB_ID;
+  const teams = leagueTeams({ clubId: userClubId, seasonsClosed: input.seasonsClosed ?? 0 });
   const transferred = new Set(input.transferredIds);
   const listed = new Set(input.listedIds);
   const pool: MarketPlayer[] = [];
 
   for (const [clubId, team] of teams) {
-    if (clubId === USER_CLUB_ID) continue;
+    if (clubId === userClubId) continue;
     for (const player of team.players) {
       if (transferred.has(player.id)) continue;
       pool.push({
@@ -276,8 +284,10 @@ export function applyTransfers(
 export function findLeaguePlayer(
   playerId: string,
   seasonsClosed = 0,
+  /** El club dirigido, para que la liga que se recorre sea la de esta partida. */
+  userClubId: string = USER_CLUB_ID,
 ): { player: Player; clubId: string } | null {
-  for (const [clubId, team] of leagueTeams(undefined, undefined, [], 0, seasonsClosed)) {
+  for (const [clubId, team] of leagueTeams({ clubId: userClubId, seasonsClosed })) {
     const player = team.players.find((entry) => entry.id === playerId);
     if (player) return { player, clubId };
   }

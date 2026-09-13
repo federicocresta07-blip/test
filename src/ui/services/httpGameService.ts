@@ -24,6 +24,8 @@ import type { GameService } from './types.ts';
 /** Los metodos del contrato. Si se agrega uno al contrato, va aca. */
 const METHODS = [
   'loadGame',
+  'currentTeam',
+  'chooseTeam',
   'saveLineup',
   'markMessageRead',
   'upgradeStaff',
@@ -47,9 +49,10 @@ export type HttpServiceOptions = {
   /**
    * Nombre de la partida.
    *
-   * Cuando no se pasa, el servidor la resuelve por cookie y crea una nueva la
-   * primera vez. Pasarlo explicitamente sirve para abrir una partida concreta,
-   * que es como dos personas juegan cada una la suya en el mismo servidor.
+   * YA NO LO DECIDE EL CLIENTE cuando el servidor pide login: la partida es la
+   * del usuario de la sesión y el servidor ignora este valor. Se mantiene para
+   * el modo sin login, que usan los tests que prueban el juego y no la
+   * entrada.
    */
   readonly gameId?: string;
 };
@@ -77,7 +80,21 @@ export function createHttpGameService(options: HttpServiceOptions = {}): GameSer
     if (!response.ok) {
       throw new Error(payload?.error ?? `El servidor respondió ${response.status}`);
     }
-    return payload?.result ?? undefined;
+
+    // EL `null` SE DEVUELVE COMO `null`, no como `undefined`.
+    //
+    // Acá había `payload?.result ?? undefined`, y `null ?? undefined` es
+    // `undefined`. No molestaba mientras ningún método devolviera `null` como
+    // respuesta con significado: los que devuelven algo devolvían objetos, y
+    // los `void` daban `undefined` de todas formas.
+    //
+    // `currentTeam` rompió eso: su contrato es `string | null` y el `null`
+    // quiere decir "todavía no eligió club". Convertido a `undefined`, la
+    // interfaz leía "hay club" y mandaba al usuario a dirigir River sin
+    // preguntarle. Se vio en el navegador, no en el compilador: los dos tipos
+    // pasan por `unknown`.
+    if (payload !== null && 'result' in payload) return payload.result;
+    return undefined;
   };
 
   const built: Record<string, (...args: unknown[]) => Promise<unknown>> = {};

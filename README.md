@@ -30,11 +30,12 @@ npm run crests     # ingesta de los escudos oficiales (ver docs/ui.md)
 npm run apertura98 # regenera los planteles del Apertura 98 desde el PKF extraido
 npm run single     # empaqueta el juego en UN solo HTML autocontenido
 
-npm test           # 378 tests (387 con una base de datos configurada)
+npm test           # 403 tests (412 con una base de datos configurada)
 npm run typecheck  # motor + interfaz + tests de navegador
 
 npm run serve      # servidor de partida en http://localhost:8787
-npm run test:ui    # 22 tests de interfaz en un navegador (pide Playwright)
+npm run test:ui    # 26 tests de interfaz en un navegador (pide Playwright)
+npm run password   # una contraseña nueva para un usuario
 
 npm run db:deploy  # aplica las migraciones (sólo en producción, ver docs)
 npm run db:migrate # genera una migración nueva (desarrollo)
@@ -49,6 +50,13 @@ Con `DATABASE_URL` configurada se guarda en **PostgreSQL** y sobrevive también
 a reinstalar el servidor. Las tres formas usan la misma interfaz de guardado,
 así que el juego no sabe cuál está usando: ver
 [`docs/deployment.md`](docs/deployment.md).
+
+Servido con API hay que **entrar con usuario y contraseña**, y cada uno elige
+uno de los veinte clubes del Apertura 98 la primera vez. La partida es la del
+usuario de la sesión, así que se retoma entrando con el mismo usuario desde
+cualquier navegador. Cada uno dirige su propio torneo: no es una liga
+compartida. Abierto como archivo no hay login —no hay dónde verificar una
+contraseña— pero sí se elige club.
 
 El motor no tiene **ninguna dependencia de runtime**, y eso sigue siendo
 cierto: el HTML autocontenido no carga nada. La interfaz agrega solo React —el
@@ -291,9 +299,10 @@ se nota sin que un crack tape a diez jugadores flojos.
 - [`docs/ui.md`](docs/ui.md) — diseño de la interfaz: estado por fases,
   decisiones de arquitectura, cómo se conecta con el motor y qué se verificó.
 - [`docs/deployment.md`](docs/deployment.md) — persistencia y despliegue: las
-  tres formas de guardar, por qué el schema no modela el fútbol, Neon y sus dos
-  URLs, cómo se generan y aplican las migraciones, y por qué una preview no
-  toca producción.
+  tres formas de guardar, por qué el schema no modela el fútbol, quiénes
+  entran y cómo funciona la sesión, cómo se elige club, Neon y sus dos URLs,
+  cómo se generan y aplican las migraciones, y por qué una preview no toca
+  producción.
 - [`docs/clausura-1998.md`](docs/clausura-1998.md) — dataset histórico del
   Torneo Clausura 1998: qué está verificado, qué falta y en qué formato
   pasar los planteles que faltan.
@@ -320,12 +329,13 @@ src/
   data/                        generador de planteles y equipos de ejemplo
   data/clausura-1998/          dataset histórico real (ver docs/clausura-1998.md)
   server/                      servidor de partida: API, archivos estáticos,
-                               almacén de archivos y almacén de PostgreSQL
+                               almacén de archivos, almacén de PostgreSQL,
+                               usuarios y sesiones
   ui/                          la interfaz web (ver docs/ui.md)
 prisma/                        schema y migraciones (ver docs/deployment.md)
 api/                           la función serverless de Vercel
-tests/                         378 tests (9 más con base de datos)
-tests-browser/                 22 tests de interfaz en un navegador real
+tests/                         403 tests (9 más con base de datos)
+tests-browser/                 26 tests de interfaz en un navegador real
 scripts/                       demo, temporada, torneo completo, calibración,
                                dataset histórico, humo de la UI y el gate de
                                migraciones del despliegue

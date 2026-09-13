@@ -76,6 +76,28 @@ export const DEMO_FACILITIES: readonly ClubFacility[] = [
  * socios reales del club, de los partidos que se jugaron, de la reputación y
  * de los sueldos. Tenerlos acá hacía que el juego mintiera: se podía vender a
  * medio plantel y el presupuesto de fichajes quedaba igual.
+ *
+ * ============================================================
+ * ES LA MISMA PARA LOS VEINTE CLUBES, Y ESO ES A PROPOSITO
+ * ============================================================
+ *
+ * Desde que se elige equipo, la pregunta obvia es si Platense tendría que
+ * arrancar con menos caja que River. Se midió antes de decidir, y la respuesta
+ * es no:
+ *
+ *   River     ingreso 124M/mes   gastos 135M/mes   déficit  -11M
+ *   Platense  ingreso  62M/mes   gastos 105M/mes   déficit  -43M
+ *
+ * El club chico YA es mucho más difícil, porque su ingreso sale de sus socios
+ * y su aforo reales mientras los sueldos salen de su plantel real. Reparto de
+ * caja proporcional a los socios (River 63.000, Platense 7.500) le daría a
+ * Platense unos 50M contra 105M de gastos mensuales: insolvente en dos
+ * semanas. Cuatro de los veinte clubes quedarían no difíciles sino
+ * imposibles.
+ *
+ * Así que la caja inicial es el piso parejo, y la diferencia entre dirigir a
+ * uno o a otro la hacen el plantel, el ingreso, los gastos, el presupuesto de
+ * fichajes y el estadio, que salen todos del archivo.
  */
 export const OPENING_CASH = 418_500_000;
 

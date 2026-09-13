@@ -5,7 +5,13 @@ import { Badge } from './ui/Badge.tsx';
 import { Tooltip } from './ui/Tooltip.tsx';
 import { Link } from '../router/router.tsx';
 import { useGameState } from '../state/GameProvider.tsx';
-import { currentGameId, DATA_SOURCE_LABEL, DATA_SOURCE_NOTICE } from '../services/index.ts';
+import {
+  currentGameId,
+  currentSession,
+  logout,
+  DATA_SOURCE_LABEL,
+  DATA_SOURCE_NOTICE,
+} from '../services/index.ts';
 import { moneyShort, shortDate } from '../lib/format.ts';
 import { squadAlerts } from '../lib/alerts.ts';
 
@@ -22,6 +28,7 @@ export function TopBar(): ReactNode {
   // El estado ya cargó cuando esto se dibuja, así que la conexión al servidor
   // ya se resolvió: leerlo en el render es correcto y no hace falta estado.
   const partida = currentGameId();
+  const quien = currentSession();
 
   const position = state.table.findIndex((row) => row.clubId === state.club.id) + 1;
   const unread = state.inbox.filter((message) => message.unread).length;
@@ -63,22 +70,26 @@ export function TopBar(): ReactNode {
         </Tooltip>
 
         {/*
-          DONDE VIVE LA PARTIDA (fase 8).
-          
-          Con un servidor detrás se muestra el nombre de la partida, y no es un
-          adorno: el servidor la identifica por una cookie `HttpOnly`, que no se
-          puede llevar a otra máquina a mano. Sin ver el nombre, una carrera
-          guardada en el servidor es inalcanzable desde otro navegador.
+          DONDE VIVE LA PARTIDA (fase 8), Y DE QUIEN ES (fase de login).
+
+          Con un servidor detrás se muestra quién entró, y no es un adorno: la
+          partida es la de ESE usuario y desde otra máquina se retoma entrando
+          con el mismo usuario. Antes acá decía cómo abrirla con `?partida=`, y
+          eso dejó de ser cierto cuando la partida pasó a salir de la sesión:
+          el servidor ignora ese parámetro.
         */}
         {partida !== null ? (
           <Tooltip
             content={
-              `La partida se guarda en el servidor con el nombre "${partida}". ` +
-              `Para retomarla desde otro navegador o otra máquina, abrí ?partida=${partida}`
+              quien !== null
+                ? `Entraste como ${quien.nombre} (${quien.usuario}). Tu carrera se guarda ` +
+                  'en el servidor: entrá con el mismo usuario desde cualquier navegador ' +
+                  'y sigue donde la dejaste.'
+                : `La partida se guarda en el servidor con el nombre "${partida}".`
             }
             side="bottom"
           >
-            <Badge tone="ok">servidor · {partida}</Badge>
+            <Badge tone="ok">{quien !== null ? quien.nombre : `servidor · ${partida}`}</Badge>
           </Tooltip>
         ) : (
           <Tooltip
@@ -91,6 +102,19 @@ export function TopBar(): ReactNode {
             <Badge>local</Badge>
           </Tooltip>
         )}
+
+        {/* Salir solo existe si hay de dónde salir. */}
+        {quien !== null ? (
+          <button
+            className="topbar__logout"
+            onClick={() => {
+              void logout().then(() => globalThis.location?.reload());
+            }}
+            title={`Salir de la sesión de ${quien.nombre}`}
+          >
+            Salir
+          </button>
+        ) : null}
 
         <button
           className={`topbar__icon ${unread + pendingOffers + critical > 0 ? 'has-badge' : ''}`}

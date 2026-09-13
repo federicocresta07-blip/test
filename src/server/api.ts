@@ -19,14 +19,28 @@
  * DE DONDE SALE LA PARTIDA
  * ============================================================
  *
- * Del header `x-partida`, y si no viene, de una cookie que el servidor pone la
- * primera vez. Cada partida es un archivo y no se cruzan: eso es lo que hace
- * que varias personas puedan jugar su propia carrera en el mismo servidor.
+ * DE LA SESION. Cada usuario tiene UNA carrera y se llama como el: la partida
+ * de `Tomy` es `Tomy`. El nombre no viaja en la peticion, se deduce de una
+ * cookie firmada, y por eso no se puede pedir la de otro.
  *
- * LO QUE ESTO NO ES. No es multijugador simultaneo en la MISMA liga: hoy
- * `playRound` resuelve los diez partidos de la fecha de una vez, asi que dos
- * managers no pueden dirigir dos clubes del mismo torneo. Eso pide que la
- * fecha espere a que todos los clubes humanos manden su alineacion, y esta
+ * ASI NO ERA ANTES, y vale decir en que quedaba: la partida salia del header
+ * `x-partida` o de una cookie SIN FIRMAR, las dos cosas que el cliente elige.
+ * Quien supiera —o adivinara— el nombre de una carrera la abria y la jugaba.
+ * Alcanzaba mientras el servidor fuera local; expuesto a internet no alcanza.
+ *
+ * `resolveGameId` sigue existiendo para el modo sin login (`requireLogin:
+ * false`), que usan los tests que prueban el juego y no la entrada.
+ *
+ * LO QUE ESTO NO ES. No es multijugador simultaneo en la MISMA liga, y con
+ * cuatro usuarios que eligen equipo conviene ser explicito: cada uno dirige su
+ * PROPIO torneo, con sus diecinueve rivales generados. Si Lucas elige River y
+ * Tomas elige Boca, no juegan uno contra el otro: juegan dos campeonatos
+ * paralelos que nunca se cruzan.
+ *
+ * La razon es del motor, no del servidor: `playRound` resuelve los diez
+ * partidos de la fecha de una vez, asi que no hay lugar donde esperar la
+ * alineacion de otro humano. Una liga compartida pide que la fecha espere a
+ * todos los clubes humanos, y eso es una fase, no un parametro. Esta
  * declarado como lo que falta en lugar de disfrazado.
  *
  * UNA PETICION A LA VEZ POR PROCESO. `setStorage` es global al proceso, asi
@@ -46,6 +60,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createMockGameService } from '../ui/services/mockGameService.ts';
 import { memoryStore, setStorage, type KeyValueStore } from '../ui/services/storage.ts';
 import { openGameStore as openFileStore, isValidGameId } from './file-store.ts';
+import { handleLogin, sessionOf, logoutCookie, respond } from './login.ts';
 
 /** Los metodos que la API expone. Salen del contrato, no de una lista aparte. */
 const service = createMockGameService();
@@ -73,7 +88,7 @@ export type OpenStore = KeyValueStore & { readonly flush: () => void | Promise<v
  */
 export type StoreFactory = (gameId: string) => OpenStore | Promise<OpenStore>;
 
-export type ApiOptions =
+export type ApiOptions = (
   | {
       /** Carpeta donde viven los archivos de partida. */
       readonly dataDir: string;
@@ -81,7 +96,19 @@ export type ApiOptions =
   | {
       /** Almacen propio: Postgres, memoria, lo que sea. */
       readonly openStore: StoreFactory;
-    };
+    }
+) & {
+  /**
+   * Si hace falta entrar con usuario y contraseña. POR DEFECTO SI.
+   *
+   * El valor por defecto es el seguro a proposito: un servidor expuesto a
+   * internet sin login deja que cualquiera abra la carrera de cualquiera, y
+   * eso tiene que costar una linea de codigo EXPLICITA, no un olvido.
+   *
+   * Se apaga solo en los tests que prueban el juego y no la entrada.
+   */
+  readonly requireLogin?: boolean;
+};
 
 /** El almacen que corresponde a estas opciones. */
 function storeFactoryOf(options: ApiOptions): StoreFactory {
@@ -97,18 +124,81 @@ export type ApiHandler = (
 
 export function createApi(options: ApiOptions): ApiHandler {
   const openStore = storeFactoryOf(options);
+  const requireLogin = options.requireLogin ?? true;
 
   return async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
     if (!url.pathname.startsWith('/api/')) return false;
 
-    if (url.pathname === '/api/rpc' && request.method === 'POST') {
-      await handleRpc(request, response, openStore);
+    // `/api/salud` es PUBLICO, y tiene que serlo: la interfaz lo usa para
+    // saber si hay servidor detras antes de que nadie haya entrado. No dice
+    // nada mas que "si".
+    if (url.pathname === '/api/salud' && request.method === 'GET') {
+      send(response, 200, { ok: true });
       return true;
     }
 
-    if (url.pathname === '/api/salud' && request.method === 'GET') {
-      send(response, 200, { ok: true });
+    if (url.pathname === '/api/login' && request.method === 'POST') {
+      if (!requireLogin) {
+        send(response, 404, { error: 'Este servidor no pide login' });
+        return true;
+      }
+      let body: string;
+      try {
+        body = await readBody(request);
+      } catch (cause) {
+        send(response, 413, { error: (cause as Error).message });
+        return true;
+      }
+      respond(response, await handleLogin(request, body));
+      return true;
+    }
+
+    if (url.pathname === '/api/logout' && request.method === 'POST') {
+      respond(response, {
+        status: 200,
+        payload: { ok: true },
+        cookie: logoutCookie(request),
+      });
+      return true;
+    }
+
+    if (url.pathname === '/api/sesion' && request.method === 'GET') {
+      // `requerido` DICE SI ESTE SERVIDOR PIDE LOGIN, y es distinto de
+      // `login`, que dice si esta petición trae sesión. Sin esa diferencia la
+      // interfaz no puede distinguir "no entraste" de "acá no se entra", y
+      // mostraba la pantalla de entrada contra un servidor sin login, donde
+      // `/api/login` responde 404. Lo encontraron los tests de navegador.
+      if (!requireLogin) {
+        send(response, 200, { login: false, requerido: false });
+        return true;
+      }
+      // 200 CON `login: false`, NO 401.
+      //
+      // `/api/sesion` es la pregunta "¿quién soy?", y "nadie" es una respuesta
+      // correcta a esa pregunta, no un acceso denegado. Con 401 el navegador
+      // anotaba un error de consola en cada carga de la página de entrada:
+      // ruido en la consola de todos, y un test de navegador que trata los
+      // errores de consola como fallos —el de este proyecto— se caía.
+      //
+      // El 401 sigue donde corresponde: en `/api/rpc`, donde sí se está
+      // pidiendo algo que hace falta permiso para obtener.
+      const session = sessionOf(request);
+      if (session === null) {
+        send(response, 200, { login: false, requerido: true });
+        return true;
+      }
+      send(response, 200, {
+        login: true,
+        requerido: true,
+        usuario: session.username,
+        nombre: session.displayName,
+      });
+      return true;
+    }
+
+    if (url.pathname === '/api/rpc' && request.method === 'POST') {
+      await handleRpc(request, response, openStore, requireLogin);
       return true;
     }
 
@@ -121,7 +211,18 @@ async function handleRpc(
   request: IncomingMessage,
   response: ServerResponse,
   openStore: StoreFactory,
+  requireLogin: boolean,
 ): Promise<void> {
+  // LA SESION SE MIRA PRIMERO, antes de leer el cuerpo: no hay razon para
+  // gastar memoria en el cuerpo de una peticion que no va a correr.
+  const session = requireLogin ? sessionOf(request) : null;
+  if (requireLogin && session === null) {
+    // 401 y no 403: la interfaz lo distingue para mostrar la pantalla de
+    // entrada en lugar de un error.
+    send(response, 401, { error: 'Tenés que entrar con tu usuario' });
+    return;
+  }
+
   let body: string;
   try {
     body = await readBody(request);
@@ -147,7 +248,12 @@ async function handleRpc(
   }
   const args = Array.isArray(call.args) ? call.args : [];
 
-  const gameId = resolveGameId(request);
+  // LA PARTIDA ES LA DEL USUARIO DE LA SESION, y no algo que el cliente pida.
+  // Ese es el cambio de seguridad de esta fase: antes el nombre de la partida
+  // venia en un header (`x-partida`) o en una cookie sin firmar, asi que
+  // cualquiera que supiera —o adivinara— el nombre de otra carrera la abria.
+  // Ahora sale de una cookie FIRMADA que el cliente no puede fabricar.
+  const gameId = session !== null ? session.username : resolveGameId(request);
 
   // ABRIR EL ALMACEN PUEDE FALLAR, y con Postgres detras falla distinto: la
   // base puede estar caida o la conexion agotada. Eso es un 503 —el servidor

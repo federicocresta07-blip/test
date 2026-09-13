@@ -565,3 +565,21 @@
     padding: var(--sp-4);
   }
 }
+
+/* Salir de la sesión. Discreto a propósito: se usa una vez y no es una acción
+   del juego, así que no compite con las que sí lo son. */
+.topbar__logout {
+  padding: var(--sp-1) var(--sp-3);
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.topbar__logout:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}

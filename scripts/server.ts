@@ -24,6 +24,7 @@ import { resolve } from 'node:path';
 import { createApi } from '../src/server/api.ts';
 import { serveStatic } from '../src/server/static-files.ts';
 import { resolveStore } from '../src/server/store-factory.ts';
+import { secretIsEphemeral } from '../src/server/auth.ts';
 
 const port = Number(process.env['PORT'] ?? 8787);
 const dist = resolve('dist');
@@ -65,6 +66,12 @@ server.listen(port, () => {
   console.log('');
   console.log('La partida se guarda en el servidor, no en el navegador: cada');
   console.log('cookie de partida es una partida y no se cruzan entre sí.');
+  if (secretIsEphemeral()) {
+    console.log('');
+    console.log('Sin SESSION_SECRET: las sesiones se caen al reiniciar el');
+    console.log('servidor. Para desarrollar alcanza; en producción es');
+    console.log('obligatorio y el build lo exige.');
+  }
   if (store.kind === 'archivos') {
     console.log('');
     console.log('Sin DATABASE_URL la partida va a disco local, que en un');

@@ -53,6 +53,8 @@ export function MarketSearchPage(): ReactNode {
     const precision = marketPrecision(state.staff, state.facilities);
     return marketPool({
       precision,
+      // El club dirigido: sus jugadores no son mercado, y los del resto sí.
+      clubId: state.club.id,
       transferredIds: state.market.transfers.map((entry) => entry.playerId),
       listedIds: state.market.listedElsewhere,
       // Los planteles rivales envejecen (fase 8): sin esto el mercado
@@ -60,6 +62,7 @@ export function MarketSearchPage(): ReactNode {
       seasonsClosed: state.season.seasonsClosed,
     });
   }, [
+    state.club.id,
     state.staff,
     state.facilities,
     state.market.transfers,

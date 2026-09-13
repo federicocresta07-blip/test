@@ -23,6 +23,7 @@ import {
   type Browser,
   type Page,
   type Served,
+  passPicker,
 } from './harness.ts';
 
 const DIST = resolve(import.meta.dirname, '..', 'dist', 'index.html');
@@ -90,6 +91,7 @@ serverTest('la interfaz usa el servidor cuando hay uno detrás', async (s) => {
     });
 
     await tab.page.goto(`${s.url}/#/club/estadio`, { waitUntil: 'networkidle' });
+    await passPicker(tab.page);
     await tab.page.waitForTimeout(1200);
 
     assert.ok(calls.length > 0, 'el estado tendría que venir por la API');
@@ -109,6 +111,7 @@ serverTest('LA PARTIDA SOBREVIVE A CAMBIAR DE NAVEGADOR', async (s) => {
   let partida = '';
   try {
     await first.page.goto(`${s.url}/#/club/estadio`, { waitUntil: 'networkidle' });
+    await passPicker(first.page);
     await first.page.waitForTimeout(1200);
 
     await first.page.locator('.ticketpick__range').fill('1800');
@@ -141,6 +144,7 @@ serverTest('LA PARTIDA SOBREVIVE A CAMBIAR DE NAVEGADOR', async (s) => {
   const clean = await freshTab();
   try {
     await clean.page.goto(`${s.url}/#/club/estadio`, { waitUntil: 'networkidle' });
+    await passPicker(clean.page);
     await clean.page.waitForTimeout(1200);
     const fresh = await clean.page.locator('.clubsummary').innerText();
     assert.ok(!/1\.800/.test(fresh), 'una partida nueva no puede ver la de otro');
@@ -161,6 +165,7 @@ serverTest('LA PARTIDA SOBREVIVE A CAMBIAR DE NAVEGADOR', async (s) => {
     await resumed.page.goto(`${s.url}/?partida=${partida}#/club/estadio`, {
       waitUntil: 'networkidle',
     });
+    await passPicker(resumed.page);
     await resumed.page.waitForTimeout(1500);
 
     assert.match(
@@ -185,6 +190,7 @@ serverTest('jugar contra el servidor mueve la tabla y la caja', async (s) => {
   const tab = await freshTab();
   try {
     await tab.page.goto(`${s.url}/#/club/finanzas`, { waitUntil: 'networkidle' });
+    await passPicker(tab.page);
     await tab.page.waitForTimeout(1200);
     const cashBefore = await tab.page.locator('.clubsummary__value').first().innerText();
 

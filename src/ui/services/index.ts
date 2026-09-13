@@ -92,13 +92,16 @@ export async function connectToServer(): Promise<ServiceKind> {
     const payload = (await response.json()) as { ok?: boolean };
     if (payload.ok !== true) return kind;
 
-    // `?partida=ana` abre esa partida; sin el parametro, el servidor la
-    // resuelve por cookie y crea una nueva la primera vez. Es lo que hace que
-    // una carrera se pueda retomar desde otra maquina.
+    // LA PARTIDA ES LA DEL USUARIO, y el servidor la deduce de la sesion. Ya
+    // no se pide por nombre: `?partida=ana` servia cuando cualquiera podia
+    // abrir cualquier carrera sabiendo su nombre, y eso es justo lo que la
+    // sesion vino a cerrar. Se sigue leyendo para el modo sin login.
     const requested = requestedGameId();
     gameService = createHttpGameService(requested ? { gameId: requested } : {});
     kind = 'servidor';
-    gameId = requested ?? (await askGameId());
+
+    const who = await session();
+    gameId = who?.usuario ?? requested ?? null;
   } catch {
     // Sin servidor detras: el servicio local ya esta puesto.
   }
@@ -106,25 +109,128 @@ export async function connectToServer(): Promise<ServiceKind> {
 }
 
 /**
- * El nombre que el servidor le puso a esta partida.
+ * ============================================================
+ * LA SESION
+ * ============================================================
  *
- * Viene en la cabecera `x-partida` de cualquier respuesta de la API. Hace
- * falta preguntarlo porque la cookie es `HttpOnly` —no la puede leer ningun
- * script, que es como tiene que ser— asi que la unica forma de que la
- * interfaz sepa en que partida esta es que el servidor se lo diga.
+ * Con servidor detras hay que entrar con usuario y contrasena. Estas tres
+ * funciones son todo lo que la interfaz necesita saber de eso.
+ *
+ * Sin servidor detras —el HTML autocontenido— NO HAY LOGIN ni puede haberlo:
+ * no hay donde verificar una contrasena, y la partida es del navegador. Por
+ * eso `session()` devuelve `null` y la interfaz no muestra ninguna entrada.
  */
-async function askGameId(): Promise<string | null> {
+
+export type Session = {
+  readonly usuario: string;
+  readonly nombre: string;
+};
+
+/**
+ * La sesion ya resuelta, para poder leerla sin esperar.
+ *
+ * La barra superior necesita saber quien esta jugando en cada render, y
+ * preguntarselo al servidor en cada uno seria una peticion por render. Se
+ * guarda cuando `session()` o `login()` la resuelven.
+ */
+let current: Session | null = null;
+
+export function currentSession(): Session | null {
+  return current;
+}
+
+/**
+ * Quien esta jugando, o `null`.
+ *
+ * `null` significa dos cosas distintas y a la interfaz le alcanza con una:
+ * que no hay sesion (hay que entrar) o que no hay servidor (no hace falta).
+ * Se distinguen por `serviceKind()`.
+ */
+export type SessionState = {
+  /**
+   * Si ESTE servidor pide entrar.
+   *
+   * Distinto de tener sesión: un servidor sin login (los tests que prueban el
+   * juego) responde `false`, y ahí mostrar la pantalla de entrada sería
+   * mandar al usuario a un `/api/login` que no existe.
+   */
+  readonly required: boolean;
+  readonly session: Session | null;
+};
+
+export async function sessionState(): Promise<SessionState> {
+  // Sin servidor no hay login posible ni hace falta.
+  if (kind !== 'servidor') return { required: false, session: null };
   try {
-    const response = await fetch('/api/rpc', {
+    const response = await fetch('/api/sesion', { credentials: 'same-origin' });
+    if (!response.ok) return { required: false, session: null };
+    const payload = (await response.json()) as {
+      login?: boolean;
+      requerido?: boolean;
+      usuario?: string;
+      nombre?: string;
+    };
+    const required = payload.requerido !== false;
+    if (payload.login !== true || !payload.usuario || !payload.nombre) {
+      current = null;
+      return { required, session: null };
+    }
+    current = { usuario: payload.usuario, nombre: payload.nombre };
+    return { required, session: current };
+  } catch {
+    return { required: false, session: null };
+  }
+}
+
+/** Quién está jugando, o `null`. Atajo sobre `sessionState`. */
+export async function session(): Promise<Session | null> {
+  return (await sessionState()).session;
+}
+
+/**
+ * Entra. Devuelve la sesion, o el mensaje de error para mostrar.
+ *
+ * El mensaje viene del servidor tal cual: es el mismo para usuario inexistente
+ * y contrasena incorrecta, a proposito.
+ */
+export async function login(
+  usuario: string,
+  contrasena: string,
+): Promise<{ ok: true; session: Session } | { ok: false; error: string }> {
+  try {
+    const response = await fetch('/api/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ method: 'loadGame', args: [] }),
+      body: JSON.stringify({ usuario, contrasena }),
     });
-    return response.headers.get('x-partida');
+    const payload = (await response.json()) as {
+      usuario?: string;
+      nombre?: string;
+      error?: string;
+    };
+    if (!response.ok || !payload.usuario || !payload.nombre) {
+      return { ok: false, error: payload.error ?? 'No se pudo entrar' };
+    }
+    gameId = payload.usuario;
+    current = { usuario: payload.usuario, nombre: payload.nombre };
+    return { ok: true, session: current };
   } catch {
-    return null;
+    return { ok: false, error: 'No se pudo hablar con el servidor' };
   }
+}
+
+/** Sale. Despues de esto hay que volver a entrar. */
+export async function logout(): Promise<void> {
+  try {
+    await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+  } catch {
+    // Si la peticion no llega, la cookie sigue puesta y la sesion sigue
+    // valiendo. Se recarga igual: es lo que el usuario pidio, y al recargar se
+    // vuelve a preguntar al servidor quien es.
+  }
+  gameId = null;
+  current = null;
 }
 
 export { DEMO_DATA_NOTICE, DATA_SOURCE_NOTICE, DATA_SOURCE_LABEL } from './mockGameService.ts';

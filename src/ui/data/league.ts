@@ -24,7 +24,7 @@ import type { Player } from '../../domain/player.ts';
 import { createTactics, type Tactics } from '../../domain/tactics.ts';
 import { createTeam, type Team } from '../../domain/team.ts';
 import { CLUBS, clubById } from './clubs.ts';
-import { DEMO_SQUAD } from './squad.ts';
+import { clubSquad } from './squad.ts';
 import {
   APERTURA98_CLUBS,
   apertura98Club,
@@ -308,18 +308,30 @@ function academyFor(reputation: number): number {
  * Ya no hay lista escrita a mano: los clubes, sus planteles, sus tacticas y
  * su nivel salen todos de `apertura98.ts`.
  */
-const RIVALS: readonly Setup[] = APERTURA98_CLUBS.filter((club) => club.id !== USER_CLUB_ID).map(
-  (club) => {
-    const players = squadFor(club.id);
-    const formationId = formationForSquad(players);
-    return {
-      clubId: club.id,
-      target: squadStrength(players),
-      chemistry: PCF_CHEMISTRY,
-      tactics: tacticsFromPcf(club, formationId),
-    };
-  },
-);
+const SETUPS: readonly Setup[] = APERTURA98_CLUBS.map((club) => {
+  const players = squadFor(club.id);
+  const formationId = formationForSquad(players);
+  return {
+    clubId: club.id,
+    target: squadStrength(players),
+    chemistry: PCF_CHEMISTRY,
+    tactics: tacticsFromPcf(club, formationId),
+  };
+});
+
+/**
+ * El setup de LOS VEINTE clubes, sin privilegiar a ninguno.
+ *
+ * Antes esta lista excluía a River, porque River era por definición el club del
+ * manager. Desde que cada usuario elige equipo, cualquiera de los veinte puede
+ * ser el dirigido y cualquiera de los veinte puede ser rival, así que el setup
+ * se arma para todos y quién es rival se decide al pedirlo.
+ */
+function setupOf(clubId: string): Setup | null {
+  return SETUPS.find((entry) => entry.clubId === clubId) ?? null;
+}
+
+const RIVALS: readonly Setup[] = SETUPS.filter((entry) => entry.clubId !== USER_CLUB_ID);
 
 export const LEAGUE_SETUP: readonly Setup[] = RIVALS;
 
@@ -354,10 +366,13 @@ function rivalTeam(entry: Setup, seasonsClosed = 0): Team {
  * 4). Entran como cualquier otro jugador: el motor no distingue, y por eso un
  * juvenil promovido compite por el puesto de verdad.
  */
-export function userTeam(
-  tactics?: Tactics,
-  chemistry = 74,
-  extra: readonly Player[] = [],
+export type UserTeamOptions = {
+  /** El club dirigido. Por defecto River, que es el club por defecto. */
+  readonly clubId?: string;
+  readonly tactics?: Tactics;
+  readonly chemistry?: number;
+  /** Juveniles que el manager subio al plantel profesional (fase 4). */
+  readonly extra?: readonly Player[];
   /**
    * Trabajo preventivo del cuerpo medico, 0..100 (fase 8).
    *
@@ -365,22 +380,32 @@ export function userTeam(
    * fisioterapeuta no previene nada, y quien construye el equipo tiene que
    * pasarlo explicitamente para que exista.
    */
-  injuryPrevention = 0,
-): Team {
-  const club = clubById(USER_CLUB_ID);
+  readonly injuryPrevention?: number;
+};
+
+export function userTeam(options: UserTeamOptions = {}): Team {
+  const clubId = options.clubId ?? USER_CLUB_ID;
+  const club = clubById(clubId);
+  // La tactica por defecto es la del archivo para ESE club, no la del motor:
+  // quien elige Velez hereda como jugaba Velez en el 98. Sin esto, elegir un
+  // club daba su plantel con una tactica genérica.
+  const tactics = options.tactics ?? setupOf(clubId)?.tactics;
   return createTeam({
     id: club.id,
     name: club.name,
     shortName: club.shortName,
-    players: [...DEMO_SQUAD.map((entry) => entry.player), ...extra],
-    chemistry,
+    players: [
+      ...clubSquad(clubId).map((entry) => entry.player),
+      ...(options.extra ?? []),
+    ],
+    chemistry: options.chemistry ?? 74,
     ...(tactics ? { tactics } : {}),
-    reputation: reputationFromClub(apertura98Club(USER_CLUB_ID)),
-    injuryPrevention,
+    reputation: reputationFromClub(apertura98Club(clubId)),
+    injuryPrevention: options.injuryPrevention ?? 0,
   });
 }
 
-const RIVALS_CACHE = new Map<number, ReadonlyMap<string, Team>>();
+const RIVALS_CACHE = new Map<string, ReadonlyMap<string, Team>>();
 
 /**
  * Los diecinueve rivales, generados una vez por temporada del juego.
@@ -393,32 +418,48 @@ const RIVALS_CACHE = new Map<number, ReadonlyMap<string, Team>>();
  * los rivales envejecen, asi que el Boca de la temporada 3 no es el de la 0 y
  * un cache sin esa clave devolveria el equipo de otro anio.
  */
-export function rivalTeams(seasonsClosed = 0): ReadonlyMap<string, Team> {
-  const cached = RIVALS_CACHE.get(seasonsClosed);
+export function rivalTeams(
+  seasonsClosed = 0,
+  /** El club dirigido, que queda AFUERA de los rivales. */
+  userClubId: string = USER_CLUB_ID,
+): ReadonlyMap<string, Team> {
+  // La clave del cache lleva el club dirigido además de las temporadas: los
+  // rivales de quien dirige Boca no son los de quien dirige River, y un cache
+  // sin esa parte de la clave devolvería la liga del otro.
+  const key = `${userClubId}:${seasonsClosed}`;
+  const cached = RIVALS_CACHE.get(key);
   if (cached) return cached;
   const built = new Map(
-    RIVALS.map((entry) => [entry.clubId, rivalTeam(entry, seasonsClosed)] as const),
+    SETUPS.filter((entry) => entry.clubId !== userClubId).map(
+      (entry) => [entry.clubId, rivalTeam(entry, seasonsClosed)] as const,
+    ),
   );
-  RIVALS_CACHE.set(seasonsClosed, built);
+  RIVALS_CACHE.set(key, built);
   return built;
 }
 
 /** Todos los equipos del torneo, con el del manager incluido. */
 export function leagueTeams(
-  userTactics?: Tactics,
-  userChemistry?: number,
-  userExtra: readonly Player[] = [],
-  /** Trabajo preventivo del club del manager, que sale de su fisioterapeuta. */
-  userInjuryPrevention = 0,
-  /** Temporadas cerradas: los rivales tambien cumplen anios (fase 8). */
-  seasonsClosed = 0,
+  options: UserTeamOptions & {
+    /** Temporadas cerradas: los rivales tambien cumplen anios (fase 8). */
+    readonly seasonsClosed?: number;
+  } = {},
 ): ReadonlyMap<string, Team> {
-  const teams = new Map(rivalTeams(seasonsClosed));
-  teams.set(
-    USER_CLUB_ID,
-    userTeam(userTactics, userChemistry, userExtra, userInjuryPrevention),
-  );
+  const clubId = options.clubId ?? USER_CLUB_ID;
+  const teams = new Map(rivalTeams(options.seasonsClosed ?? 0, clubId));
+  teams.set(clubId, userTeam(options));
   return teams;
+}
+
+/**
+ * El nivel del club: el overall del mejor once que permite su plantel.
+ *
+ * Sale del archivo, no de una opinión nuestra, y es lo que hace que elegir
+ * equipo sea una decisión: dirigir a Platense no es lo mismo que dirigir a
+ * River, y el elector de equipo lo tiene que decir antes de que alguien elija.
+ */
+export function clubStrength(clubId: string): number {
+  return setupOf(clubId)?.target ?? 60;
 }
 
 /** Solo los clubes del torneo, en el orden en que los muestra la interfaz. */

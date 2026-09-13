@@ -47,7 +47,110 @@ los tests del motor afirman, y desharían borrados que están documentados.
 modelo de fútbol**, con la lista de nombres prohibidos. Si de verdad hace falta
 uno, hay que borrar ese test a mano y explicar por qué.
 
-## 3. Neon: dos URLs, y no es redundancia
+## 3. Quién entra: los usuarios y la sesión
+
+Cuatro usuarios fijos, con la contraseña guardada como **hash de scrypt** en
+`src/server/users.ts`:
+
+| Usuario | Se llama |
+|---|---|
+| `lhs237` | Lucas |
+| `Tomy` | Tomás |
+| `Kezman` | Agustín |
+| `fercha07` | fede |
+
+El nombre de usuario **no distingue mayúsculas** —nadie se acuerda de cómo
+escribió el suyo— pero la partida es una sola: `Tomy` y `tomy` son la misma
+carrera.
+
+**Los usuarios están en el código y no en la base** porque el login tiene que
+funcionar sin base de datos: el HTML autocontenido no tiene servidor y
+`npm run serve` sin `DATABASE_URL` guarda en archivos. Con los usuarios en
+Postgres no se podría entrar a un servidor de archivos. Son cuatro personas
+conocidas, no un registro abierto: no hay alta, ni baja, ni "olvidé mi
+contraseña".
+
+**Se pueden commitear esos hashes** porque las contraseñas se generaron al azar
+con 80 bits de entropía (cuatro grupos de cuatro sobre un alfabeto de 32), así
+que no hay diccionario que las saque de un scrypt. El hash de una contraseña
+*elegida por una persona* no se podría commitear con el mismo argumento.
+
+### Cambiar una contraseña, o sumar un jugador
+
+```bash
+npm run password -- Tomy     # reemplaza la de Tomy: imprime el bloque a pegar
+npm run password -- pepe     # un usuario nuevo: imprime el JSON de USUARIOS_EXTRA
+```
+
+La contraseña se muestra **una sola vez** y no queda guardada en ningún lado.
+Si se pierde, se genera otra.
+
+`USUARIOS_EXTRA` es una variable de entorno con usuarios además de los cuatro:
+lleva hashes, nunca contraseñas, y sirve para sumar a alguien sin tocar el
+código. Un nombre que ya existe en `users.ts` se ignora, así que la variable no
+puede apropiarse de la cuenta de otro.
+
+### La sesión
+
+Una cookie firmada con HMAC-SHA256, `HttpOnly`, `SameSite=Lax`, `Secure` sobre
+HTTPS, válida 30 días. Lleva `usuario.vencimiento.firma` y **no lleva la
+contraseña ni su hash**: si se filtra, se filtró una sesión con fecha de
+vencimiento.
+
+No hay tabla de sesiones: en serverless eso sería una consulta a la base en
+cada petición. Lo que se pierde es poder revocar una sesión desde el servidor;
+cambiar `SESSION_SECRET` invalida todas, y con cuatro personas eso alcanza como
+botón de pánico.
+
+### EL CAMBIO QUE IMPORTA: la partida sale de la sesión
+
+Antes el servidor sacaba el nombre de la partida del header `x-partida` o de
+una cookie **sin firmar** — las dos cosas que el cliente elige. Quien supiera o
+adivinara el nombre de una carrera la abría y la jugaba. Alcanzaba mientras el
+servidor fuera local; expuesto a internet no alcanza.
+
+Ahora la partida de `Tomy` **es** `Tomy`, y el nombre se deduce de la cookie
+firmada. Mandar `x-partida: lhs237` con una sesión de `Tomy` devuelve la de
+`Tomy`, y hay un test que lo comprueba.
+
+`requireLogin: false` existe para los tests que prueban el juego y no la
+entrada. El valor por defecto es **con** login, así que un servidor de verdad
+no queda abierto por un olvido.
+
+## 4. Cada uno elige su club
+
+La primera vez que alguien entra, elige uno de los **veinte** clubes del
+Apertura 1998. Se elige una vez y es para toda la carrera: cambiarlo dejaría la
+tabla, la caja y el estadio describiendo a otro equipo.
+
+Los veinte planteles son los **reales del archivo** (462 jugadores), así que
+quien elige Boca dirige a Riquelme y a Palermo. Con el club cambian el plantel,
+el estadio y su aforo, la reputación, el ingreso, los sueldos, el presupuesto
+de fichajes, los diecinueve rivales y el mercado.
+
+El club vive en su **propia clave** del guardado (`manager:club:v1`), no dentro
+de la temporada. Es una distinción que se paga: con el club adentro de la
+temporada, `resetSeason` lo borraba y quien dirigía Vélez volvía siendo River
+sin un solo aviso. Estaba escrito y probado así antes de encontrarlo.
+
+**La caja inicial es la misma para los veinte**, y es a propósito: está medido
+y explicado en `src/ui/data/club-development.ts`. El club chico ya es mucho más
+difícil porque su ingreso sale de sus socios reales mientras los sueldos salen
+de su plantel real (River −11M/mes, Platense −43M/mes); repartir la caja
+proporcional a los socios dejaría a cuatro clubes insolventes en dos semanas.
+
+### CUATRO CARRERAS, NO UNA LIGA COMPARTIDA
+
+Cada usuario dirige **su propio torneo**, con sus diecinueve rivales. Si Lucas
+elige River y Tomás elige Boca, no juegan uno contra el otro: juegan dos
+campeonatos paralelos que nunca se cruzan.
+
+La razón es del motor, no del servidor: `playRound` resuelve los diez partidos
+de la fecha de una vez, así que no hay dónde esperar la alineación de otro
+humano. Una liga compartida pide que la fecha espere a todos los clubes
+humanos, y eso es una fase entera, no un parámetro.
+
+## 5. Neon: dos URLs, y no es redundancia
 
 Neon da dos endpoints para la misma base. Hacen falta los dos:
 
@@ -92,7 +195,7 @@ proxy WebSocket de Neon y contra cualquier otra base falla con `Received
 network error or non-101 status code`, que no dice que el problema es el
 adaptador. De ahí la elección por host.
 
-## 4. Las migraciones
+## 6. Las migraciones
 
 Todo cambio de estructura es un archivo en `prisma/migrations/`, commiteado y
 revisado como cualquier código. **Nunca a mano contra producción.**
@@ -139,7 +242,7 @@ marcado en `scripts/migrate-deploy.ts`, en la rama del `if (!isProduction)`:
 habría que pasarle la URL de la rama y migrar **esa**. Mientras eso no exista,
 no migrar es lo correcto y lo seguro.
 
-## 5. Vercel
+## 7. Vercel
 
 `vercel.json` define un sitio estático más **una** función:
 
@@ -174,14 +277,23 @@ frías simultáneas no abren dos pools.
 |---|---|---|---|
 | `DATABASE_URL` | **obligatoria** (pooled) | opcional, mejor una rama propia | no hace falta |
 | `DIRECT_URL` | **obligatoria** (directa) | no la usa (no migra) | no hace falta |
+| `SESSION_SECRET` | **obligatoria** (≥16 caracteres) | conviene, o las sesiones se caen | opcional |
 | `SHADOW_DATABASE_URL` | no | no | sólo para generar migraciones |
+| `USUARIOS_EXTRA` | opcional | opcional | opcional |
 | `VERCEL_ENV` | la pone Vercel | la pone Vercel | la pone Vercel |
+
+`SESSION_SECRET` es obligatoria en producción y **el build se corta sin ella**.
+Sin secreto configurado, `auth.ts` inventa uno al azar por proceso: en un
+servidor de una pieza alcanza, pero en serverless cada arranque en frío
+inventaría otro y a los cuatro les pediría entrar de nuevo cada tantos minutos,
+sin un error a la vista. El síntoma sin la causa es lo peor que puede pasar en
+producción, así que se comprueba antes de desplegar.
 
 **`VERCEL_ENV` no se configura a mano.** Ponerla en Preview con el valor
 `production` haría que una preview migre la base de producción, que es
 exactamente lo que el gate existe para impedir.
 
-## 6. Qué está comprobado, y con qué
+## 8. Qué está comprobado, y con qué
 
 `tests/persistence.test.ts` — 9 tests, **sin base de datos**, dentro de
 `npm test`. Contrato del almacén contra un doble que registra las consultas
@@ -207,12 +319,32 @@ la nueva. Nada falla en el despliegue; falla cuando alguien juega. Los dos
 tests lo detectan, y se comprobó que **fallan** cuando se les mete una columna
 de más.
 
-Los 22 tests de navegador (`npm run test:ui`) usan siempre el almacén de
-archivos, a propósito: son herméticos y no dependen de que haya una base.
-El camino UI → API → Postgres se verificó a mano, jugando una fecha contra
-Postgres y releyéndola después de reiniciar el servidor.
+`tests/auth.test.ts` — 15 tests de la entrada: que los cuatro usuarios existan
+con su nombre, que ninguna contraseña esté en el repositorio, que un usuario
+inexistente y una contraseña incorrecta digan **lo mismo**, que sin sesión no
+se juegue, que **la partida sea la del usuario y no la que pida el cliente**,
+que dos usuarios no se vean, que una cookie retocada (usuario, vencimiento,
+firma) no sirva, y que demasiados intentos frenen.
 
-## 7. Los secretos
+`tests/team-choice.test.ts` — 10 tests de la elección: que los veinte clubes
+tengan su plantel real (462 jugadores en total), que elegir cambie **todo** y no
+sólo el escudo, que los rivales sean los otros diecinueve, que el mercado no
+ofrezca a los propios, que no se pueda cambiar de club, y que el club sobreviva
+a reiniciar la temporada.
+
+Los 26 tests de navegador (`npm run test:ui`): 22 prueban las pantallas del
+juego con el almacén de archivos y sin login, a propósito —son herméticos— y 4
+(`login.test.ts`) recorren la entrada de verdad en Chromium: la pantalla, el
+rechazo, entrar, elegir club y que el plantel que se ve sea el de ese club.
+
+Ahí aparecieron los dos bugs que el compilador no podía ver: un `null` que
+viajaba como `undefined` y mandaba al usuario a dirigir River sin preguntarle,
+y una pantalla de entrada mostrada contra un servidor sin login.
+
+El camino UI → API → Postgres se verificó a mano, con los cuatro usuarios
+entrando, eligiendo cuatro clubes distintos y jugando fechas sin pisarse.
+
+## 9. Los secretos
 
 En `.gitignore`: `.env`, `.env.*` (menos `.env.example`), `src/generated/`,
 `api/index.mjs`, `api/index.mjs.map`, `api/assets/`, `.vercel`.

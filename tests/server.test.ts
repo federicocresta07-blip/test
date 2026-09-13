@@ -32,7 +32,14 @@ type Booted = {
 
 async function boot(): Promise<Booted> {
   const dataDir = mkdtempSync(join(tmpdir(), 'manager-partidas-'));
-  const api = createApi({ dataDir });
+  // SIN LOGIN A PROPOSITO. Estos tests prueban la plomería del RPC —que el
+  // contrato viaje, que el estado se guarde en el servidor, que dos partidas
+  // no se cruzen— y no la entrada. La entrada tiene sus propios tests en
+  // `tests/auth.test.ts`, que son los que prueban que sin sesión no se pasa.
+  //
+  // Que haya que pedirlo explícitamente es el punto: el valor por defecto es
+  // CON login, así que un servidor de verdad nunca queda abierto por olvido.
+  const api = createApi({ dataDir, requireLogin: false });
   const server: Server = createServer((request, response) => {
     void api(request, response).then((handled) => {
       if (handled) return;

@@ -173,6 +173,23 @@ export function emptySeason(seed = DEFAULT_SEASON_SEED): SeasonSave {
 
 const STORAGE_KEY = 'manager:temporada:v1';
 
+/**
+ * Si esta partida ya tiene un guardado, sin importar qué dice.
+ *
+ * Lo usa el elector de equipo para distinguir dos cosas que `readSeason` no
+ * distingue: una partida NUEVA (hay que elegir club) de una partida VIEJA sin
+ * club anotado (es River, porque antes todas lo eran). Sin esta diferencia, a
+ * quien ya tenía una carrera de River en el navegador se le pediría elegir
+ * equipo y empezaría de cero.
+ */
+export function hasStoredSeason(): boolean {
+  try {
+    return storage().getItem(STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function readSeason(): SeasonSave {
   try {
     const raw = storage().getItem(STORAGE_KEY);

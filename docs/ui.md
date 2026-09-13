@@ -40,8 +40,8 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 378 tests (387 con una base de datos configurada)
-npm run test:ui    # 22 tests de navegador (pide Playwright)
+npm test           # 403 tests (412 con una base de datos configurada)
+npm run test:ui    # 26 tests de navegador (pide Playwright)
 npm run serve      # servidor de partida en http://localhost:8787
 ```
 
@@ -868,11 +868,19 @@ declararla es más útil que esconderla.
   nivel en el momento, aunque el dominio ya tiene sus semanas de obra
   declaradas en `facilityUpgradeWeeks`. Engancharlas es el mismo mecanismo que
   ya existe para el estadio.
-- **El servidor no tiene usuarios.** Quien tenga el nombre de una partida la
-  abre. Alcanza para un prototipo y no alcanza para nada más: un servidor
-  público necesita autenticación, y eso es un sistema, no un parámetro. Con
-  base de datos esto no mejora: mejora la durabilidad del guardado, no quién
-  puede leerlo.
+- **El login no tiene registro ni recuperación.** Son cuatro usuarios fijos con
+  contraseñas que les dieron: no hay alta, ni baja, ni "olvidé mi contraseña",
+  ni cambio de contraseña desde la interfaz. Rotar una es correr
+  `npm run password` y commitear el hash nuevo. Para cuatro personas conocidas
+  alcanza; para un registro abierto haría falta una tabla de usuarios, y con
+  ella el login dejaría de funcionar sin base de datos.
+- **No se puede cambiar de club sin empezar de nuevo.** Es deliberado —la tabla
+  y la caja describen a un equipo— pero no hay forma de borrar la partida desde
+  la interfaz, así que "empezar de nuevo con otro club" hoy pide borrar la
+  partida a mano en el servidor.
+- **Las sesiones no se pueden revocar de a una.** La cookie es firmada y sin
+  estado, así que el único botón es cambiar `SESSION_SECRET`, que cierra las
+  cuatro.
 - **Las partidas viejas no se limpian.** Cada partida nueva escribe un archivo
   —o dos filas— y nadie los borra. En Postgres `Game.updatedAt` está indexado
   justamente para poder barrer las abandonadas, pero la tarea que lo haga no

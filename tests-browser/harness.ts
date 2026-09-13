@@ -40,6 +40,7 @@ export type Browser = {
 
 /** Lo que usamos de una pagina de Playwright, sin depender de sus tipos. */
 export type Page = {
+  addInitScript(script: unknown, arg?: unknown): Promise<void>;
   goto(url: string, options?: unknown): Promise<unknown>;
   title(): Promise<string>;
   locator(selector: string): Locator;
@@ -48,12 +49,15 @@ export type Page = {
   keyboard: { press(key: string): Promise<void> };
   screenshot(options: { path: string }): Promise<unknown>;
   waitForTimeout(ms: number): Promise<void>;
+  waitForSelector(selector: string, options?: unknown): Promise<unknown>;
   evaluate<T>(fn: (arg: never) => T, arg?: unknown): Promise<T>;
   on(event: string, handler: (payload: never) => void): void;
 };
 
 export type Locator = {
   count(): Promise<number>;
+  inputValue(): Promise<string>;
+  isEnabled(): Promise<boolean>;
   first(): Locator;
   nth(index: number): Locator;
   innerText(): Promise<string>;
@@ -137,7 +141,11 @@ export async function serveBuild(withApi = false): Promise<Served> {
   let api: ApiHandler | null = null;
   if (withApi) {
     dataDir = mkdtempSync(join(tmpdir(), 'manager-browser-'));
-    api = createApi({ dataDir });
+    // SIN LOGIN A PROPOSITO, igual que en `tests/server.test.ts`: estos tests
+    // prueban las pantallas del juego, no la entrada. La entrada tiene sus
+    // propios tests —`tests-browser/login.test.ts` y `tests/auth.test.ts`—
+    // que son los que la ejercitan de verdad, con contrasena y todo.
+    api = createApi({ dataDir, requireLogin: false });
   }
 
   const server: Server = createServer((request, response) => {
@@ -177,10 +185,43 @@ export async function serveBuild(withApi = false): Promise<Served> {
  * final. Es la comprobacion que mas veces encontro algo: una pantalla puede
  * verse bien y estar tirando excepciones en cada render.
  */
+export const CLUB_STORAGE_KEY = 'manager:club:v1';
+
+/** El club que eligen los tests que no prueban la eleccion. */
+export const TEST_CLUB = 'river';
+
 export async function openPage(
   browser: Browser,
+  /**
+   * El club ya elegido en esta partida, o `null` para llegar al elector.
+   *
+   * POR QUE ESTO EXISTE. Desde que se elige equipo, una partida nueva muestra
+   * primero el elector, y los veintidos tests que prueban las pantallas del
+   * juego se quedaban ahi esperando una tabla que todavia no existia. Sembrar
+   * el club es declarar "este navegador ya eligio", que es la unica cosa que
+   * esos tests necesitan del elector.
+   *
+   * El test que prueba el elector pasa `null` y lo recorre a mano.
+   */
+  club: string | null = TEST_CLUB,
 ): Promise<{ readonly page: Page; readonly errors: string[] }> {
   const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+
+  if (club !== null) {
+    // Se escribe ANTES de que corra el codigo de la pagina: si se escribiera
+    // despues, la interfaz ya habria decidido mostrar el elector.
+    await page.addInitScript(
+      ([key, value]: readonly [string, string]) => {
+        try {
+          globalThis.localStorage?.setItem(key, value);
+        } catch {
+          // Sin localStorage el test va a fallar mas adelante y con un
+          // mensaje mas claro que uno inventado aca.
+        }
+      },
+      [CLUB_STORAGE_KEY, club] as const,
+    );
+  }
   const errors: string[] = [];
   page.on('console', (message: never) => {
     const m = message as unknown as { type(): string; text(): string };
@@ -202,6 +243,29 @@ export async function openPage(
     errors.push(`pageerror: ${(error as unknown as Error).message}`);
   });
   return { page, errors };
+}
+
+/**
+ * Pasa el elector de equipo si esta en pantalla.
+ *
+ * Los tests que prueban el SERVIDOR no pueden sembrar el club en
+ * `localStorage` como los otros: con API detras, el club vive en la partida
+ * del servidor y la interfaz lo pide por HTTP. Asi que se elige de verdad,
+ * haciendo clic, que es lo que hace una persona.
+ *
+ * Si el elector no esta, no hace nada: un contexto que ya eligio va directo al
+ * juego, y el test que lo llama no tiene que saber en cual de los dos esta.
+ */
+export async function passPicker(page: Page, club = TEST_CLUB): Promise<void> {
+  const visible = await page
+    .locator('.picker__grid')
+    .isVisible()
+    .catch(() => false);
+  if (!visible) return;
+
+  await page.locator(`.picker__club[data-club="${club}"]`).click();
+  await page.locator('.picker__foot button').click();
+  await page.waitForSelector('.topbar');
 }
 
 /**

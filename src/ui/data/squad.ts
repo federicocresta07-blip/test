@@ -1,7 +1,11 @@
 /**
- * EL PLANTEL DEL CLUB QUE DIRIGE EL MANAGER — River Plate, Apertura 1998.
+ * LOS PLANTELES DEL APERTURA 1998, como los ve la interfaz.
  *
- * Ya no son jugadores inventados. Los veintisiete salen de `EQ003003.PKF`, el
+ * `clubSquad(clubId)` da el plantel de cualquiera de los veinte clubes: desde
+ * que cada usuario elige equipo, el del manager es uno de esos veinte y no uno
+ * privilegiado. `DEMO_SQUAD` es el de River, que quedó como el por defecto.
+ *
+ * Ya no son jugadores inventados. Los jugadores salen de `EQ003003.PKF`, el
  * archivo de equipos de PC Apertura 6.0, con sus nombres, dorsales, fechas de
  * nacimiento, nacionalidades y los diez atributos que guarda el juego.
  *
@@ -56,9 +60,12 @@ function natCode(nationality: string | null): string {
  * orden del plantel como numero de ficha y el jugador queda igual: el dorsal
  * no cambia como juega.
  */
-export const DEMO_SQUAD: readonly ClubPlayer[] = apertura98Squad(USER_CLUB).map(
-  (raw, index) => ({
-    player: playerFromApertura98(raw, USER_CLUB),
+export function clubSquad(clubId: string): readonly ClubPlayer[] {
+  const cached = SQUAD_CACHE.get(clubId);
+  if (cached) return cached;
+
+  const squad: readonly ClubPlayer[] = apertura98Squad(clubId).map((raw, index) => ({
+    player: playerFromApertura98(raw, clubId),
     shirtNumber: raw.d ?? 40 + index,
     nationality: natCode(raw.nat),
     // El valor y el salario los pone el mercado, no este archivo. Se completan
@@ -68,8 +75,23 @@ export const DEMO_SQUAD: readonly ClubPlayer[] = apertura98Squad(USER_CLUB).map(
     contractUntil: PCF_CONTRACT_UNTIL,
     yellowCards: 0,
     unhappy: false,
-  }),
-);
+  }));
+
+  SQUAD_CACHE.set(clubId, squad);
+  return squad;
+}
+
+const SQUAD_CACHE = new Map<string, readonly ClubPlayer[]>();
+
+/**
+ * El plantel del club por defecto, River.
+ *
+ * Sigue existiendo porque es el club por defecto —una partida sin club
+ * elegido es River, igual que antes— y porque los tests lo usan como plantel
+ * de referencia. Ya no es EL plantel del manager: eso ahora depende de qué
+ * club eligió cada usuario, y sale de `clubSquad`.
+ */
+export const DEMO_SQUAD: readonly ClubPlayer[] = clubSquad(USER_CLUB);
 
 /** Meses de contrato que quedan, para la valuacion de mercado. */
 export function contractMonths(contractUntil: string, today: string): number {

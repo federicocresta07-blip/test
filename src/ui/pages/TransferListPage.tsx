@@ -46,6 +46,8 @@ export function TransferListPage(): ReactNode {
     const precision = marketPrecision(state.staff, state.facilities);
     const pool = marketPool({
       precision,
+      // El club dirigido: sus jugadores no son mercado, y los del resto sí.
+      clubId: state.club.id,
       transferredIds: state.market.transfers.map((entry) => entry.playerId),
       listedIds: state.market.listedElsewhere,
       // Los planteles rivales envejecen (fase 8): sin esto el mercado
@@ -54,6 +56,7 @@ export function TransferListPage(): ReactNode {
     });
     return transferListed(pool).slice().sort((a, b) => b.appraisal.overall - a.appraisal.overall);
   }, [
+    state.club.id,
     state.staff,
     state.facilities,
     state.market.transfers,

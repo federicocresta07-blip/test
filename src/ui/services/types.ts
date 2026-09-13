@@ -57,6 +57,24 @@ export type GameService = {
   loadGame(): Promise<GameState>;
 
   /**
+   * Qué club dirige esta partida, o `null` si todavía no se eligió.
+   *
+   * Existe para que la interfaz sepa si tiene que mostrar el elector de equipo
+   * ANTES de cargar el estado: `loadGame` de una partida sin club elegido
+   * devolvería River, y el usuario habría empezado una carrera que no eligió.
+   */
+  currentTeam(): Promise<string | null>;
+
+  /**
+   * Elige el club de esta partida. UNA SOLA VEZ.
+   *
+   * Falla si ya hay uno elegido: cambiar de club a mitad de carrera dejaría la
+   * tabla, las finanzas y el estadio describiendo a otro equipo. Para cambiar
+   * hay que empezar de nuevo.
+   */
+  chooseTeam(clubId: string): Promise<void>;
+
+  /**
    * Persiste la alineacion: titulares, suplentes, formacion, tactica,
    * capitan y balon parado (seccion 6.12).
    */

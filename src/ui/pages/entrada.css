@@ -1,0 +1,201 @@
+/* ============================================================
+   LA ENTRADA: login y elección de equipo
+   ============================================================
+
+   Las dos pantallas que se ven ANTES del juego. Usan los mismos tokens que
+   todo lo demás —no hay un color nuevo acá— porque son parte del juego y no
+   una pantalla de sistema pegada adelante. */
+
+/* --- Login --- */
+.login {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: var(--sp-8) var(--sp-5);
+}
+
+.login__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: 340px;
+  padding: var(--sp-7) var(--sp-6);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.login__head {
+  margin-bottom: var(--sp-2);
+  text-align: center;
+}
+
+.login__kicker,
+.picker__kicker {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.login__title {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+}
+
+.login__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.login__label {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.login__input {
+  padding: var(--sp-3);
+  font: inherit;
+  font-size: var(--fs-md);
+  color: var(--text-primary);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.login__input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-subtle);
+  outline-offset: 1px;
+}
+
+.login__error,
+.picker__error {
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--danger);
+  background: var(--danger-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.login__note {
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* --- Elección de equipo --- */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--sp-7) var(--sp-5);
+}
+
+.picker__head {
+  text-align: center;
+}
+
+.picker__title {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+}
+
+.picker__detail {
+  max-width: 60ch;
+  margin: var(--sp-2) auto 0;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--sp-3);
+  list-style: none;
+}
+
+.picker__club {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-4) var(--sp-2);
+  font: inherit;
+  color: var(--text-primary);
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.picker__club:hover {
+  background: var(--surface-hover);
+}
+
+.picker__club--active {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+}
+
+.picker__club:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.picker__name {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.picker__meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.picker__strength {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: var(--accent-text);
+}
+
+.picker__players {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.picker__foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.picker__chosen {
+  text-align: center;
+}
+
+.picker__chosenName {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+}
+
+.picker__chosenDetail {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}

@@ -4,6 +4,10 @@
  * Corre `prisma migrate deploy` —el comando de producción— y sólo en
  * producción. Es el guardián entre el repositorio y el schema de la base.
  *
+ * Y es, de paso, el único lugar del build que sabe que está en producción, así
+ * que también comprueba ahí las variables sin las cuales la aplicación
+ * arrancaría rota en silencio: ver `SESSION_SECRET` más abajo.
+ *
  * ============================================================
  * LAS TRES REGLAS QUE ESTE ARCHIVO HACE CUMPLIR
  * ============================================================
@@ -47,6 +51,8 @@ const env = process.env['VERCEL_ENV'] ?? 'local';
 const isProduction = env === 'production';
 const hasDatabase = (process.env['DATABASE_URL'] ?? '').length > 0;
 const hasDirect = (process.env['DIRECT_URL'] ?? '').length > 0;
+// 16 caracteres es el mínimo que `auth.ts` acepta como secreto de verdad.
+const hasSecret = (process.env['SESSION_SECRET'] ?? '').length >= 16;
 
 function done(message: string): never {
   console.log(`[migraciones] ${message}`);
@@ -91,6 +97,27 @@ if (!hasDirect) {
     'falta DIRECT_URL en producción. Es el endpoint DIRECTO de Neon (sin ' +
       '`-pooler`), y las migraciones tienen que ir por ahí: un pooler en modo ' +
       'transacción no sostiene los bloqueos que `migrate deploy` necesita.',
+  );
+}
+
+if (!hasSecret) {
+  // SIN SECRETO DE SESION, EL LOGIN NO SIRVE EN PRODUCCION.
+  //
+  // `auth.ts` inventa uno al azar cuando falta, y en un servidor de una sola
+  // pieza eso alcanza. En serverless no: cada arranque en frío inventa otro,
+  // y todas las cookies firmadas con el anterior dejan de valer. El síntoma
+  // no es un error, es peor: a los cuatro les pide entrar de nuevo cada
+  // tantos minutos, sin explicación y sin nada en los logs.
+  //
+  // Se corta acá, con las migraciones, porque es el único lugar del build que
+  // ya mira el entorno de producción. Generalo con:
+  //
+  //     node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  fail(
+    'falta SESSION_SECRET en producción (mínimo 16 caracteres). Sin él, cada ' +
+      'arranque en frío de la función inventa otro secreto y todas las ' +
+      'sesiones se caen: los usuarios tendrían que entrar de nuevo todo el ' +
+      'tiempo. Configuralo en Vercel (Settings → Environment Variables).',
   );
 }
 

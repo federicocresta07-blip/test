@@ -11,7 +11,8 @@ import { createTactics } from '../../domain/tactics.ts';
 import { createTeam } from '../../domain/team.ts';
 import type { GameState, LineupSelection } from '../models/index.ts';
 import { CLUBS, clubById } from '../data/clubs.ts';
-import { DEMO_SQUAD, withMarketValues } from '../data/squad.ts';
+import { clubSquad, withMarketValues } from '../data/squad.ts';
+import { readClub, writeClub, managedClub } from './club-store.ts';
 import {
   DEMO_FACILITIES,
   OPENING_CASH,
@@ -88,7 +89,7 @@ import {
   staffSpec,
   type StaffAssignment,
 } from '../../domain/staff.ts';
-import { LEAGUE_CLUB_IDS, leagueTeams } from '../data/league.ts';
+import { LEAGUE_CLUB_IDS, leagueTeams, USER_CLUB_ID } from '../data/league.ts';
 import { buildYouthSquad } from '../data/youth.ts';
 import { autoTransferList, negotiate, squadNeed, valuePlayer } from '../../domain/market.ts';
 import {
@@ -126,6 +127,7 @@ import {
   withAttributes,
   withCondition,
   writeSeason,
+  hasStoredSeason,
   type GateRecord,
   type SeasonSave,
   type StoredOffer,
@@ -153,7 +155,9 @@ export const DATA_SOURCE_LABEL = 'PC Apertura 98';
 /** @deprecated Se mantiene el nombre viejo para no romper importaciones. */
 export const DEMO_DATA_NOTICE = DATA_SOURCE_NOTICE;
 
-const CLUB_ID = 'river';
+// EL CLUB DIRIGIDO sale de `club-store.ts`, que es su unica fuente de verdad.
+// Hasta la fase de login esto era `const CLUB_ID = 'river'`, y estaba bien
+// mientras hubiera un solo jugador.
 
 /** Cohesion con la que arranca el plantel antes de jugar nada. */
 export const INITIAL_CHEMISTRY = 74;
@@ -183,11 +187,11 @@ const DEFAULT_TACTICS_DEMO = createTactics({
  * Once inicial: el que propone el motor.
  * Es determinista, asi que el club siempre arranca con la misma alineacion.
  */
-function initialLineup(): LineupSelection {
+function initialLineup(clubId: string = USER_CLUB_ID): LineupSelection {
   const team = createTeam({
-    id: CLUB_ID,
-    name: clubById(CLUB_ID).name,
-    players: DEMO_SQUAD.map((entry) => entry.player),
+    id: clubId,
+    name: clubById(clubId).name,
+    players: clubSquad(clubId).map((entry) => entry.player),
     chemistry: 74,
     tactics: DEFAULT_TACTICS_DEMO,
   });
@@ -297,11 +301,11 @@ function composeFinances(
 ): Finances {
   const totals = investmentTotals(development);
   const table = seasonTable(save.records);
-  const position = table.findIndex((row) => row.clubId === CLUB_ID) + 1;
+  const position = table.findIndex((row) => row.clubId === managedClub()) + 1;
   const rounds = totalRounds(seasonFixtures(save.seed));
 
   return financesOf({
-    clubId: CLUB_ID,
+    clubId: managedClub(),
     builtSeats: development.stadiumSeats ?? 0,
     squad,
     staff: composeStaff(development),
@@ -329,7 +333,7 @@ function homeMatchesLeft(save: SeasonSave, rounds: number): number {
   let left = 0;
   for (const fixture of fixtures) {
     if (fixture.round < save.round || fixture.round > rounds) continue;
-    if (fixture.homeClubId === CLUB_ID) left += 1;
+    if (fixture.homeClubId === managedClub()) left += 1;
   }
   return left;
 }
@@ -337,15 +341,15 @@ function homeMatchesLeft(save: SeasonSave, rounds: number): number {
 /** El estadio del club para la pantalla: dato real mas lo que se amplio. */
 function composeStadium(development: DevelopmentState, save: SeasonSave): StadiumView {
   const builtSeats = development.stadiumSeats ?? 0;
-  const stadium = stadiumOf(CLUB_ID, builtSeats);
+  const stadium = stadiumOf(managedClub(), builtSeats);
   return {
     name: stadium.name,
     capacity: stadium.capacity,
-    originalCapacity: originalCapacity(CLUB_ID),
+    originalCapacity: originalCapacity(managedClub()),
     builtSeats,
     members: stadium.members,
     ticketPrice: development.ticketPrice ?? REFERENCE_TICKET_PRICE,
-    reputation: reputationOf(CLUB_ID, builtSeats),
+    reputation: reputationOf(managedClub(), builtSeats),
     gates: [...(save.gates ?? [])]
       .sort((a, b) => b.round - a.round)
       .map((gate) => ({
@@ -401,20 +405,20 @@ function gateOfRound(
   rounds: number,
 ): { readonly record: GateRecord; readonly revenue: MatchRevenue } | null {
   const fixture = fixtures.find(
-    (entry) => entry.round === save.round && entry.homeClubId === CLUB_ID,
+    (entry) => entry.round === save.round && entry.homeClubId === managedClub(),
   );
   if (!fixture) return null;
 
   const table = seasonTable(save.records);
-  const row = table.find((entry) => entry.clubId === CLUB_ID);
-  const form = recordsOfClub(save.records, CLUB_ID)
+  const row = table.find((entry) => entry.clubId === managedClub());
+  const form = recordsOfClub(save.records, managedClub())
     .slice(-5)
     .reverse()
-    .map((record) => outcomeOf(record, CLUB_ID));
+    .map((record) => outcomeOf(record, managedClub()));
 
   const ticketPrice = development.ticketPrice ?? REFERENCE_TICKET_PRICE;
   const revenue = gateFor({
-    clubId: CLUB_ID,
+    clubId: managedClub(),
     builtSeats: development.stadiumSeats ?? 0,
     ticketPrice,
     opponentId: fixture.awayClubId,
@@ -469,7 +473,11 @@ function matchImportance(
  * por eso importa que las semanas bajen solas al jugar y no al entrar a la
  * pantalla.
  */
-function advanceStadiumWork(development: DevelopmentState): {
+function advanceStadiumWork(
+  development: DevelopmentState,
+  /** El club dirigido: la capacidad que se informa es la de SU estadio. */
+  clubId: string,
+): {
   readonly state: DevelopmentState;
   readonly changed: boolean;
   readonly finished: { readonly seats: number; readonly capacity: number } | null;
@@ -491,7 +499,7 @@ function advanceStadiumWork(development: DevelopmentState): {
   return {
     state: { ...rest, stadiumSeats: seats },
     changed: true,
-    finished: { seats: work.seats, capacity: stadiumOf(CLUB_ID, seats).capacity },
+    finished: { seats: work.seats, capacity: stadiumOf(clubId, seats).capacity },
   };
 }
 
@@ -613,7 +621,7 @@ function composeYouth(development: DevelopmentState, save: SeasonSave): readonly
   for (let season = 0; season <= seasonsClosed; season += 1) {
     const years = seasonsClosed - season;
     for (const entry of buildYouthSquad(
-      CLUB_ID,
+      managedClub(),
       academy?.level ?? 1,
       `camada-${season}`,
       years,
@@ -679,7 +687,7 @@ function developedYouth(entry: YouthPlayer, years: number, coaching: number): Yo
 function promotedPlayers(development: DevelopmentState, save: SeasonSave): readonly Player[] {
   const academy = composeFacilities(development).find((entry) => entry.id === 'academia');
   const promoted = new Set(save.promoted ?? []);
-  return buildYouthSquad(CLUB_ID, academy?.level ?? 1)
+  return buildYouthSquad(managedClub(), academy?.level ?? 1)
     .filter((entry) => promoted.has(entry.player.id))
     .map((entry) => withCondition(entry.player, save.conditions[entry.player.id]));
 }
@@ -758,12 +766,12 @@ function recordTransferIncome(amount: number, label: string): void {
  */
 function listedIds(save: SeasonSave): readonly string[] {
   const teams = applyTransfers(
-    leagueTeams(undefined, undefined, [], 0, save.seasonsClosed ?? 0),
+    leagueTeams({ clubId: managedClub(), seasonsClosed: save.seasonsClosed ?? 0 }),
     save.transfers ?? [],
   );
   const ids: string[] = [...(save.listed ?? [])];
   for (const [clubId, team] of teams) {
-    if (clubId === CLUB_ID) continue;
+    if (clubId === managedClub()) continue;
     for (const player of autoTransferList(team.players)) ids.push(player.id);
   }
   return ids;
@@ -789,11 +797,11 @@ function composeMarket(development: DevelopmentState, save: SeasonSave): GameSta
 
 /** Los jugadores que el club del manager compro. */
 function signedPlayers(save: SeasonSave): readonly Player[] {
-  const incoming = (save.transfers ?? []).filter((entry) => entry.toClubId === CLUB_ID);
+  const incoming = (save.transfers ?? []).filter((entry) => entry.toClubId === managedClub());
   if (incoming.length === 0) return [];
 
   return incoming
-    .map((entry) => findLeaguePlayer(entry.playerId, save.seasonsClosed ?? 0))
+    .map((entry) => findLeaguePlayer(entry.playerId, save.seasonsClosed ?? 0, managedClub()))
     .filter((found): found is { player: Player; clubId: string } => found !== null)
     .map((found) => withCondition(found.player, save.conditions[found.player.id]));
 }
@@ -812,12 +820,12 @@ function generateIncomingOffers(
   round: number,
 ): readonly StoredOffer[] {
   const teams = applyTransfers(
-    leagueTeams(undefined, undefined, [], 0, save.seasonsClosed ?? 0),
+    leagueTeams({ clubId: managedClub(), seasonsClosed: save.seasonsClosed ?? 0 }),
     save.transfers ?? [],
   );
   const alreadyOffered = new Set(
     (save.offers ?? [])
-      .filter((entry) => entry.toClubId === CLUB_ID && entry.status === 'enviada')
+      .filter((entry) => entry.toClubId === managedClub() && entry.status === 'enviada')
       .map((entry) => entry.playerId),
   );
   const sold = soldIds(save);
@@ -853,7 +861,7 @@ function generateIncomingOffers(
   // evaluan igual. Y sin dejar que cada club busque su segunda opcion, el
   // primero se llevaba el objetivo y los demas no ofrecian nada.
   const contenders = [...teams]
-    .filter(([clubId]) => clubId !== CLUB_ID)
+    .filter(([clubId]) => clubId !== managedClub())
     .sort(([, a], [, b]) => b.reputation - a.reputation);
 
   const offers: StoredOffer[] = [];
@@ -883,7 +891,7 @@ function generateIncomingOffers(
       playerId: wish.target.player.id,
       playerName: wish.target.player.name,
       fromClubId: clubId,
-      toClubId: CLUB_ID,
+      toClubId: managedClub(),
       amount,
       status: 'enviada',
       round,
@@ -910,7 +918,7 @@ const MAX_INCOMING_PER_ROUND = 3;
 function soldIds(save: SeasonSave): ReadonlySet<string> {
   return new Set(
     (save.transfers ?? [])
-      .filter((entry) => entry.fromClubId === CLUB_ID)
+      .filter((entry) => entry.fromClubId === managedClub())
       .map((entry) => entry.playerId),
   );
 }
@@ -943,7 +951,7 @@ function composeSquad(
   save: SeasonSave,
   today: string,
 ): readonly ClubPlayer[] {
-  const base = DEMO_SQUAD.map((entry) => ({
+  const base = clubSquad(managedClub()).map((entry) => ({
     ...entry,
     // El orden importa: primero los atributos desarrollados, despues el
     // estado. Los dos vienen del guardado y ninguno se puede recalcular.
@@ -1008,7 +1016,7 @@ function composeSquad(
 function composeSeason(save: SeasonSave): GameState['season'] {
   const fixtures = seasonFixtures(save.seed);
   const rounds = totalRounds(fixtures);
-  const own = recordsOfClub(save.records, CLUB_ID);
+  const own = recordsOfClub(save.records, managedClub());
 
   return {
     seed: save.seed,
@@ -1019,16 +1027,54 @@ function composeSeason(save: SeasonSave): GameState['season'] {
     totals: save.totals,
     lastUserMatch: own[0] ?? null,
     seasonsClosed: save.seasonsClosed ?? 0,
-    chemistry: save.chemistry[CLUB_ID] ?? INITIAL_CHEMISTRY,
+    chemistry: save.chemistry[managedClub()] ?? INITIAL_CHEMISTRY,
   };
 }
 
 export function createMockGameService(): GameService {
   return {
+    async currentTeam(): Promise<string | null> {
+      const anotado = readClub();
+      if (anotado !== null) return anotado;
+
+      // Sin club anotado pero CON temporada guardada: es una partida de antes
+      // de que se pudiera elegir, y todas esas eran River. Se anota para que
+      // quede explícito y no se vuelva a preguntar nunca más.
+      if (hasStoredSeason()) {
+        writeClub(USER_CLUB_ID);
+        return USER_CLUB_ID;
+      }
+
+      // Partida nueva: hay que elegir.
+      return null;
+    },
+
+    async chooseTeam(clubId: string): Promise<void> {
+      if (!LEAGUE_CLUB_IDS.includes(clubId)) {
+        throw new Error('Ese club no juega este torneo');
+      }
+      if (readClub() !== null || hasStoredSeason()) {
+        // Una vez empezada, la carrera es de ese club. Cambiarlo dejaría la
+        // tabla, la caja y el estadio describiendo a otro equipo.
+        throw new Error('Esta partida ya tiene un club elegido');
+      }
+
+      writeClub(clubId);
+
+      // La alineación se borra por si acaso: una guardada con jugadores de
+      // otro club dejaría la cancha vacía sin decir por qué.
+      try {
+        storage().removeItem(LINEUP_STORAGE_KEY);
+      } catch {
+        // Si no se puede borrar, `readStoredLineup` descarta los ids que no
+        // están en el plantel y el motor arma el once igual.
+      }
+    },
+
     async loadGame(): Promise<GameState> {
-      const club = clubById(CLUB_ID);
       const development = readDevelopment();
       const save = readSeason();
+      const club = clubById(managedClub());
       const fixtures = seasonFixtures(save.seed);
       const table = seasonTable(save.records);
       const today = todayOf(save, totalRounds(fixtures));
@@ -1037,13 +1083,13 @@ export function createMockGameService(): GameService {
         manager: {
           id: 'mgr-1',
           name: 'Director Técnico',
-          clubId: CLUB_ID,
+          clubId: managedClub(),
           since: '2025-01-15',
         },
         club,
         clubs: CLUBS,
         squad,
-        lineup: readStoredLineup() ?? initialLineup(),
+        lineup: readStoredLineup() ?? initialLineup(managedClub()),
         finances: composeFinances(development, squad, save),
         stadium: composeStadium(development, save),
         staff: composeStaff(development),
@@ -1054,8 +1100,8 @@ export function createMockGameService(): GameService {
         table: toUiTable(table),
         // Se derivan de las ofertas reales del mercado, no de una lista
         // escrita a mano: una sola fuente de verdad.
-        offersReceived: offersFromMarket(save.offers ?? [], CLUB_ID).received,
-        offersSent: offersFromMarket(save.offers ?? [], CLUB_ID).sent,
+        offersReceived: offersFromMarket(save.offers ?? [], managedClub()).received,
+        offersSent: offersFromMarket(save.offers ?? [], managedClub()).sent,
         inbox: composeInbox(development, today),
         season: composeSeason(save),
         youth: composeYouth(development, save),
@@ -1194,30 +1240,31 @@ export function createMockGameService(): GameService {
       // Los planteles base son deterministas; encima se les aplica el estado
       // con el que quedaron de la fecha anterior.
       const development = readDevelopment();
-      const base = leagueTeams(
-        selection.tactics,
-        save.chemistry[CLUB_ID] ?? INITIAL_CHEMISTRY,
-        promotedPlayers(development, save),
+      const base = leagueTeams({
+        clubId: managedClub(),
+        tactics: selection.tactics,
+        chemistry: save.chemistry[managedClub()] ?? INITIAL_CHEMISTRY,
+        extra: promotedPlayers(development, save),
         // EL FISIOTERAPEUTA (fase 8). Su efecto entra al partido por aca y
         // reduce cuantas lesiones sortea el motor. Antes no entraba a ningun
         // lado y el rol declaraba `pendiente`.
-        injuryPreventionOf(staffAssignments(development)),
+        injuryPrevention: injuryPreventionOf(staffAssignments(development)),
         // Los rivales tambien cumplen anios (fase 8).
-        save.seasonsClosed ?? 0,
-      );
+        seasonsClosed: save.seasonsClosed ?? 0,
+      });
       // Los traspasos mueven jugadores entre planteles antes de jugar: el que
       // se vendio el jueves no juega el domingo.
       const teams = restoreTeams(applyTransfers(base, save.transfers ?? []), save);
 
       const table = seasonTable(save.records);
-      const position = table.findIndex((row) => row.clubId === CLUB_ID) + 1;
+      const position = table.findIndex((row) => row.clubId === managedClub()) + 1;
       const squadForOffers = composeSquad(development, save, todayOf(save, rounds));
 
       const outcome = playSeasonRound({
         fixtures,
         round: save.round,
         teams,
-        userClubId: CLUB_ID,
+        userClubId: managedClub(),
         // La alineacion elegida por el manager. Los huecos vacios los
         // completa el motor con su propia autoseleccion.
         userLineup: {
@@ -1247,7 +1294,7 @@ export function createMockGameService(): GameService {
       const gate = gateOfRound(development, save, fixtures, position, rounds);
 
       // La obra del estadio avanza una semana por fecha.
-      const work = advanceStadiumWork(development);
+      const work = advanceStadiumWork(development, managedClub());
       if (work.changed) writeDevelopment(work.state);
 
       const next: SeasonSave = {
@@ -1259,7 +1306,7 @@ export function createMockGameService(): GameService {
         // LOS ATRIBUTOS DESARROLLADOS (fase 8). Solo del club del manager: los
         // rivales se derivan de las temporadas cerradas y guardar 418
         // jugadores mas seria medio megabyte por nada.
-        attributes: snapshotAttributes(outcome.teams, [CLUB_ID]),
+        attributes: snapshotAttributes(outcome.teams, [managedClub()]),
         chemistry: snapshotChemistry(outcome.teams),
         offers: [...(save.offers ?? []), ...incoming],
         ...(gate ? { gates: [...(save.gates ?? []), gate.record] } : {}),
@@ -1331,7 +1378,7 @@ export function createMockGameService(): GameService {
       // nivel decide cuantos y con que techo, asi que mejorar la instalacion
       // se ve de una temporada a la otra.
       const intake = buildYouthSquad(
-        CLUB_ID,
+        managedClub(),
         academy?.level ?? 1,
         `camada-${seasonsClosed + 1}`,
         0,
@@ -1404,7 +1451,7 @@ export function createMockGameService(): GameService {
         throw new Error('Esa ampliación no está entre las opciones');
       }
 
-      const stadium = stadiumOf(CLUB_ID, development.stadiumSeats ?? 0);
+      const stadium = stadiumOf(managedClub(), development.stadiumSeats ?? 0);
       const cost = expansionCost(seats, stadium.capacity);
       if (availableCash(development, readSeason()) < cost) {
         throw new Error('No hay caja suficiente para encarar la ampliación');
@@ -1452,11 +1499,11 @@ export function createMockGameService(): GameService {
       const development = readDevelopment();
 
       const teams = applyTransfers(
-    leagueTeams(undefined, undefined, [], 0, save.seasonsClosed ?? 0),
+    leagueTeams({ clubId: managedClub(), seasonsClosed: save.seasonsClosed ?? 0 }),
     save.transfers ?? [],
   );
       const found = [...teams].find(([clubId, team]) =>
-        clubId !== CLUB_ID && team.players.some((entry) => entry.id === playerId),
+        clubId !== managedClub() && team.players.some((entry) => entry.id === playerId),
       );
       if (!found) throw new Error('Ese jugador ya no está en el club al que le ofreciste');
       const [sellerId, sellerTeam] = found;
@@ -1483,7 +1530,7 @@ export function createMockGameService(): GameService {
         id: `of-${Date.now()}-${playerId}`,
         playerId,
         playerName: player.name,
-        fromClubId: CLUB_ID,
+        fromClubId: managedClub(),
         toClubId: sellerId,
         amount,
         status: result.verdict,
@@ -1500,7 +1547,7 @@ export function createMockGameService(): GameService {
                 playerId,
                 playerName: player.name,
                 fromClubId: sellerId,
-                toClubId: CLUB_ID,
+                toClubId: managedClub(),
                 amount,
                 round: save.round,
               },
@@ -1530,7 +1577,7 @@ export function createMockGameService(): GameService {
       const save = readSeason();
       const offer = (save.offers ?? []).find((entry) => entry.id === offerId);
       if (!offer) throw new Error('Esa oferta ya no está');
-      if (offer.toClubId !== CLUB_ID) throw new Error('Esa oferta no es por un jugador tuyo');
+      if (offer.toClubId !== managedClub()) throw new Error('Esa oferta no es por un jugador tuyo');
       if (offer.status !== 'enviada' && offer.status !== 'contraoferta') {
         throw new Error('Esa oferta ya está resuelta');
       }
@@ -1567,7 +1614,7 @@ export function createMockGameService(): GameService {
             {
               playerId: offer.playerId,
               playerName: offer.playerName,
-              fromClubId: CLUB_ID,
+              fromClubId: managedClub(),
               toClubId: offer.fromClubId,
               amount: asked,
               round: save.round,
@@ -1586,7 +1633,7 @@ export function createMockGameService(): GameService {
           {
             playerId: offer.playerId,
             playerName: offer.playerName,
-            fromClubId: CLUB_ID,
+            fromClubId: managedClub(),
             toClubId: offer.fromClubId,
             amount: offer.amount,
             round: save.round,
