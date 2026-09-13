@@ -100,8 +100,13 @@ export function resolveChanceMix(
  * CALIDAD DE LA POSICION DE REMATE (etapa 3).
  *
  * Mide lo BUENA que es la ocasion que el jugador se genera: donde se ubica,
- * como llega, si la controla. Deliberadamente NO usa `definicion`: acertar el
+ * como llega, si la controla. Deliberadamente NO usa `remate`: acertar el
  * remate es la etapa 4. Asi ningun atributo se cobra dos veces.
+ *
+ * Con diez atributos estas mezclas quedaron mas cortas, y en dos casos hubo
+ * que decidir en lugar de renombrar. El viejo `posicionamiento` colapso en
+ * `entradas`, que para un atacante no significa nada: donde media "sabe
+ * ubicarse en el area" ahora pesan la calidad y la velocidad, no las entradas.
  */
 export function positioningAbility(rated: RatedPlayer, kind: ChanceKind): number {
   const a = rated.player.attributes;
@@ -109,17 +114,19 @@ export function positioningAbility(rated: RatedPlayer, kind: ChanceKind): number
   switch (kind) {
     case 'cabezazo':
     case 'balonParado':
-      return a.juegoAereo * 0.45 + a.salto * 0.25 + a.posicionamiento * 0.2 + a.fuerza * 0.1 + shift;
+      // Ganar la posicion en el area es un duelo fisico. PC Futbol no tiene
+      // juego aereo ni salto: lo mas cercano es la agresividad.
+      return a.agresividad * 0.65 + a.calidad * 0.2 + a.velocidad * 0.15 + shift;
     case 'remateLejano':
-      return a.tecnica * 0.4 + a.control * 0.3 + a.fuerza * 0.2 + a.decisiones * 0.1 + shift;
+      return a.calidad * 0.7 + a.agresividad * 0.2 + a.regate * 0.1 + shift;
     case 'contraataque':
-      return a.velocidad * 0.35 + a.control * 0.25 + a.decisiones * 0.2 + a.posicionamiento * 0.2 + shift;
+      return a.velocidad * 0.45 + a.calidad * 0.35 + a.regate * 0.2 + shift;
     case 'tiroLibre':
-      return a.tecnica * 0.6 + a.decisiones * 0.4 + shift;
+      return a.calidad + shift;
     case 'penal':
-      return a.concentracion * 0.6 + a.decisiones * 0.4 + shift;
+      return a.calidad + shift;
     default:
-      return a.posicionamiento * 0.5 + a.control * 0.25 + a.tecnica * 0.15 + a.aceleracion * 0.1 + shift;
+      return a.calidad * 0.45 + a.velocidad * 0.3 + a.regate * 0.25 + shift;
   }
 }
 
@@ -127,8 +134,13 @@ export function positioningAbility(rated: RatedPlayer, kind: ChanceKind): number
  * DEFINICION (etapa 4).
  *
  * Mide la capacidad de convertir la ocasion una vez creada. Es el atributo que
- * usa `conversion.ts`, y el que hace que un 9 con definicion 94 sea otra cosa
+ * usa `conversion.ts`, y el que hace que un 9 con remate 94 sea otra cosa
  * (seccion 33).
+ *
+ * En PC Futbol la definicion es `remate` (RM) y la potencia de disparo es
+ * `tiro` (TI). Son dos atributos distintos del archivo, asi que el remate de
+ * cerca y el tiro de afuera siguen separados. Los tiros libres y los penales,
+ * en cambio, ya no: los tres eran atributos propios y ahora son `tiro`.
  */
 export function finishingAbility(rated: RatedPlayer, kind: ChanceKind): number {
   const a = rated.player.attributes;
@@ -136,17 +148,17 @@ export function finishingAbility(rated: RatedPlayer, kind: ChanceKind): number {
   switch (kind) {
     case 'cabezazo':
     case 'balonParado':
-      return a.definicion * 0.45 + a.juegoAereo * 0.35 + a.remate * 0.2 + shift;
+      return a.remate * 0.55 + a.agresividad * 0.3 + a.tiro * 0.15 + shift;
     case 'remateLejano':
-      return a.remate * 0.6 + a.definicion * 0.25 + a.tecnica * 0.15 + shift;
+      return a.tiro * 0.65 + a.remate * 0.2 + a.calidad * 0.15 + shift;
     case 'contraataque':
-      return a.definicion * 0.6 + a.decisiones * 0.25 + a.concentracion * 0.15 + shift;
+      return a.remate * 0.7 + a.calidad * 0.3 + shift;
     case 'tiroLibre':
-      return a.tirosLibres * 0.8 + a.tecnica * 0.2 + shift;
+      return a.tiro * 0.8 + a.calidad * 0.2 + shift;
     case 'penal':
-      return a.penales * 0.7 + a.concentracion * 0.2 + a.definicion * 0.1 + shift;
+      return a.tiro * 0.6 + a.calidad * 0.25 + a.remate * 0.15 + shift;
     default:
-      return a.definicion * 0.7 + a.remate * 0.2 + a.concentracion * 0.1 + shift;
+      return a.remate * 0.75 + a.tiro * 0.15 + a.calidad * 0.1 + shift;
   }
 }
 
@@ -178,8 +190,8 @@ function assistWeight(rated: RatedPlayer, kind: ChanceKind): number {
   const meta = POSITION_META[rated.position];
   const creation =
     kind === 'cabezazo'
-      ? a.centros * 0.6 + a.vision * 0.25 + a.tecnica * 0.15
-      : a.vision * 0.45 + a.paseCorto * 0.25 + a.regate * 0.15 + a.tecnica * 0.15;
+      ? a.pase * 0.7 + a.calidad * 0.3
+      : a.calidad * 0.6 + a.pase * 0.25 + a.regate * 0.15;
   const abilityFactor = Math.max(0.15, 1 + (creation - 65) / 60);
   const wideBonus = kind === 'cabezazo' && meta.isWide ? 1.6 : 1;
   return (0.15 + rated.slot.attackDuty * 1.1) * abilityFactor * wideBonus;

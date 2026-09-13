@@ -47,7 +47,6 @@ const FOCUS_LABEL: Record<TrainingFocus, string> = {
   tecnica: 'Técnica',
   defensivo: 'Defensivo',
   ofensivo: 'Ofensivo',
-  mental: 'Mental',
   arquero: 'Arquero',
 };
 
@@ -202,18 +201,18 @@ export function TrainingPage(): ReactNode {
           <p>
             Cuatro cosas lo mueven, y ninguna es azar puro. <strong>La edad</strong>: un pibe de 18
             crece rápido, a los 27 se estanca y después de los 31 empieza a perder — y no pierde
-            todo junto, primero se va lo físico, así que un 5 de 33 sigue mejorando el
-            posicionamiento mientras le baja la velocidad. <strong>El techo</strong>: se crece hacia
+            todo junto, primero se va lo físico, así que un 5 de 33 sigue mejorando las entradas
+            y la calidad mientras le baja la velocidad. <strong>El techo</strong>: se crece hacia
             el potencial, no sin límite. <strong>Los minutos</strong>: el que no juega crece cerca
             de la mitad de rápido. Y <strong>el entrenamiento</strong>: el plan reparte hacia dónde
             va el crecimiento, y el entrenador de su línea lo acelera.
           </p>
           <p>
             Medido sobre una temporada de 19 fechas: un juvenil con margen que juega seguido y tiene
-            un entrenador de cuatro estrellas gana unos <strong>11 puntos</strong> de overall; el
-            mismo sin entrenador, <strong>9</strong>; el mismo sin jugar, <strong>6</strong>. Un
-            titular de 27 en su techo, cero. Un veterano de 34 pierde unos tres puntos de físico y
-            casi nada de cabeza.
+            un entrenador de cuatro estrellas gana unos <strong>13 puntos</strong> de overall; el
+            mismo sin entrenador, <strong>9</strong>; el mismo sin jugar, <strong>7</strong>. Un
+            titular de 27 en su techo, cero. Un veterano de 34 pierde unos dos puntos de físico y
+            casi nada del resto.
           </p>
           <p>
             El plan <strong>no suma, reparte</strong>: lo que un grupo de atributos gana, los otros

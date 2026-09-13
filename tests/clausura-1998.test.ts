@@ -265,9 +265,17 @@ test('los rasgos estimados llegan intactos al jugador del motor', () => {
   );
   assert.ok(chilavert, 'falta Chilavert en el plantel de Vélez');
   // El arquero goleador: los rasgos que lo definían tienen que estar.
-  assert.equal(chilavert.attributes.penales, 94);
-  assert.equal(chilavert.attributes.tirosLibres, 92);
-  assert.equal(chilavert.attributes.reflejos, 91);
+  //
+  // Con veintinueve atributos eran tres asserts distintos: penales 94, tiros
+  // libres 92 y reflejos 91. Los dos primeros colapsaron en `tiro` y el tercero
+  // en `portero`, así que el dataset los promedió. Lo que el test fija ahora es
+  // lo que lo hacía Chilavert: pateaba como un delantero y atajaba.
+  assert.equal(chilavert.attributes.tiro, 93, 'pateaba los tiros libres y los penales');
+  assert.equal(chilavert.attributes.portero, 90, 'y era arquero de selección');
+  assert.ok(
+    chilavert.attributes.tiro > chilavert.attributes.remate + 15,
+    'le pegaba mucho mejor de lejos que de cabeza, que es lo que lo hacía raro',
+  );
 });
 
 test('los planteles jugables pueden poner un once', () => {

@@ -1,22 +1,30 @@
 // Seccion 25: atributos y overall por posicion.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildAttributes } from '../src/domain/attributes.ts';
+import { ATTRIBUTE_KEYS, buildAttributes } from '../src/domain/attributes.ts';
 import { bestPosition, overallForPosition, POSITION_WEIGHTS } from '../src/ratings/overall.ts';
 import { POSITIONS } from '../src/domain/positions.ts';
 import { attributesFor } from '../src/data/squad-builder.ts';
 
+/**
+ * El volante de la especificacion, con los diez atributos.
+ *
+ * Es el mismo jugador que antes: los veinticinco valores originales se
+ * promediaron dentro del atributo que los absorbio. Su pase y su calidad son
+ * lo mas alto, su remate lo mas bajo, y sigue siendo un MC.
+ */
 const MIGUEL = buildAttributes({
-  velocidad: 71, aceleracion: 74, resistencia: 83, fuerza: 68,
-  paseCorto: 86, paseLargo: 79, tecnica: 84, control: 82, regate: 76,
-  definicion: 63, remate: 72, marcaje: 67, quite: 73,
-  vision: 87, decisiones: 84, posicionamiento: 81, concentracion: 78,
-  trabajoEquipo: 80, agilidad: 74, salto: 60, centros: 70,
-  tirosLibres: 70, penales: 65, juegoAereo: 60, agresividad: 65,
+  velocidad: 73, resistencia: 83, agresividad: 64, calidad: 83,
+  remate: 63, regate: 76, pase: 78, tiro: 69, entradas: 70, portero: 12,
 });
 
-test('el ejemplo de la especificacion da overall 80 como MC', () => {
-  assert.equal(overallForPosition(MIGUEL, 'MC'), 80);
+test('el ejemplo de la especificacion sigue siendo un volante de 80', () => {
+  // Con veintinueve atributos daba exactamente 80. Con diez y los pesos
+  // reequilibrados da 79: un punto de diferencia en la escala entera del juego
+  // es el costo de la baja, y se fija aca para que un cambio de pesos que lo
+  // corra mas se note.
+  const overall = overallForPosition(MIGUEL, 'MC');
+  assert.ok(overall >= 78 && overall <= 81, `dio ${overall}`);
 });
 
 test('el mismo jugador vale distinto en cada puesto', () => {
@@ -33,33 +41,44 @@ test('cada posicion tiene su propia formula', () => {
   const seen = new Set<string>();
   for (const position of POSITIONS) {
     const weights = POSITION_WEIGHTS[position];
-    assert.ok(Object.keys(weights).length >= 10, `${position} necesita pesos suficientes`);
+    // Con diez atributos ningun puesto usa los diez: un arquero no se mide por
+    // el remate. Cinco es el minimo para que la formula no sea un promedio.
+    assert.ok(Object.keys(weights).length >= 5, `${position} necesita pesos suficientes`);
     seen.add(JSON.stringify(weights));
   }
   // LD/LI y ED/EI son espejos, asi que quedan 9 tablas distintas de 11 puestos.
   assert.equal(seen.size, 9, 'las formulas no pueden ser todas iguales');
 });
 
-test('el delantero pesa definicion muy por encima de marcaje y quite', () => {
+test('el delantero pesa el remate muy por encima de las entradas', () => {
   const dc = POSITION_WEIGHTS.DC;
-  assert.ok((dc.definicion ?? 0) > 15);
-  assert.ok((dc.posicionamiento ?? 0) > 10);
-  assert.ok((dc.definicion ?? 0) > 4 * ((dc.marcaje ?? 0) + (dc.quite ?? 0) + 1));
+  assert.ok((dc.remate ?? 0) > 20, 'el 9 vive del remate');
+  assert.ok((dc.remate ?? 0) > 8 * (dc.entradas ?? 0));
 });
 
-test('el defensor central pesa marcaje, quite, fuerza y juego aereo', () => {
+test('el defensor central pesa las entradas y la agresividad', () => {
   const dfc = POSITION_WEIGHTS.DFC;
-  for (const key of ['marcaje', 'quite', 'posicionamiento', 'fuerza', 'juegoAereo', 'concentracion'] as const) {
-    assert.ok((dfc[key] ?? 0) >= 6, `DFC deberia valorar ${key}`);
-  }
-  assert.ok((dfc.marcaje ?? 0) > (dfc.definicion ?? 0) * 5);
+  assert.ok((dfc.entradas ?? 0) >= 30, 'un central se mide por las entradas');
+  assert.ok((dfc.agresividad ?? 0) >= 20, 'y por el empuje fisico');
+  assert.ok((dfc.entradas ?? 0) > ((dfc.remate ?? 0) + 1) * 5);
 });
 
-test('el arquero se mide con atributos de arquero', () => {
+test('el arquero se mide por el atributo de arquero, y no por el remate', () => {
   const por = POSITION_WEIGHTS.POR;
-  assert.ok((por.reflejos ?? 0) > 15);
-  assert.ok((por.manos ?? 0) > 10);
-  assert.equal(por.definicion, undefined);
+  // Es el unico atributo de puesto que guarda el archivo, asi que pesa mas de
+  // la mitad del overall por definicion.
+  assert.ok((por.portero ?? 0) > 50);
+  assert.equal(por.remate, undefined);
+  assert.equal(por.entradas, undefined);
+});
+
+test('los diez atributos aparecen en alguna tabla, y ninguno sobra', () => {
+  // Si un atributo no pesa en ningun puesto, no deberia existir.
+  const used = new Set<string>();
+  for (const position of POSITIONS) {
+    for (const key of Object.keys(POSITION_WEIGHTS[position])) used.add(key);
+  }
+  assert.deepEqual([...used].sort(), [...ATTRIBUTE_KEYS].sort());
 });
 
 test('bestPosition encuentra el puesto natural del jugador generado', () => {

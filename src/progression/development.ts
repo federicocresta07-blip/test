@@ -31,15 +31,7 @@
 import { DEFAULT_CONFIG, type EngineConfig } from '../config/engine-config.ts';
 import { clamp } from '../core/math.ts';
 import { Rng } from '../core/rng.ts';
-import {
-  GOALKEEPING_ATTRIBUTES,
-  MENTAL_ATTRIBUTES,
-  PHYSICAL_ATTRIBUTES,
-  TECHNICAL_ATTRIBUTES,
-  DEFENSIVE_ATTRIBUTES,
-  type AttributeKey,
-  type Attributes,
-} from '../domain/attributes.ts';
+import { type AttributeKey, type Attributes } from '../domain/attributes.ts';
 import type { Player } from '../domain/player.ts';
 import { overallForPosition } from '../ratings/overall.ts';
 
@@ -58,31 +50,44 @@ export const TRAINING_FOCUSES = [
   'general',
   'fisico',
   'tecnica',
-  'defensivo',
   'ofensivo',
-  'mental',
+  'defensivo',
   'arquero',
 ] as const;
 
 export type TrainingFocus = (typeof TRAINING_FOCUSES)[number];
 
-/** Grupo al que pertenece cada atributo, para repartir el entrenamiento. */
-export type AttributeGroup = 'fisico' | 'tecnico' | 'defensivo' | 'mental' | 'arquero';
+/**
+ * Grupo al que pertenece cada atributo, para repartir el entrenamiento.
+ *
+ * SE CAYO EL GRUPO MENTAL, Y CON EL EL PLAN MENTAL. Con veintinueve atributos
+ * habia seis mentales: vision, decisiones, posicionamiento, concentracion,
+ * agresividad y trabajo de equipo. Con diez, cinco de esos viven dentro de
+ * `calidad`, que es tecnico. No queda nada que entrenar en un plan mental, y
+ * dejar el plan en la pantalla entrenando `calidad` seria un dial que promete
+ * una cosa y hace otra.
+ *
+ * En cambio aparece el grupo OFENSIVO como grupo de verdad: `remate` y `tiro`
+ * son dos de los diez. Antes eran un bonus de 1,35 sobre una lista de claves
+ * sueltas, que era la forma de simular un grupo que no existia.
+ */
+export type AttributeGroup = 'fisico' | 'tecnico' | 'ofensivo' | 'defensivo' | 'arquero';
 
-const OFFENSIVE_KEYS: readonly AttributeKey[] = [
-  'definicion',
-  'remate',
-  'regate',
-  'control',
-  'tecnica',
-];
+const GROUP_OF: Readonly<Record<AttributeKey, AttributeGroup>> = {
+  velocidad: 'fisico',
+  resistencia: 'fisico',
+  agresividad: 'fisico',
+  calidad: 'tecnico',
+  regate: 'tecnico',
+  pase: 'tecnico',
+  remate: 'ofensivo',
+  tiro: 'ofensivo',
+  entradas: 'defensivo',
+  portero: 'arquero',
+};
 
 export function groupOf(key: AttributeKey): AttributeGroup {
-  if ((PHYSICAL_ATTRIBUTES as readonly string[]).includes(key)) return 'fisico';
-  if ((TECHNICAL_ATTRIBUTES as readonly string[]).includes(key)) return 'tecnico';
-  if ((DEFENSIVE_ATTRIBUTES as readonly string[]).includes(key)) return 'defensivo';
-  if ((MENTAL_ATTRIBUTES as readonly string[]).includes(key)) return 'mental';
-  return 'arquero';
+  return GROUP_OF[key];
 }
 
 /**
@@ -93,17 +98,13 @@ export function groupOf(key: AttributeKey): AttributeGroup {
  * un plan es elegir a que renunciar.
  */
 const FOCUS_WEIGHTS: Readonly<Record<TrainingFocus, Readonly<Record<AttributeGroup, number>>>> = {
-  general: { fisico: 1, tecnico: 1, defensivo: 1, mental: 1, arquero: 1 },
-  fisico: { fisico: 1.9, tecnico: 0.6, defensivo: 0.8, mental: 0.7, arquero: 0.7 },
-  tecnica: { fisico: 0.6, tecnico: 1.9, defensivo: 0.7, mental: 0.9, arquero: 0.7 },
-  defensivo: { fisico: 1.0, tecnico: 0.6, defensivo: 2.0, mental: 1.2, arquero: 0.7 },
-  ofensivo: { fisico: 0.9, tecnico: 1.6, defensivo: 0.5, mental: 1.0, arquero: 0.7 },
-  mental: { fisico: 0.6, tecnico: 0.8, defensivo: 1.0, mental: 2.0, arquero: 0.8 },
-  arquero: { fisico: 0.9, tecnico: 0.5, defensivo: 0.5, mental: 1.0, arquero: 2.0 },
+  general: { fisico: 1, tecnico: 1, ofensivo: 1, defensivo: 1, arquero: 1 },
+  fisico: { fisico: 1.9, tecnico: 0.6, ofensivo: 0.7, defensivo: 0.8, arquero: 0.7 },
+  tecnica: { fisico: 0.6, tecnico: 1.9, ofensivo: 1.0, defensivo: 0.7, arquero: 0.7 },
+  ofensivo: { fisico: 0.9, tecnico: 1.1, ofensivo: 2.0, defensivo: 0.5, arquero: 0.7 },
+  defensivo: { fisico: 1.0, tecnico: 0.7, ofensivo: 0.5, defensivo: 2.0, arquero: 0.7 },
+  arquero: { fisico: 0.9, tecnico: 0.5, ofensivo: 0.5, defensivo: 0.5, arquero: 2.0 },
 };
-
-/** El plan ofensivo empuja los atributos de ataque por encima de su grupo. */
-const OFFENSIVE_BONUS = 1.35;
 
 // ============================================================
 // La curva de edad
@@ -113,7 +114,7 @@ const OFFENSIVE_BONUS = 1.35;
  * Cuanto puede crecer (o cuanto pierde) un jugador a cada edad, por grupo.
  *
  * El valor es un multiplicador del crecimiento base. Negativo significa que
- * ese grupo baja. Que lo fisico caiga antes que lo mental es lo que hace que
+ * ese grupo baja. Que lo fisico caiga antes que lo tecnico es lo que hace que
  * un veterano siga teniendo valor: pierde piernas, no cabeza.
  */
 export function ageFactor(age: number, group: AttributeGroup): number {
@@ -237,10 +238,10 @@ export function developPlayer(input: DevelopmentInput): DevelopmentResult {
   const weights = FOCUS_WEIGHTS[focus];
 
   // El profesionalismo del jugador: quien se cuida y entrena bien aprovecha
-  // mas. Usamos concentracion y trabajo en equipo, que es lo mas cerca que
-  // tenemos de "se toma en serio el entrenamiento".
-  const professionalism =
-    (player.attributes.concentracion + player.attributes.trabajoEquipo) / 200;
+  // mas. Con veintinueve atributos salia de concentracion y trabajo en equipo;
+  // los dos viven ahora dentro de `calidad`, que es lo mas cerca que queda de
+  // "se toma en serio el entrenamiento".
+  const professionalism = player.attributes.calidad / 100;
 
   const isGoalkeeper = player.position === 'POR';
   const changes: AttributeChange[] = [];
@@ -249,20 +250,17 @@ export function developPlayer(input: DevelopmentInput): DevelopmentResult {
   for (const key of Object.keys(player.attributes) as AttributeKey[]) {
     const group = groupOf(key);
 
-    // Los atributos de arquero solo se mueven en un arquero, y al revés: no
-    // tiene sentido que un 9 mejore los reflejos ni que un arquero mejore la
-    // definicion mas que cualquier otra cosa.
+    // El atributo de arquero solo se mueve en un arquero, y al revés: no
+    // tiene sentido que un 9 mejore los reflejos ni que un arquero mejore el
+    // remate mas que cualquier otra cosa.
     if (group === 'arquero' && !isGoalkeeper) continue;
-    if (isGoalkeeper && (group === 'defensivo' || group === 'tecnico') && key !== 'saque') {
-      // Un arquero mejora lo tecnico, pero mucho menos: no es lo suyo.
+    if (isGoalkeeper && (group === 'defensivo' || group === 'ofensivo')) {
+      // Un arquero mejora lo de afuera del arco, pero mucho menos.
       if (rng.next() > 0.35) continue;
     }
 
     const age = ageFactor(player.age, group);
     let weight = weights[group];
-    if (focus === 'ofensivo' && (OFFENSIVE_KEYS as readonly string[]).includes(key)) {
-      weight *= OFFENSIVE_BONUS;
-    }
 
     let delta: number;
     if (age > 0) {
@@ -369,8 +367,8 @@ function explain(context: {
   return reasons;
 }
 
-/** Los atributos de arquero, para las pantallas que los separan. */
-export const GK_KEYS: readonly AttributeKey[] = GOALKEEPING_ATTRIBUTES;
+/** El atributo de arquero, para las pantallas que lo separan. */
+export const GK_KEYS: readonly AttributeKey[] = ['portero'];
 
 // ============================================================
 // El plantel completo

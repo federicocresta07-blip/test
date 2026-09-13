@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import {
   DEFENSIVE_ATTRIBUTES,
   GOALKEEPING_ATTRIBUTES,
-  MENTAL_ATTRIBUTES,
   PHYSICAL_ATTRIBUTES,
   TECHNICAL_ATTRIBUTES,
   type AttributeKey,
@@ -21,37 +20,24 @@ import { playerStatuses, PositionTag } from './PlayerCells.tsx';
 import { fitLabel } from '../../lib/positions.ts';
 import { StatusBadge } from '../ui/Badge.tsx';
 
-/** Nombres legibles de los atributos del motor. */
-const ATTRIBUTE_LABEL: Partial<Record<AttributeKey, string>> = {
+/**
+ * Nombres legibles de los diez atributos.
+ *
+ * Son los mismos diez que guarda PC Futbol, asi que el nombre de la ficha y el
+ * nombre del byte del archivo son el mismo: lo que se ve en pantalla se puede
+ * buscar en `docs/pcf_data_format.md`.
+ */
+const ATTRIBUTE_LABEL: Record<AttributeKey, string> = {
   velocidad: 'Velocidad',
-  aceleracion: 'Aceleración',
   resistencia: 'Resistencia',
-  fuerza: 'Fuerza',
-  salto: 'Salto',
-  agilidad: 'Agilidad',
-  paseCorto: 'Pase corto',
-  paseLargo: 'Pase largo',
-  centros: 'Centros',
-  tecnica: 'Técnica',
-  control: 'Control',
-  regate: 'Regate',
-  definicion: 'Definición',
-  remate: 'Remate',
-  juegoAereo: 'Juego aéreo',
-  tirosLibres: 'Tiros libres',
-  penales: 'Penales',
-  marcaje: 'Marcaje',
-  quite: 'Quite',
-  vision: 'Visión',
-  decisiones: 'Decisiones',
-  posicionamiento: 'Posicionamiento',
-  concentracion: 'Concentración',
   agresividad: 'Agresividad',
-  trabajoEquipo: 'Trabajo de equipo',
-  reflejos: 'Reflejos',
-  manos: 'Manos',
-  achique: 'Achique',
-  saque: 'Saque',
+  calidad: 'Calidad',
+  remate: 'Remate',
+  regate: 'Regate',
+  pase: 'Pase',
+  tiro: 'Tiro',
+  entradas: 'Entradas',
+  portero: 'Portero',
 };
 
 /**
@@ -83,17 +69,21 @@ export function PlayerQuickPanel({
   const statuses = playerStatuses(entry);
   const energy = energyOf(player);
 
+  // Con diez atributos la ficha los muestra TODOS, y el arquero solo cambia el
+  // orden: su atributo de puesto va primero. Antes eran veintinueve repartidos
+  // en cuatro grupos y habia que elegir cuales mostrar.
   const groups: readonly { label: string; keys: readonly AttributeKey[] }[] = isGoalkeeper
     ? [
         { label: 'Arquero', keys: GOALKEEPING_ATTRIBUTES },
-        { label: 'Mentales', keys: MENTAL_ATTRIBUTES },
         { label: 'Físicos', keys: PHYSICAL_ATTRIBUTES },
+        { label: 'Con la pelota', keys: TECHNICAL_ATTRIBUTES },
+        { label: 'Defensivos', keys: DEFENSIVE_ATTRIBUTES },
       ]
     : [
-        { label: 'Técnicos', keys: TECHNICAL_ATTRIBUTES },
-        { label: 'Mentales', keys: MENTAL_ATTRIBUTES },
-        { label: 'Defensivos', keys: DEFENSIVE_ATTRIBUTES },
+        { label: 'Con la pelota', keys: TECHNICAL_ATTRIBUTES },
         { label: 'Físicos', keys: PHYSICAL_ATTRIBUTES },
+        { label: 'Defensivos', keys: DEFENSIVE_ATTRIBUTES },
+        { label: 'Arquero', keys: GOALKEEPING_ATTRIBUTES },
       ];
 
   return (

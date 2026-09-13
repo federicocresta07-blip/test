@@ -29,91 +29,30 @@ import type { PerformanceContext, RatedPlayer } from './effective-rating.ts';
 import { evaluatePerformance } from './effective-rating.ts';
 import type { Rng } from '../core/rng.ts';
 
-/** Atributos que definen cada dimension, con su peso relativo. */
+/**
+ * Atributos que definen cada dimension, con su peso relativo.
+ *
+ * Al bajar a diez atributos estas ocho tablas se acortaron bastante, y en dos
+ * dimensiones hubo que decidir en lugar de renombrar:
+ *
+ * - `balonParado` vivia de tiros libres, juego aereo, salto y penales, cuatro
+ *   atributos que ya no existen por separado. Ahora es tiro, agresividad y
+ *   remate: la pelota quieta es pegarle bien y ganar el cabezazo.
+ * - `presion` usaba trabajo de equipo y concentracion. Ahora es resistencia,
+ *   entradas y agresividad, que es lo que el archivo permite distinguir.
+ *
+ * Cada tabla suma 100 para que el peso se lea como porcentaje.
+ */
 const DIMENSION_ATTRIBUTES: Readonly<Record<Dimension, Partial<Record<AttributeKey, number>>>> = {
-  ataque: {
-    definicion: 18,
-    posicionamiento: 14,
-    remate: 12,
-    regate: 10,
-    tecnica: 9,
-    control: 9,
-    aceleracion: 8,
-    velocidad: 8,
-    juegoAereo: 7,
-    decisiones: 5,
-  },
-  mediocampo: {
-    paseCorto: 18,
-    control: 13,
-    decisiones: 12,
-    vision: 12,
-    tecnica: 11,
-    quite: 10,
-    resistencia: 8,
-    trabajoEquipo: 8,
-    paseLargo: 8,
-  },
-  defensa: {
-    marcaje: 18,
-    quite: 16,
-    posicionamiento: 16,
-    concentracion: 12,
-    fuerza: 11,
-    juegoAereo: 10,
-    velocidad: 9,
-    decisiones: 8,
-  },
-  arquero: {
-    reflejos: 22,
-    manos: 18,
-    posicionamiento: 16,
-    achique: 13,
-    concentracion: 12,
-    agilidad: 11,
-    decisiones: 8,
-  },
-  fisico: {
-    resistencia: 26,
-    fuerza: 22,
-    velocidad: 20,
-    aceleracion: 18,
-    salto: 14,
-  },
-  creacion: {
-    vision: 22,
-    paseCorto: 17,
-    paseLargo: 13,
-    tecnica: 13,
-    decisiones: 12,
-    regate: 11,
-    centros: 12,
-  },
-  presion: {
-    resistencia: 22,
-    quite: 18,
-    trabajoEquipo: 16,
-    agresividad: 14,
-    aceleracion: 14,
-    concentracion: 16,
-  },
-  contraataque: {
-    velocidad: 24,
-    aceleracion: 20,
-    paseLargo: 14,
-    regate: 14,
-    definicion: 14,
-    decisiones: 14,
-  },
-  balonParado: {
-    tirosLibres: 20,
-    centros: 16,
-    juegoAereo: 18,
-    salto: 14,
-    fuerza: 12,
-    remate: 10,
-    penales: 10,
-  },
+  ataque: { remate: 30, calidad: 22, velocidad: 18, regate: 14, tiro: 10, agresividad: 6 },
+  mediocampo: { pase: 30, calidad: 34, entradas: 14, resistencia: 12, regate: 10 },
+  defensa: { entradas: 42, agresividad: 24, calidad: 18, velocidad: 12, pase: 4 },
+  arquero: { portero: 72, calidad: 18, velocidad: 10 },
+  fisico: { resistencia: 40, velocidad: 34, agresividad: 26 },
+  creacion: { calidad: 40, pase: 38, regate: 14, velocidad: 8 },
+  presion: { resistencia: 34, entradas: 28, agresividad: 22, velocidad: 16 },
+  contraataque: { velocidad: 44, pase: 18, regate: 16, remate: 14, calidad: 8 },
+  balonParado: { tiro: 40, agresividad: 32, remate: 20, calidad: 8 },
 };
 
 /** Peso de un puesto en cada dimension, segun linea y tareas de la formacion. */
@@ -295,9 +234,8 @@ export function computeTeamStrength(
           value: clampRating(
             weightedMean([
               { value: r.player.attributes.regate, weight: 3 },
-              { value: r.player.attributes.velocidad, weight: 3 },
-              { value: r.player.attributes.centros, weight: 3 },
-              { value: r.player.attributes.aceleracion, weight: 2 },
+              { value: r.player.attributes.velocidad, weight: 5 },
+              { value: r.player.attributes.pase, weight: 3 },
             ]) + (r.rating - r.performance.baseOverall),
           ),
           weight: 1,
@@ -308,7 +246,10 @@ export function computeTeamStrength(
 
   const aerialQuality = weightedPowerMean(
     fieldPlayers.map((r) => ({
-      value: attributeBlend(r.player.attributes, { juegoAereo: 3, salto: 2, fuerza: 2 }) +
+      // El juego aereo no existe en el archivo: la agresividad es lo mas
+      // cercano a ganar un duelo por arriba, y el remate lo que se hace con
+      // la pelota una vez ganada.
+      value: attributeBlend(r.player.attributes, { agresividad: 5, remate: 2 }) +
         (r.rating - r.performance.baseOverall),
       weight: r.slot.attackDuty + r.slot.defenseDuty,
     })),
@@ -316,15 +257,15 @@ export function computeTeamStrength(
   );
 
   const topFinisher = maxOf(attackers.length ? attackers : fieldPlayers, (r) =>
-    attributeBlend(r.player.attributes, { definicion: 4, posicionamiento: 3, remate: 2 }) +
+    attributeBlend(r.player.attributes, { remate: 5, tiro: 2, calidad: 2 }) +
     (r.rating - r.performance.baseOverall));
 
   const topCreator = maxOf(fieldPlayers, (r) =>
-    attributeBlend(r.player.attributes, { vision: 4, paseCorto: 3, tecnica: 2, paseLargo: 2 }) +
+    attributeBlend(r.player.attributes, { calidad: 5, pase: 5, regate: 1 }) +
     (r.rating - r.performance.baseOverall));
 
   const topDefender = maxOf(defenders.length ? defenders : fieldPlayers, (r) =>
-    attributeBlend(r.player.attributes, { marcaje: 3, quite: 3, posicionamiento: 3 }) +
+    attributeBlend(r.player.attributes, { entradas: 6, agresividad: 3 }) +
     (r.rating - r.performance.baseOverall));
 
   const stamina = weightedMean(
@@ -394,19 +335,19 @@ function detectKeyPlayers(rated: readonly RatedPlayer[]): KeyPlayer[] {
     const attrs = r.player.attributes;
     const options: { role: KeyPlayer['role']; score: number }[] = [];
     if (r.position === 'POR') {
-      options.push({ role: 'arquero', score: attributeBlend(attrs, { reflejos: 3, manos: 2, posicionamiento: 2 }) });
+      options.push({ role: 'arquero', score: attributeBlend(attrs, { portero: 6, calidad: 1 }) });
     } else {
       options.push({
         role: 'goleador',
-        score: attributeBlend(attrs, { definicion: 4, posicionamiento: 3, remate: 2 }) * (0.55 + r.slot.attackDuty * 0.55),
+        score: attributeBlend(attrs, { remate: 5, tiro: 2, calidad: 2 }) * (0.55 + r.slot.attackDuty * 0.55),
       });
       options.push({
         role: 'creador',
-        score: attributeBlend(attrs, { vision: 4, paseCorto: 3, regate: 2, tecnica: 2 }) * (0.7 + r.slot.attackDuty * 0.35),
+        score: attributeBlend(attrs, { calidad: 5, pase: 4, regate: 2 }) * (0.7 + r.slot.attackDuty * 0.35),
       });
       options.push({
         role: 'lider defensivo',
-        score: attributeBlend(attrs, { marcaje: 3, quite: 3, posicionamiento: 2, concentracion: 2 }) * (0.6 + r.slot.defenseDuty * 0.5),
+        score: attributeBlend(attrs, { entradas: 6, agresividad: 2, calidad: 2 }) * (0.6 + r.slot.defenseDuty * 0.5),
       });
     }
     const best = options.reduce((a, b) => (b.score > a.score ? b : a));
@@ -455,12 +396,12 @@ export function resolveSetPieceTakers(
   return {
     penalty:
       designated(team.setPieceTakers.penales) ??
-      bestBy({ penales: 4, definicion: 3, concentracion: 2, tecnica: 1 }),
+      bestBy({ tiro: 4, remate: 3, calidad: 3 }),
     freeKick:
       designated(team.setPieceTakers.tirosLibres) ??
-      bestBy({ tirosLibres: 5, tecnica: 2, remate: 1 }),
+      bestBy({ tiro: 6, calidad: 2 }),
     corner:
       designated(team.setPieceTakers.corners) ??
-      bestBy({ centros: 5, tecnica: 2, paseLargo: 1 }),
+      bestBy({ pase: 6, calidad: 2 }),
   };
 }

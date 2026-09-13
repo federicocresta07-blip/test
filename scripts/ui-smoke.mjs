@@ -11,6 +11,10 @@
  *   npm run build && npx vite preview --port 4173 &
  *   npm i --no-save playwright && node scripts/ui-smoke.mjs
  *
+ * Si el Chromium del sistema no es el que espera Playwright:
+ *
+ *   CHROMIUM_PATH=/ruta/al/chromium node scripts/ui-smoke.mjs
+ *
  * Convertir esto en tests automatizados es la fase 8 del plan.
  */
 
@@ -20,7 +24,11 @@ import { mkdirSync } from 'node:fs';
 const BASE = process.env.BASE_URL ?? 'http://localhost:4173';
 mkdirSync('./ui-shots', { recursive: true });
 
-const browser = await chromium.launch();
+// En entornos donde el Chromium instalado no es el que espera esta version de
+// Playwright, `CHROMIUM_PATH` apunta al ejecutable a mano.
+const browser = await chromium.launch(
+  process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+);
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -28,6 +36,33 @@ page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 
 const check = (label, ok, detail = '') =>
   console.log(`${ok ? 'OK  ' : 'FALLA'} ${label}${detail ? ' — ' + detail : ''}`);
+
+/**
+ * Un suplente del puesto pedido, elegido en el momento.
+ *
+ * Antes esto eran dos nombres escritos a mano ("Hernán Ledesma", "Lisandro
+ * Ferreyra"), que venian del plantel de demostracion. Cuando el juego paso a
+ * los planteles reales del Apertura 98 esos nombres dejaron de existir y el
+ * script se colgaba treinta segundos esperando una fila que no estaba. Ahora
+ * se busca por puesto entre los que no estan en la cancha, asi que sirve con
+ * cualquier plantel.
+ */
+async function benchRow(position) {
+  const onPitch = await page.locator('.pitch__chipbtn .chip__name').allTextContents();
+  const index = await page.evaluate(
+    ({ position, onPitch }) => {
+      const rows = [...document.querySelectorAll('.squadtable__table tbody tr')];
+      return rows.findIndex((tr) => {
+        const pos = tr.querySelector('.postag')?.textContent?.trim();
+        const name = tr.querySelector('.playername__text')?.textContent?.trim();
+        return pos === position && name && !onPitch.includes(name);
+      });
+    },
+    { position, onPitch },
+  );
+  if (index < 0) throw new Error(`no hay suplente de ${position} en el plantel`);
+  return page.locator('.squadtable__table tbody tr').nth(index);
+}
 
 await page.goto(`${BASE}/#/equipo/alineacion`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(400);
@@ -59,8 +94,8 @@ await page.waitForTimeout(300);
 const metricBefore = await page.locator('.metricrow:has-text("Ataque") .metricrow__value').textContent();
 
 // --- 5. Drag & drop: plantel -> cancha ---
-// Se arrastra un suplente (Ledesma, DC) al puesto de delantero.
-const source = page.locator('tr:has-text("Hernán Ledesma")').first();
+// Se arrastra un suplente del ataque al puesto de delantero.
+const source = await benchRow('DC');
 const target = page.locator('.pitch__slot').filter({ has: page.locator('.chip') }).nth(1);
 const targetNameBefore = await target.locator('.chip__name').textContent();
 await source.dragTo(target);
@@ -89,9 +124,11 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
 
 // --- 8. Jugador fuera de posición muestra el efecto (sección 6.5) ---
-// Se pone un defensor central de extremo.
-const dfc = page.locator('tr:has-text("Lisandro Ferreyra")').first();
-const wing = page.locator('.pitch__slot').first();
+// Se pone un defensor central de extremo. El puesto se busca por su etiqueta:
+// antes era `.pitch__slot` primero, que es el ARCO, asi que el test ponia al
+// central de arquero y comprobaba el caso extremo en lugar del que dice.
+const dfc = await benchRow('DFC');
+const wing = page.locator('.pitch__slot').filter({ has: page.locator('.pitch__slotlabel:text-is("ED")') }).first();
 await dfc.dragTo(wing);
 await page.waitForTimeout(400);
 const outOfPos = await page.locator('.chip--outofposition').count();
@@ -119,9 +156,24 @@ await page.waitForTimeout(200);
 await page.click('button:has-text("Autoseleccionar XI")');
 await page.waitForTimeout(400);
 const chipsAuto = await page.locator('.pitch__chipbtn').count();
-const outAuto = await page.locator('.chip--outofposition').count();
 check('autoseleccionar arma los 11', chipsAuto === 11, `${chipsAuto}`);
-check('autoseleccionar respeta los puestos', outAuto === 0, `${outAuto} fuera de posición`);
+
+// Antes esto exigia CERO fichas marcadas, y con el plantel de demostracion se
+// cumplia porque tenia un jugador natural para cada puesto. Los planteles
+// reales no: River 98 no tiene ningun extremo izquierdo natural, asi que
+// alguien tiene que jugar ahi corrido de puesto y la ficha se marca. Exigir
+// cero era exigir que el plantel fuese de laboratorio.
+//
+// Lo que si tiene que cumplirse es que la seleccion automatica no ponga a
+// nadie MUY fuera de puesto: cada ficha marcada pierde poco, porque es su
+// posicion secundaria o una vecina, no un central de nueve.
+const deltas = (await page.locator('.chip--outofposition .chip__delta').allTextContents()).map(Number);
+const worst = deltas.length > 0 ? Math.min(...deltas) : 0;
+check(
+  'autoseleccionar no pone a nadie muy fuera de puesto',
+  worst >= -6,
+  `${deltas.length} fichas corridas, la peor ${worst}`,
+);
 
 // --- 11. Suplentes ---
 const bench = await page.locator('.bench__chip').count();

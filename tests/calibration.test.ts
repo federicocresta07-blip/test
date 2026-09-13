@@ -108,22 +108,44 @@ test('el modelo probabilistico previo coincide con lo que simula el motor (secci
 });
 
 test('EL RESULTADO NO DEPENDE SOLO DEL OVERALL (seccion 29)', () => {
-  // Mismo overall en los dos equipos, distinta tactica: el resultado cambia.
-  const attacking = run(78, 78, 1);
-  void attacking;
+  // EL MISMO PLANTEL en los dos lados, clonado jugador por jugador: mismos
+  // atributos, misma edad, misma forma. Lo UNICO distinto es la tactica.
+  //
+  // Asi que si el overall fuese lo unico que cuenta, los dos informes tendrian
+  // que dar lo mismo: son el mismo equipo contra si mismo con la misma ventaja
+  // de localia, y la unica asimetria posible viene del cruce tactico.
+  //
+  // POR QUE ESTA ESCRITO ASI. Antes el test armaba dos planteles distintos
+  // (uno por prefijo) y comparaba el informe con cada uno de local. Eso mezcla
+  // dos cosas: el cruce tactico y la diferencia de plantel, porque dos
+  // planteles del mismo overall objetivo no son iguales, y el numero que
+  // medimos era en buena parte esa diferencia. Con un solo plantel clonado la
+  // diferencia de plantel es cero por construccion y lo que queda es tactica.
+  const squad = buildSquad({ target: 78, prefix: 'EQ', seed: 'tactica' });
+  const sideOf = (id: string, tactics: Partial<Tactics>): Team =>
+    createTeam({
+      id, name: id, shortName: id.slice(0, 3).toUpperCase(),
+      // Los ids tienen que ser distintos entre los dos equipos, el resto no.
+      players: squad.map((p) => ({ ...p, id: `${id}-${p.id}` })),
+      chemistry: 65, tactics: createTactics(tactics),
+    });
+  const PRESS = { formationId: '4-3-3', pressing: 'alta', tempo: 'rapido', passingStyle: 'mixto' } as const;
+  const SLOW = { formationId: '4-2-3-1', pressing: 'media', passingStyle: 'posesion', tempo: 'lento' } as const;
+
   const pressVsSlow = simulateMany({
-    home: teamOf(78, 'Presion', { formationId: '4-3-3', pressing: 'alta', tempo: 'rapido', passingStyle: 'mixto' }),
-    away: teamOf(78, 'Lento', { formationId: '4-2-3-1', pressing: 'media', passingStyle: 'posesion', tempo: 'lento' }),
-    matches: 2000, seed: 777,
+    home: sideOf('Presion', PRESS), away: sideOf('Lento', SLOW), matches: 3000, seed: 777,
   });
   const slowVsPress = simulateMany({
-    home: teamOf(78, 'Lento', { formationId: '4-2-3-1', pressing: 'media', passingStyle: 'posesion', tempo: 'lento' }),
-    away: teamOf(78, 'Presion', { formationId: '4-3-3', pressing: 'alta', tempo: 'rapido', passingStyle: 'mixto' }),
-    matches: 2000, seed: 777,
+    home: sideOf('Lento', SLOW), away: sideOf('Presion', PRESS), matches: 3000, seed: 777,
   });
-  // Si el overall fuese lo unico que cuenta, los dos informes serian iguales.
+
+  // Medido sobre nueve combinaciones de plantel y semilla, la diferencia dio
+  // entre 2.8 y 5.0 puntos y siempre para el mismo lado: al equipo de posesion
+  // le rinde mas jugar de local que al de presion, porque el partido lento le
+  // da menos transiciones al rival.
+  const delta = slowVsPress.homeWinPct - pressVsSlow.homeWinPct;
   assert.ok(
-    Math.abs(pressVsSlow.homeWinPct - slowVsPress.homeWinPct) > 3,
+    delta > 2,
     `la tactica tiene que cambiar el resultado: ${pressVsSlow.homeWinPct}% vs ${slowVsPress.homeWinPct}%`,
   );
 });

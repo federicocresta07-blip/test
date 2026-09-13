@@ -24,43 +24,46 @@ export function evaluateTacticalFit(
   const meta = POSITION_META[assigned];
   const demands: number[] = [];
 
-  // Presion alta: exige resistencia, trabajo de equipo y agresividad.
+  // Presion alta: exige resistencia, agresividad y entradas.
   const pressingAbility = avg([
     attributes.resistencia,
-    attributes.trabajoEquipo,
     attributes.agresividad,
-    attributes.quite,
+    attributes.entradas,
   ]);
   demands.push(demand(profile.pressing, pressingAbility));
 
-  // Juego de posesion: exige pase corto, tecnica y control en todo el equipo.
-  const possessionAbility = avg([attributes.paseCorto, attributes.tecnica, attributes.control]);
+  // Juego de posesion: exige pase y calidad en todo el equipo.
+  const possessionAbility = avg([attributes.pase, attributes.calidad]);
   demands.push(demand(1 - profile.directness, possessionAbility));
 
-  // Juego directo: exige juego aereo, fuerza y pase largo (o velocidad arriba).
+  // Juego directo: arriba exige empuje y velocidad para pelear el pelotazo;
+  // atras, pase largo y fisico para mandarlo. El archivo no separa el juego
+  // aereo, asi que la agresividad hace ese papel.
   const directAbility = meta.line === 'DEL'
-    ? avg([attributes.juegoAereo, attributes.fuerza, attributes.velocidad])
-    : avg([attributes.paseLargo, attributes.fuerza, attributes.juegoAereo]);
+    ? avg([attributes.agresividad, attributes.remate, attributes.velocidad])
+    : avg([attributes.pase, attributes.agresividad]);
   demands.push(demand(profile.directness, directAbility));
 
-  // Ritmo alto: exige resistencia y agilidad para sostenerlo.
-  demands.push(demand(profile.tempo, avg([attributes.resistencia, attributes.agilidad, attributes.aceleracion])));
+  // Ritmo alto: exige resistencia y velocidad para sostenerlo.
+  demands.push(demand(profile.tempo, avg([attributes.resistencia, attributes.velocidad])));
 
-  // Linea alta: exige velocidad y concentracion a la ultima linea.
+  // Linea alta: exige velocidad y lectura a la ultima linea. La concentracion
+  // era un atributo propio y ahora vive dentro de la calidad.
   if (meta.line === 'DEF' || assigned === 'MCD') {
     demands.push(
-      demand(profile.defensiveLine, avg([attributes.velocidad, attributes.aceleracion, attributes.concentracion])),
+      demand(profile.defensiveLine, avg([attributes.velocidad, attributes.calidad])),
     );
   }
 
-  // Juego por bandas: exige centros y regate a los puestos anchos.
+  // Juego por bandas: exige pase y regate a los puestos anchos. Los centros
+  // eran un atributo propio y ahora viven dentro del pase.
   if (meta.isWide) {
-    demands.push(demand(profile.wingFocus, avg([attributes.centros, attributes.regate, attributes.velocidad])));
+    demands.push(demand(profile.wingFocus, avg([attributes.pase, attributes.regate, attributes.velocidad])));
   }
 
   // Mucha tarea ofensiva y defensiva a la vez exige motor.
   const twoWayLoad = clamp(slot.attackDuty * slot.defenseDuty * 2, 0, 1);
-  demands.push(demand(twoWayLoad, avg([attributes.resistencia, attributes.trabajoEquipo])));
+  demands.push(demand(twoWayLoad, avg([attributes.resistencia, attributes.calidad])));
 
   return clamp(avg(demands) , 0, 1);
 }

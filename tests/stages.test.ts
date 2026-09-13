@@ -153,12 +153,12 @@ test('etapa 4: un gran definidor convierte mas la misma ocasion (seccion 33)', (
   const id = base[9]!.id;
   const withStar = base.map((p) =>
     p.id === id
-      ? createPlayer({ id, name: 'Killer', position: 'DC', attributes: attributesFor('DC', 90, { definicion: 94, posicionamiento: 92 }) })
+      ? createPlayer({ id, name: 'Killer', position: 'DC', attributes: attributesFor('DC', 90, { remate: 94, calidad: 92 }) })
       : p,
   );
   const withPoor = base.map((p) =>
     p.id === id
-      ? createPlayer({ id, name: 'Flojo', position: 'DC', attributes: attributesFor('DC', 62, { definicion: 52 }) })
+      ? createPlayer({ id, name: 'Flojo', position: 'DC', attributes: attributesFor('DC', 62, { remate: 52 }) })
       : p,
   );
 
@@ -262,7 +262,7 @@ test('un equipo especialista en balon parado genera mas peligro con la pelota qu
   const specialists = buildSquad({ target: 78, prefix: 'BP', seed: 'bp' }).map((p) =>
     createPlayer({
       id: p.id, name: p.name, position: p.position,
-      attributes: attributesFor(p.position, 78, { tirosLibres: 92, centros: 90, juegoAereo: 90, salto: 88 }),
+      attributes: attributesFor(p.position, 78, { agresividad: 89, pase: 90, tiro: 92 }),
     }),
   );
   const expert = strengthOf(78, { setPieceFocus: true }, specialists);

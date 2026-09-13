@@ -1,15 +1,15 @@
 /**
  * EL PUENTE ENTRE PC FUTBOL Y EL MOTOR.
  *
- * PC Apertura 98 guarda diez atributos por jugador y el motor usa
- * veintinueve: nueve se toman del archivo y veinte se derivan. Este archivo
- * verifica que esa derivacion no deforme a los 462 jugadores.
+ * El motor usa los MISMOS diez atributos que guarda PC Apertura 98, asi que no
+ * hay nada derivado y el mapeo es una identidad. Este archivo lo fija: si algun
+ * dia vuelve a aparecer un atributo derivado, el test lo dice.
  *
- * LA COMPROBACION QUE VALE. El motor calcula su overall por puesto con
- * veintinueve pesos; PC Futbol calcula su media con cuatro atributos. Son dos
- * formulas independientes que no se conocen entre si, asi que su correlacion
- * sobre los 462 jugadores es una prueba real del mapeo: si estuviera mal, los
- * dos numeros se despegarian.
+ * LA COMPROBACION QUE VALE. El motor calcula su overall por puesto con once
+ * tablas de pesos; PC Futbol calcula su media con cuatro de los diez
+ * atributos. Siguen siendo dos formulas distintas, asi que su correlacion
+ * sobre los 462 jugadores sigue midiendo algo: que las tablas de pesos del
+ * motor no deformen el plantel.
  */
 
 import assert from 'node:assert/strict';
@@ -57,14 +57,14 @@ test('el mapeo cubre los veintinueve atributos del motor, sin inventar ninguno',
   assert.deepEqual(declared, [...ATTRIBUTE_KEYS].sort());
 });
 
-test('nueve atributos salen del archivo y veinte se derivan', () => {
+test('los diez atributos salen del archivo y NINGUNO se deriva', () => {
+  // Este test existia al reves: verificaba que nueve fueran originales y
+  // veinte derivados. Al bajar el motor a diez atributos la capa de derivacion
+  // desaparecio, y lo que hay que fijar ahora es que no vuelva.
   const sources = Object.values(PCF_ATTRIBUTE_SOURCE);
-  const original = sources.filter((s) => s.startsWith('original')).length;
-  const derived = sources.filter((s) => s.startsWith('derivado')).length;
-  assert.equal(original + derived, ATTRIBUTE_KEYS.length);
-  // Diez, contando `marcaje`, que toma `entradas` sin tocarlo igual que `quite`.
-  assert.equal(original, 10);
-  assert.equal(derived, 19);
+  assert.equal(sources.length, ATTRIBUTE_KEYS.length);
+  assert.equal(sources.filter((s) => s.startsWith('original')).length, 10);
+  assert.equal(sources.filter((s) => s.startsWith('derivado')).length, 0);
 });
 
 test('los diecinueve roles de PC Futbol mapean a puestos que el motor conoce', () => {
@@ -190,7 +190,7 @@ test('el mapeo es deterministico', () => {
   }
 });
 
-test('los nueve atributos originales llegan intactos al motor', () => {
+test('los diez atributos llegan intactos al motor', () => {
   const raw = apertura98Squad('boca').find((p) => p.n.includes('RIQUELME'));
   assert.ok(raw, 'Riquelme tiene que estar en el plantel de Boca');
   const { position } = positionFromPcf(raw.roles, raw.dem);
@@ -205,16 +205,17 @@ test('los nueve atributos originales llegan intactos al motor', () => {
     weight: raw.w,
   });
 
+  // Los diez, uno por uno, en el orden del archivo.
   assert.equal(attributes.velocidad, raw.a.ve);
   assert.equal(attributes.resistencia, raw.a.re);
   assert.equal(attributes.agresividad, raw.a.ag);
-  assert.equal(attributes.tecnica, raw.a.ca);
+  assert.equal(attributes.calidad, raw.a.ca);
+  assert.equal(attributes.remate, raw.a.rm);
   assert.equal(attributes.regate, raw.a.rg);
-  assert.equal(attributes.paseCorto, raw.a.pa);
-  assert.equal(attributes.definicion, raw.a.rm);
-  assert.equal(attributes.quite, raw.a.en);
-  assert.equal(attributes.marcaje, raw.a.en);
-  assert.equal(attributes.reflejos, raw.a.po);
+  assert.equal(attributes.pase, raw.a.pa);
+  assert.equal(attributes.tiro, raw.a.ti);
+  assert.equal(attributes.entradas, raw.a.en);
+  assert.equal(attributes.portero, raw.a.po);
 });
 
 test('Riquelme queda de volante y no de lateral', () => {

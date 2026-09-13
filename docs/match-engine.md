@@ -33,13 +33,20 @@ distintos. El caso más claro es el delantero:
 
 | Etapa | Qué mide | Atributos |
 |---|---|---|
-| 3 — calidad de la ocasión | qué tan **buena** es la posición que se genera | `posicionamiento`, `control`, `tecnica`, `juegoAereo`, `salto`, `velocidad` |
-| 4 — conversión | si **acierta** el remate | `definicion`, `remate`, `tirosLibres`, `penales`, `concentracion` |
+| 3 — calidad de la ocasión | qué tan **buena** es la posición que se genera | `calidad`, `velocidad`, `regate`, `agresividad` |
+| 4 — conversión | si **acierta** el remate | `remate`, `tiro`, `calidad` |
 
-Por eso el ejemplo de la especificación (overall 90, definición 94,
-posicionamiento 92) mejora las dos cosas, pero por caminos separados y
-medibles: `posicionamiento` sube el xG de sus ocasiones y `definicion` sube la
-probabilidad de convertirlas.
+Por eso un 9 con `remate` 96 mejora las dos cosas, pero por caminos separados y
+medibles: la calidad y la velocidad suben el xG de sus ocasiones y el `remate`
+sube la probabilidad de convertirlas.
+
+Con diez atributos este reparto es más ajustado que con veintinueve, y en un
+caso hubo que **decidir en lugar de renombrar**: el viejo `posicionamiento`
+colapsó en `entradas`, que para un delantero no significa nada. Donde la etapa
+3 medía "sabe ubicarse en el área" ahora pesan la calidad y la velocidad. El
+que sigue partido en dos es el disparo: en PC Fútbol el `remate` (RM) es
+definir de cerca y el `tiro` (TI) es pegarle de afuera, así que son dos
+atributos del archivo y no una invención nuestra.
 
 Lo mismo con la defensa rival, que aparece en tres lugares distintos con
 efectos distintos: en el volumen de ocasiones (organización defensiva), en el
@@ -126,11 +133,16 @@ creativo. Es un ajuste al 35%, con tope de 12 puntos: matiza, no decide.
 ### Adecuación táctica
 
 `ratings/tactical-fit.ts` compara lo que pide el entrenador con lo que el
-jugador tiene: la presión alta exige resistencia y trabajo de equipo, la
-posesión exige pase corto y técnica, el juego directo exige juego aéreo y
-fuerza, la línea alta exige velocidad y concentración a los defensores, el
-juego por bandas exige centros y regate a los puestos anchos. Si la táctica no
-pide nada de eso, el efecto es neutro.
+jugador tiene: la presión alta exige resistencia, agresividad y entradas; la
+posesión exige pase y calidad; el juego directo exige agresividad y velocidad
+arriba, y pase largo atrás; la línea alta exige velocidad y lectura a los
+defensores; el juego por bandas exige pase y regate a los puestos anchos. Si
+la táctica no pide nada de eso, el efecto es neutro.
+
+Varias de esas exigencias eran atributos propios que ya no existen —el trabajo
+de equipo, la concentración, los centros, el juego aéreo—, y ahora viven dentro
+de la calidad, el pase y la agresividad. Es menos fino que antes, pero antes
+esos números los estimábamos nosotros.
 
 ---
 

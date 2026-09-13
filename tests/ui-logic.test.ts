@@ -584,10 +584,10 @@ test('un jugador generado con attributesFor entra sin romper nada', () => {
     id: 'nuevo',
     name: 'Refuerzo Demo',
     position: 'MCO',
-    attributes: attributesFor('MCO', 85, { vision: 90 }),
+    attributes: attributesFor('MCO', 85, { calidad: 90 }),
   });
   assert.equal(naturalOverall(extra), 85);
-  assert.equal(extra.attributes.vision, 90);
+  assert.equal(extra.attributes.calidad, 90);
 });
 
 // ============================================================

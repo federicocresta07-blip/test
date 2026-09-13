@@ -19,11 +19,12 @@ export { Rng, hashString } from './core/rng.ts';
 
 // Dominio
 export {
+  ATTRIBUTE_ABSORBED,
+  ATTRIBUTE_CODES,
   ATTRIBUTE_KEYS,
   buildAttributes,
   DEFENSIVE_ATTRIBUTES,
   GOALKEEPING_ATTRIBUTES,
-  MENTAL_ATTRIBUTES,
   PHYSICAL_ATTRIBUTES,
   TECHNICAL_ATTRIBUTES,
   type AttributeKey,

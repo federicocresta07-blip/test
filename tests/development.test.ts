@@ -100,13 +100,14 @@ test('la curva de edad crece de joven, se estanca en el pico y cae despues', () 
   assert.ok(ageFactor(24, 'fisico') > ageFactor(PEAK_AGE + 2, 'fisico'));
   assert.ok(ageFactor(33, 'fisico') < 0, 'a los 33 se pierde fisico');
 
-  // Lo fisico se va antes que lo mental: es lo que hace que un veterano siga
-  // sirviendo.
+  // Lo fisico se va antes que el resto: es lo que hace que un veterano siga
+  // sirviendo. Antes el grupo de comparacion era `mental`, que ya no existe
+  // porque no quedo ningun atributo mental que entrenar.
   assert.ok(
-    ageFactor(33, 'mental') > ageFactor(33, 'fisico'),
-    'a los 33 la cabeza tiene que aguantar mejor que las piernas',
+    ageFactor(33, 'tecnico') > ageFactor(33, 'fisico'),
+    'a los 33 el oficio tiene que aguantar mejor que las piernas',
   );
-  assert.ok(ageFactor(36, 'mental') > ageFactor(36, 'fisico'));
+  assert.ok(ageFactor(36, 'tecnico') > ageFactor(36, 'fisico'));
 });
 
 test('el margen se mide contra el potencial y se agota en el techo', () => {
@@ -143,7 +144,10 @@ test('un juvenil con margen que juega crece de verdad en una temporada', () => {
   const gained = result.overallAfter - result.overallBefore;
   assert.ok(gained >= 7, `un juvenil con margen tendria que ganar varios puntos, gano ${gained}`);
   assert.ok(gained <= 16, `tampoco puede pegar un salto irreal: gano ${gained}`);
-  assert.ok(result.changes.length > 10, 'tendrian que moverse muchos atributos');
+  // Con diez atributos "muchos" es otra cosa: antes eran veintinueve y se
+  // movian mas de diez. Ahora la mitad de los diez ya es la mayoria del
+  // jugador, y el arquero ni se toca en un jugador de campo.
+  assert.ok(result.changes.length >= 5, `se movieron ${result.changes.length} atributos`);
   assert.ok(result.reasons.length >= 3, 'el resultado tiene que explicarse');
 });
 
@@ -202,7 +206,7 @@ test('un jugador en su techo no crece por mas que entrene', () => {
   assert.ok(result.reasons.some((reason) => reason.includes('potencial')));
 });
 
-test('un veterano pierde piernas y conserva la cabeza', () => {
+test('un veterano pierde piernas y conserva el oficio', () => {
   const veteran = player({ age: 34, overall: 78, potential: 78, id: 'veterano' });
   const result = developPlayer({
     player: veteran,
@@ -212,7 +216,7 @@ test('un veterano pierde piernas y conserva la cabeza', () => {
   });
 
   const physical = result.changes.filter((change) => groupOf(change.attribute) === 'fisico');
-  const mental = result.changes.filter((change) => groupOf(change.attribute) === 'mental');
+  const craft = result.changes.filter((change) => groupOf(change.attribute) === 'tecnico');
 
   assert.ok(physical.length > 0, 'tendria que perder algo de fisico');
   assert.ok(
@@ -223,12 +227,12 @@ test('un veterano pierde piernas y conserva la cabeza', () => {
   const physicalLoss =
     physical.reduce((total, change) => total + (change.from - change.to), 0) /
     Math.max(1, physical.length);
-  const mentalLoss =
-    mental.reduce((total, change) => total + (change.from - change.to), 0) /
-    Math.max(1, mental.length);
+  const craftLoss =
+    craft.reduce((total, change) => total + (change.from - change.to), 0) /
+    Math.max(1, craft.length);
   assert.ok(
-    physicalLoss > mentalLoss,
-    `tendria que perder mas fisico (${physicalLoss.toFixed(1)}) que cabeza (${mentalLoss.toFixed(1)})`,
+    physicalLoss > craftLoss,
+    `tendria que perder mas fisico (${physicalLoss.toFixed(1)}) que oficio (${craftLoss.toFixed(1)})`,
   );
 
   // Y la caida tiene que ser gradual: en tres temporadas sigue jugable.
@@ -394,8 +398,8 @@ test('el plan individual manda sobre el del equipo, y el del equipo sobre el del
   const teamWide = { ...DEFAULT_TRAINING_PLAN, teamFocus: 'fisico' as TrainingFocus };
   assert.equal(focusFor(teamWide, 'x', 'DC'), 'fisico');
 
-  const withOwn = { ...teamWide, individual: { x: 'mental' as TrainingFocus } };
-  assert.equal(focusFor(withOwn, 'x', 'DC'), 'mental');
+  const withOwn = { ...teamWide, individual: { x: 'ofensivo' as TrainingFocus } };
+  assert.equal(focusFor(withOwn, 'x', 'DC'), 'ofensivo');
   assert.equal(focusFor(withOwn, 'otro', 'DC'), 'fisico');
   assert.equal(individualCount(withOwn), 1);
 });

@@ -51,10 +51,10 @@ test('un equipo mejor tiene mejores dimensiones', () => {
 
 test('un delantero de clase levanta el ataque sin tocar la defensa (seccion 33)', () => {
   const base = buildSquad({ target: 76, prefix: 'EQ', seed: 'fuerza' });
-  // El ejemplo de la especificacion: overall 90, definicion 94, posicionamiento 92.
+  // El ejemplo de la especificacion: overall 90 con el remate en 96.
   const star = createPlayer({
-    id: base[9]?.id ?? 'star', name: 'Crack', position: 'DC',
-    attributes: attributesFor('DC', 90, { definicion: 94, posicionamiento: 92 }),
+    id: base.find((p) => p.position === 'DC')?.id ?? 'star', name: 'Crack', position: 'DC',
+    attributes: attributesFor('DC', 90, { remate: 96 }),
   });
   const withStar = base.map((p) => (p.id === star.id ? star : p));
 
@@ -71,16 +71,32 @@ test('un delantero de clase levanta el ataque sin tocar la defensa (seccion 33)'
 });
 
 test('a igual overall, el especialista mueve su area y no el resto', () => {
-  // Mismo nivel general, distinto reparto: un 9 de 80 con definicion 94
-  // convierte mejor, pero no hace mejor al equipo en todo.
-  const base = buildSquad({ target: 78, prefix: 'EQ', seed: 'especialista' });
-  const id = base[9]?.id ?? 'dc';
+  // Mismo nivel general, distinto reparto: un 9 de 80 con remate 96 convierte
+  // mejor, pero no hace mejor al equipo en todo.
+  //
+  // El especialista se define con UN solo atributo alto. Con veintinueve se le
+  // ponian dos (definicion y posicionamiento) y seguia siendo un especialista;
+  // con diez, dos de los tres pesos grandes del DC ya es un delantero completo,
+  // y el solve baja todo lo demas para compensar.
+  //
+  // Y la condicion del plantel va PLANA. `topFinisher` es el maximo del once y
+  // le suma a cada jugador su corrimiento del dia (forma, moral, ajuste
+  // tactico), asi que un extremo en racha puede taparle el maximo al 9 y el
+  // test deja de medir el reparto de atributos para medir la forma. Con la
+  // condicion igual para todos, lo unico que cambia entre las dos variantes es
+  // el 9, que es lo que el test dice medir.
+  const flat = { form: 60, morale: 60, fatigue: 10, sharpness: 85 };
+  const base = buildSquad({ target: 78, prefix: 'EQ', seed: 'especialista', condition: flat });
+  const id = base.find((p) => p.position === 'DC')?.id ?? 'dc';
   const finisher = createPlayer({
     id, name: 'Definidor', position: 'DC',
-    attributes: attributesFor('DC', 80, { definicion: 94, posicionamiento: 90 }),
+    attributes: attributesFor('DC', 80, { remate: 96 }),
+    condition: flat,
   });
   const allRounder = createPlayer({
-    id, name: 'Completo', position: 'DC', attributes: attributesFor('DC', 80),
+    id, name: 'Completo', position: 'DC',
+    attributes: attributesFor('DC', 80),
+    condition: flat,
   });
 
   const withFinisher = strengthOf(teamOf(78, '4-3-3', base.map((p) => (p.id === id ? finisher : p))));

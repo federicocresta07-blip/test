@@ -30,7 +30,7 @@ npm run crests     # ingesta de los escudos oficiales (ver docs/ui.md)
 npm run apertura98 # regenera los planteles del Apertura 98 desde el PKF extraido
 npm run single     # empaqueta el juego en UN solo HTML autocontenido
 
-npm test           # 310 tests
+npm test           # 311 tests
 npm run typecheck  # motor + interfaz
 ```
 
@@ -91,7 +91,7 @@ const nueve = createPlayer({
   age: 27,
   // attributesFor arma el perfil del puesto para un overall objetivo;
   // los rasgos propios se pasan aparte.
-  attributes: attributesFor('DC', 87, { definicion: 92, posicionamiento: 90 }),
+  attributes: attributesFor('DC', 87, { remate: 92, tiro: 88 }),
   secondaryPositions: ['SD'],
   condition: { form: 78, morale: 70, fatigue: 8, sharpness: 92 },
 });
@@ -193,6 +193,25 @@ Concretamente, **el resultado no depende solo del overall**. Un mismo par de
 equipos de 78 cambia de favorito según la táctica, la formación, el estado de
 sus jugadores, la cohesión y el cruce entre estilos. Hay tests que lo verifican.
 
+## Los diez atributos
+
+Cada jugador tiene **diez** atributos, en escala 1..100:
+
+| | |
+|---|---|
+| Físicos | `velocidad`, `resistencia`, `agresividad` |
+| Con la pelota | `calidad`, `remate`, `regate`, `pase`, `tiro` |
+| Defensivos | `entradas` |
+| Arquero | `portero` |
+
+Son exactamente los diez de PC Fútbol, con sus nombres y su orden, porque de
+ahí salen los planteles del juego. El motor tenía veintinueve y diecinueve se
+derivaban de estos diez; esa capa era nuestra estimación disfrazada de dato, y
+se fue entera. Lo que se perdió a cambio —el juego aéreo, los tiros libres
+separados de la potencia de disparo, las cuatro facetas del arquero, la
+concentración— está documentado en `src/domain/attributes.ts` y en
+[`docs/ui.md`](docs/ui.md).
+
 ## Las cinco etapas del partido
 
 ```
@@ -277,7 +296,7 @@ src/
   data/                        generador de planteles y equipos de ejemplo
   data/clausura-1998/          dataset histórico real (ver docs/clausura-1998.md)
   ui/                          la interfaz web (ver docs/ui.md)
-tests/                         310 tests
+tests/                         311 tests
 scripts/                       demo, temporada, torneo completo, calibración,
                                dataset histórico y humo de la UI
 ```

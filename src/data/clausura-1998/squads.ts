@@ -106,54 +106,54 @@ const VELEZ: HistoricalSquad = {
   players: [
     {
       name: 'José Luis Chilavert', position: 'POR', age: 32, estimatedRating: 89,
-      estimatedTraits: { reflejos: 91, manos: 88, tirosLibres: 92, penales: 94, saque: 90, concentracion: 88 },
+      estimatedTraits: { calidad: 88, tiro: 93, portero: 90 },
       note: 'Arquero goleador, referente del equipo. Pateaba los tiros libres y los penales.',
     },
     {
       name: 'Flavio Zandoná', position: 'DFC', secondaryPositions: ['LD'], estimatedRating: 78,
-      estimatedTraits: { marcaje: 81, juegoAereo: 80, fuerza: 79 },
+      estimatedTraits: { agresividad: 80, entradas: 81 },
       note: 'La fuente no aclara el lado. Se le asigna LD como secundaria por inferencia, para ' +
         'que la línea de cuatro se pueda armar sin que nadie juegue fuera de posición.',
     },
     {
       name: 'Sebastián Méndez', position: 'DFC', estimatedRating: 77,
-      estimatedTraits: { quite: 80, posicionamiento: 79 },
+      estimatedTraits: { entradas: 80 },
     },
     {
       name: 'Mauricio Pellegrino', position: 'DFC', age: 26, estimatedRating: 80,
-      estimatedTraits: { marcaje: 82, posicionamiento: 83, concentracion: 82, juegoAereo: 81 },
+      estimatedTraits: { agresividad: 81, calidad: 82, entradas: 82 },
       note: 'Después jugó en Valencia, Liverpool y Barcelona.',
     },
     {
       name: 'Raúl Cardozo', position: 'LI', estimatedRating: 75,
-      estimatedTraits: { resistencia: 80, centros: 76 },
+      estimatedTraits: { resistencia: 80, pase: 76 },
     },
     {
       name: 'Lucas Castromán', position: 'MC', age: 18, estimatedRating: 74,
-      estimatedTraits: { tecnica: 78, vision: 77, paseCorto: 77 },
+      estimatedTraits: { calidad: 78, pase: 77 },
       note: 'Juvenil que se afirmó en este equipo. Después jugó en Italia.',
     },
     {
       name: 'Marcelo Gómez', position: 'MCD', estimatedRating: 79,
-      estimatedTraits: { quite: 83, paseCorto: 80, posicionamiento: 81 },
+      estimatedTraits: { pase: 80, entradas: 82 },
     },
     {
       name: 'Fernando Pandolfi', position: 'MC', estimatedRating: 77,
-      estimatedTraits: { resistencia: 82, trabajoEquipo: 81 },
+      estimatedTraits: { resistencia: 82, calidad: 81 },
     },
     {
       name: 'Martín Posse', position: 'DC', estimatedRating: 80, goals: 10,
-      estimatedTraits: { definicion: 83, posicionamiento: 82, juegoAereo: 79 },
+      estimatedTraits: { agresividad: 79, calidad: 82, remate: 83 },
       note: 'Máximo goleador del equipo en el torneo, junto con Camps.',
     },
     {
       name: 'Patricio Camps', position: 'SD', estimatedRating: 79, goals: 10,
-      estimatedTraits: { definicion: 82, control: 79, tecnica: 78 },
+      estimatedTraits: { calidad: 78, remate: 82 },
       note: 'Máximo goleador del equipo en el torneo, junto con Posse.',
     },
     {
       name: 'Carlos Cordone', position: 'EI', estimatedRating: 80,
-      estimatedTraits: { regate: 84, aceleracion: 84, velocidad: 83 },
+      estimatedTraits: { velocidad: 84, regate: 84 },
     },
   ],
 };
@@ -179,58 +179,58 @@ const LANUS: HistoricalSquad = {
   players: [
     {
       name: 'Rodrigo Burela', position: 'POR', appearances: 19, estimatedRating: 76,
-      estimatedTraits: { reflejos: 78, manos: 77, concentracion: 78 },
+      estimatedTraits: { calidad: 78, portero: 78 },
       note: 'Jugó los 19 partidos del torneo.',
     },
     {
       name: 'Juan José Serrizuela', position: 'DFC', secondaryPositions: ['LD'], age: 34, estimatedRating: 76,
-      estimatedTraits: { marcaje: 79, posicionamiento: 82, concentracion: 81 },
+      estimatedTraits: { calidad: 81, entradas: 80 },
       note: 'Defensor experimentado, con paso previo por River y Boca. La fuente lo enumera primero entre ' +
         'los cuatro defensores; se le asigna LD como secundaria por inferencia.',
     },
     {
       name: 'Lucas Alessandria', position: 'DFC', appearances: 19, estimatedRating: 74,
-      estimatedTraits: { marcaje: 77, juegoAereo: 77 },
+      estimatedTraits: { agresividad: 77, entradas: 77 },
       note: 'Jugó los 19 partidos del torneo.',
     },
     {
       name: 'Gustavo Siviero', position: 'DFC', estimatedRating: 77,
-      estimatedTraits: { marcaje: 79, quite: 78, posicionamiento: 79 },
+      estimatedTraits: { entradas: 79 },
       note: 'Vendido al Mallorca después del torneo.',
     },
     {
       name: 'Gabriel Ramón', position: 'LI', estimatedRating: 73,
-      estimatedTraits: { resistencia: 79, centros: 74 },
+      estimatedTraits: { resistencia: 79, pase: 74 },
     },
     {
       name: 'Juan Fernández', position: 'ED', secondaryPositions: ['LD'], estimatedRating: 73,
-      estimatedTraits: { resistencia: 78, velocidad: 76, centros: 75 },
+      estimatedTraits: { velocidad: 76, resistencia: 78, pase: 75 },
       note: 'La fuente lo enumera entre los cuatro mediocampistas y en primer lugar, así que se lo ubica ' +
         'como volante por derecha. Es inferencia, no dato.',
     },
     {
       name: 'Daniel Cravero', position: 'MCD', estimatedRating: 75,
-      estimatedTraits: { quite: 79, marcaje: 77 },
+      estimatedTraits: { entradas: 78 },
     },
     {
       name: 'Julián Kmet', position: 'MC', estimatedRating: 78,
-      estimatedTraits: { paseCorto: 81, vision: 79, tecnica: 79 },
+      estimatedTraits: { calidad: 79, pase: 81 },
       note: 'Vendido al Sporting de Lisboa después del torneo.',
     },
     {
       name: 'Leonardo Mas', position: 'EI', secondaryPositions: ['MC'], estimatedRating: 75,
-      estimatedTraits: { paseCorto: 78, trabajoEquipo: 79, centros: 74 },
+      estimatedTraits: { calidad: 79, pase: 76 },
       note: 'Último de los cuatro mediocampistas en el orden de la fuente, por eso se lo ubica por la ' +
         'izquierda. Es inferencia, no dato.',
     },
     {
       name: 'Gustavo Bartelt', position: 'DC', age: 21, estimatedRating: 82, goals: 13,
-      estimatedTraits: { definicion: 86, posicionamiento: 84, remate: 82, aceleracion: 81 },
+      estimatedTraits: { velocidad: 81, calidad: 84, remate: 86, tiro: 82 },
       note: 'Goleador del torneo con 13 goles. Vendido a la Roma en 6,5 millones de dólares.',
     },
     {
       name: 'Gonzalo Belloso', position: 'SD', estimatedRating: 78,
-      estimatedTraits: { definicion: 80, tecnica: 79, vision: 78 },
+      estimatedTraits: { calidad: 78, remate: 80 },
     },
   ],
 };

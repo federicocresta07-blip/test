@@ -62,7 +62,7 @@ test('pero el bloque cerrado sufre con buenos extremos y centros', () => {
     p.position === 'ED' || p.position === 'EI' || p.position === 'LD' || p.position === 'LI'
       ? createPlayer({
           id: p.id, name: p.name, position: p.position,
-          attributes: attributesFor(p.position, 86, { centros: 90, regate: 90, velocidad: 90 }),
+          attributes: attributesFor(p.position, 86, { velocidad: 90, regate: 90, pase: 90 }),
         })
       : p,
   );

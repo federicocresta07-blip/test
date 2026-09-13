@@ -18,85 +18,31 @@ import { createPlayer, type Player } from '../domain/player.ts';
 import type { Position } from '../domain/positions.ts';
 import { preciseOverallForPosition } from '../ratings/overall.ts';
 
-/** Desvios tipicos por puesto respecto del nivel general del jugador. */
+/**
+ * Desvios tipicos por puesto respecto del nivel general del jugador.
+ *
+ * Al bajar a diez atributos estos desvios se PROMEDIARON, no se sumaron: son
+ * corrimientos sobre el nivel del jugador, no pesos de una media. Sumar los
+ * cuatro que colapsaban en `agresividad` habria convertido un +9 en un +36.
+ *
+ * Y despues se ESCALARON al 60%. Con veintinueve atributos un desvio de +14 se
+ * diluia entre muchos; con diez, cada atributo pesa el triple en el overall,
+ * asi que el mismo desvio salia disparado: un DC de nivel 76 quedaba con
+ * remate 91 y calidad 70, un especialista extremo que el generador no queria
+ * hacer. Se midio generando planteles y mirando la dispersion.
+ */
 const POSITION_PROFILE: Readonly<Record<Position, PartialAttributes>> = {
-  POR: {
-    reflejos: 12, manos: 10, achique: 6, saque: 2, agilidad: 6, posicionamiento: 8,
-    concentracion: 6, velocidad: -22, aceleracion: -20, regate: -30, definicion: -35,
-    remate: -30, marcaje: -25, quite: -25, centros: -25, juegoAereo: -6, tirosLibres: -15,
-    penales: -20, resistencia: -12, salto: 2, fuerza: 0, paseCorto: -8, paseLargo: -4,
-    tecnica: -12, control: -12, vision: -10, agresividad: -12, trabajoEquipo: -4, decisiones: 2,
-  },
-  DFC: {
-    marcaje: 12, quite: 10, juegoAereo: 12, fuerza: 10, salto: 9, posicionamiento: 8,
-    concentracion: 6, agresividad: 6, velocidad: -4, aceleracion: -6, regate: -16,
-    definicion: -20, remate: -12, centros: -14, vision: -10, tecnica: -8, control: -6,
-    paseCorto: -2, paseLargo: 0, tirosLibres: -12, penales: -14, agilidad: -8,
-    resistencia: 0, trabajoEquipo: 4, decisiones: 2,
-  },
-  LD: {
-    velocidad: 10, aceleracion: 10, resistencia: 12, centros: 10, marcaje: 4, quite: 4,
-    regate: 2, juegoAereo: -10, salto: -8, fuerza: -6, definicion: -16, remate: -10,
-    vision: -4, tirosLibres: -8, penales: -12, posicionamiento: 0, trabajoEquipo: 4,
-    concentracion: 0, agresividad: 2, tecnica: 0, control: 0, paseCorto: 0, paseLargo: -2,
-    agilidad: 4, decisiones: 0,
-  },
-  LI: {
-    velocidad: 10, aceleracion: 10, resistencia: 12, centros: 10, marcaje: 4, quite: 4,
-    regate: 2, juegoAereo: -10, salto: -8, fuerza: -6, definicion: -16, remate: -10,
-    vision: -4, tirosLibres: -8, penales: -12, posicionamiento: 0, trabajoEquipo: 4,
-    concentracion: 0, agresividad: 2, tecnica: 0, control: 0, paseCorto: 0, paseLargo: -2,
-    agilidad: 4, decisiones: 0,
-  },
-  MCD: {
-    quite: 12, marcaje: 8, posicionamiento: 8, resistencia: 8, paseCorto: 6, fuerza: 6,
-    concentracion: 6, trabajoEquipo: 8, agresividad: 4, decisiones: 4, velocidad: -6,
-    aceleracion: -6, regate: -8, definicion: -18, remate: -10, centros: -8, vision: 0,
-    tecnica: -2, control: 0, paseLargo: 2, juegoAereo: 2, salto: 0, tirosLibres: -6,
-    penales: -10, agilidad: -4,
-  },
-  MC: {
-    paseCorto: 10, vision: 10, tecnica: 8, control: 8, decisiones: 8, paseLargo: 6,
-    resistencia: 6, trabajoEquipo: 6, quite: 2, regate: 2, marcaje: -4, juegoAereo: -10,
-    salto: -8, fuerza: -4, velocidad: -4, aceleracion: -4, definicion: -10, remate: -2,
-    centros: -2, posicionamiento: 0, concentracion: 2, agresividad: -2, tirosLibres: 2,
-    penales: -2, agilidad: 0,
-  },
-  MCO: {
-    vision: 12, tecnica: 12, control: 10, paseCorto: 10, regate: 10, decisiones: 6,
-    remate: 4, tirosLibres: 6, agilidad: 6, definicion: 0, marcaje: -18, quite: -14,
-    fuerza: -10, juegoAereo: -12, salto: -10, resistencia: -4, concentracion: -2,
-    agresividad: -8, trabajoEquipo: -2, velocidad: 0, aceleracion: 2, centros: 4,
-    paseLargo: 4, posicionamiento: 0, penales: 4,
-  },
-  ED: {
-    regate: 14, velocidad: 14, aceleracion: 14, agilidad: 10, centros: 10, tecnica: 8,
-    control: 6, definicion: 2, remate: 0, vision: 2, marcaje: -18, quite: -16,
-    fuerza: -10, juegoAereo: -14, salto: -8, concentracion: -4, agresividad: -6,
-    resistencia: 2, trabajoEquipo: -2, posicionamiento: -2, paseCorto: 0, paseLargo: -4,
-    tirosLibres: 0, penales: 0, decisiones: 0,
-  },
-  EI: {
-    regate: 14, velocidad: 14, aceleracion: 14, agilidad: 10, centros: 10, tecnica: 8,
-    control: 6, definicion: 2, remate: 0, vision: 2, marcaje: -18, quite: -16,
-    fuerza: -10, juegoAereo: -14, salto: -8, concentracion: -4, agresividad: -6,
-    resistencia: 2, trabajoEquipo: -2, posicionamiento: -2, paseCorto: 0, paseLargo: -4,
-    tirosLibres: 0, penales: 0, decisiones: 0,
-  },
-  SD: {
-    definicion: 12, posicionamiento: 10, control: 8, tecnica: 8, regate: 8, aceleracion: 8,
-    remate: 6, velocidad: 6, vision: 4, marcaje: -20, quite: -18, juegoAereo: -6,
-    salto: -4, fuerza: -4, concentracion: -2, agresividad: -4, trabajoEquipo: -4,
-    resistencia: -2, paseCorto: 0, paseLargo: -6, centros: -6, tirosLibres: -2,
-    penales: 4, decisiones: 2, agilidad: 4,
-  },
-  DC: {
-    definicion: 14, posicionamiento: 12, remate: 10, juegoAereo: 10, fuerza: 8, salto: 8,
-    velocidad: 6, aceleracion: 6, marcaje: -22, quite: -20, vision: -6, paseLargo: -10,
-    centros: -10, regate: 0, tecnica: 2, control: 2, paseCorto: -4, concentracion: 0,
-    agresividad: 0, trabajoEquipo: -4, resistencia: -2, tirosLibres: -4, penales: 8,
-    decisiones: 0, agilidad: 0,
-  },
+  POR: { velocidad: -7, resistencia: -7, agresividad: -2, calidad: -3, remate: -21, regate: -18, pase: -7, tiro: -13, entradas: -15, portero: 5 },
+  DFC: { velocidad: -4, agresividad: 5, calidad: -1, remate: -12, regate: -10, pase: -3, tiro: -8, entradas: 6 },
+  LD: { velocidad: 5, resistencia: 7, agresividad: -4, remate: -10, regate: 1, pase: 2, tiro: -6, entradas: 2 },
+  LI: { velocidad: 5, resistencia: 7, agresividad: -4, remate: -10, regate: 1, pase: 2, tiro: -6, entradas: 2 },
+  MCD: { velocidad: -3, resistencia: 5, agresividad: 2, calidad: 2, remate: -11, regate: -5, tiro: -5, entradas: 5 },
+  MC: { velocidad: -2, resistencia: 4, agresividad: -4, calidad: 4, remate: -6, regate: 1, pase: 3, tiro: -1, entradas: -1 },
+  MCO: { velocidad: 2, resistencia: -2, agresividad: -6, calidad: 4, regate: 6, pase: 4, tiro: 3, entradas: -7 },
+  ED: { velocidad: 8, resistencia: 1, agresividad: -6, calidad: 1, remate: 1, regate: 8, pase: 1, entradas: -7 },
+  EI: { velocidad: 8, resistencia: 1, agresividad: -6, calidad: 1, remate: 1, regate: 8, pase: 1, entradas: -7 },
+  SD: { velocidad: 4, resistencia: -1, agresividad: -2, calidad: 2, remate: 7, regate: 5, pase: -2, tiro: 2, entradas: -5 },
+  DC: { velocidad: 2, resistencia: -1, agresividad: 4, calidad: -1, remate: 8, pase: -5, tiro: 3, entradas: -6 },
 };
 
 export type SquadShape = {
@@ -250,8 +196,9 @@ function compose(
   const out: PartialAttributes = {};
   const isGk = position === 'POR';
   for (const key of ATTRIBUTE_KEYS) {
-    const isGkAttribute = key === 'reflejos' || key === 'manos' || key === 'achique' || key === 'saque';
-    if (isGkAttribute && !isGk) {
+    // El unico atributo de arquero. Un jugador de campo lo tiene bajo y no
+    // entra en su overall.
+    if (key === 'portero' && !isGk) {
       out[key] = 12;
       continue;
     }

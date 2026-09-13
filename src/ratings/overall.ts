@@ -2,9 +2,19 @@
  * Calculo del overall segun la posicion (seccion 25).
  *
  * No hay una unica formula: cada posicion tiene su tabla de pesos. Un DC vive
- * de definicion, posicionamiento y velocidad; un DFC de marcaje, quite, fuerza
- * y juego aereo. Los pesos se normalizan, asi que se pueden editar libremente
- * sin preocuparse por que sumen exactamente 1.
+ * del remate, la velocidad y el empuje; un DFC de las entradas y la
+ * agresividad. Los pesos se normalizan, asi que se pueden editar libremente
+ * sin preocuparse por que sumen exactamente 100.
+ *
+ * SOBRE LA BAJA A DIEZ ATRIBUTOS. Estas tablas tenian veintinueve claves.
+ * Al pasar a los diez de PC Futbol se fusionaron los pesos de los que
+ * colapsaban en el mismo atributo, y despues se reequilibraron a mano: la
+ * suma directa dejaba `calidad` en el 46% del overall de un MC, porque absorbio
+ * seis atributos viejos (tecnica, control, vision, decisiones, concentracion y
+ * trabajo de equipo). Un atributo que pesa casi la mitad vuelve irrelevantes a
+ * los otros nueve.
+ *
+ * Cada tabla suma 100 para que el peso se lea como porcentaje.
  */
 
 import type { AttributeKey, Attributes } from '../domain/attributes.ts';
@@ -18,192 +28,29 @@ export type AttributeWeights = Partial<Record<AttributeKey, number>>;
  * Leer cada bloque como "que hace importante a un jugador en este puesto".
  */
 export const POSITION_WEIGHTS: Readonly<Record<Position, AttributeWeights>> = {
-  POR: {
-    reflejos: 20,
-    manos: 16,
-    posicionamiento: 14,
-    achique: 11,
-    concentracion: 10,
-    agilidad: 9,
-    decisiones: 8,
-    saque: 5,
-    juegoAereo: 4,
-    salto: 3,
-    paseCorto: 2,
-    fuerza: 2,
-  },
-  DFC: {
-    marcaje: 17,
-    quite: 15,
-    posicionamiento: 14,
-    fuerza: 11,
-    juegoAereo: 11,
-    concentracion: 10,
-    salto: 6,
-    decisiones: 6,
-    velocidad: 4,
-    aceleracion: 3,
-    paseCorto: 3,
-    control: 2,
-    paseLargo: 2,
-    agresividad: 2,
-    trabajoEquipo: 2,
-    resistencia: 2,
-  },
-  LD: {
-    velocidad: 12,
-    aceleracion: 10,
-    resistencia: 10,
-    marcaje: 11,
-    quite: 10,
-    posicionamiento: 9,
-    centros: 9,
-    paseCorto: 6,
-    control: 5,
-    concentracion: 5,
-    fuerza: 4,
-    regate: 4,
-    tecnica: 3,
-    decisiones: 3,
-    trabajoEquipo: 3,
-    juegoAereo: 2,
-  },
-  LI: {
-    velocidad: 12,
-    aceleracion: 10,
-    resistencia: 10,
-    marcaje: 11,
-    quite: 10,
-    posicionamiento: 9,
-    centros: 9,
-    paseCorto: 6,
-    control: 5,
-    concentracion: 5,
-    fuerza: 4,
-    regate: 4,
-    tecnica: 3,
-    decisiones: 3,
-    trabajoEquipo: 3,
-    juegoAereo: 2,
-  },
-  MCD: {
-    quite: 15,
-    marcaje: 12,
-    posicionamiento: 13,
-    paseCorto: 11,
-    decisiones: 10,
-    concentracion: 8,
-    resistencia: 7,
-    fuerza: 6,
-    trabajoEquipo: 5,
-    vision: 5,
-    paseLargo: 4,
-    control: 4,
-    tecnica: 3,
-    juegoAereo: 3,
-    agresividad: 2,
-  },
-  MC: {
-    paseCorto: 15,
-    vision: 13,
-    decisiones: 12,
-    tecnica: 10,
-    control: 10,
-    paseLargo: 8,
-    posicionamiento: 6,
-    resistencia: 6,
-    quite: 5,
-    concentracion: 5,
-    regate: 5,
-    marcaje: 4,
-    trabajoEquipo: 4,
-    velocidad: 4,
-    fuerza: 3,
-    aceleracion: 2,
-    remate: 2,
-    definicion: 2,
-    agilidad: 1,
-  },
-  MCO: {
-    vision: 15,
-    paseCorto: 13,
-    tecnica: 12,
-    control: 11,
-    regate: 10,
-    decisiones: 9,
-    remate: 6,
-    definicion: 5,
-    aceleracion: 5,
-    agilidad: 4,
-    paseLargo: 4,
-    posicionamiento: 4,
-    velocidad: 3,
-    tirosLibres: 2,
-    resistencia: 2,
-  },
-  ED: {
-    regate: 14,
-    aceleracion: 13,
-    velocidad: 13,
-    tecnica: 10,
-    control: 9,
-    centros: 9,
-    agilidad: 7,
-    definicion: 6,
-    vision: 5,
-    decisiones: 4,
-    paseCorto: 4,
-    resistencia: 4,
-    remate: 3,
-    posicionamiento: 3,
-  },
-  EI: {
-    regate: 14,
-    aceleracion: 13,
-    velocidad: 13,
-    tecnica: 10,
-    control: 9,
-    centros: 9,
-    agilidad: 7,
-    definicion: 6,
-    vision: 5,
-    decisiones: 4,
-    paseCorto: 4,
-    resistencia: 4,
-    remate: 3,
-    posicionamiento: 3,
-  },
-  SD: {
-    definicion: 15,
-    posicionamiento: 12,
-    control: 10,
-    tecnica: 10,
-    aceleracion: 9,
-    remate: 8,
-    regate: 8,
-    velocidad: 7,
-    vision: 6,
-    decisiones: 6,
-    paseCorto: 4,
-    agilidad: 3,
-    juegoAereo: 2,
-  },
-  DC: {
-    definicion: 20,
-    posicionamiento: 15,
-    remate: 11,
-    velocidad: 9,
-    aceleracion: 9,
-    tecnica: 7,
-    control: 7,
-    juegoAereo: 7,
-    decisiones: 6,
-    fuerza: 5,
-    salto: 4,
-    regate: 4,
-    vision: 3,
-    concentracion: 2,
-  },
+  // El arquero tiene un solo atributo de puesto, asi que pesa mucho por
+  // definicion. Lo demas es lo poco que PC Futbol permite distinguir: si sale
+  // rapido del arco y si juega bien con los pies.
+  POR: { portero: 62, calidad: 18, velocidad: 10, agresividad: 6, pase: 4 },
+
+  DFC: { entradas: 38, agresividad: 26, calidad: 18, velocidad: 10, pase: 5, resistencia: 3 },
+
+  LD: { entradas: 26, velocidad: 22, pase: 17, calidad: 17, resistencia: 9, regate: 5, agresividad: 4 },
+  LI: { entradas: 26, velocidad: 22, pase: 17, calidad: 17, resistencia: 9, regate: 5, agresividad: 4 },
+
+  MCD: { entradas: 34, calidad: 28, pase: 16, agresividad: 12, resistencia: 8, velocidad: 2 },
+
+  MC: { calidad: 34, pase: 26, entradas: 14, resistencia: 8, velocidad: 7, regate: 6, tiro: 3, agresividad: 2 },
+
+  MCO: { calidad: 33, pase: 21, regate: 14, velocidad: 11, tiro: 9, remate: 6, entradas: 4, resistencia: 2 },
+
+  ED: { velocidad: 29, calidad: 22, regate: 18, pase: 14, remate: 8, tiro: 4, resistencia: 4, entradas: 1 },
+  EI: { velocidad: 29, calidad: 22, regate: 18, pase: 14, remate: 8, tiro: 4, resistencia: 4, entradas: 1 },
+
+  SD: { remate: 22, calidad: 24, velocidad: 19, regate: 12, tiro: 10, pase: 7, entradas: 4, agresividad: 2 },
+
+  // El 9 clasico: el remate primero, y el empuje fisico para ganar la posicion.
+  DC: { remate: 28, calidad: 20, velocidad: 18, agresividad: 16, tiro: 12, regate: 4, entradas: 2 },
 };
 
 /**

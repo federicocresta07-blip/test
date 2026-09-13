@@ -39,7 +39,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 310 tests
+npm test           # 311 tests
 ```
 
 Requiere Node 22.18 o superior.
@@ -197,8 +197,8 @@ mueven — ninguna es azar puro:
 
 **La edad.** Un pibe de 18 crece rápido, a los 27 se estanca, después de los 31
 empieza a perder. Y no pierde todo junto: primero se va lo físico. Un 5 de 33
-sigue mejorando el posicionamiento mientras le baja la velocidad, y eso es lo
-que hace que un veterano siga sirviendo.
+sigue mejorando las entradas y la calidad mientras le baja la velocidad, y eso
+es lo que hace que un veterano siga sirviendo.
 
 **El techo.** Se crece hacia el potencial, no sin límite. El potencial por
 defecto ahora sale de `defaultPotential(overall, edad, id)`: mucho margen a los
@@ -217,12 +217,16 @@ Medido sobre una temporada de 19 fechas (unas 22 semanas):
 
 | Jugador | Gana |
 |---|---|
-| Juvenil de 17 con margen, jugando, entrenador ★4 | **+11** de overall |
+| Juvenil de 17 con margen, jugando, entrenador ★4 | **+13** de overall |
 | El mismo sin entrenador | +9 |
-| El mismo sin jugar | +6 |
-| Titular de 22 con algo de margen | +5 |
+| El mismo sin jugar | +7 |
+| Titular de 22 con algo de margen | +4 |
 | Jugador de 27 o más en su techo | 0 |
-| Veterano de 34 | −3 de físico, −1 de cabeza |
+| Veterano de 34 | −2 de físico, y el resto casi quieto |
+
+Los números se volvieron a medir después de bajar el motor a diez atributos: el
+crecimiento se reparte entre menos atributos, así que el overall se mueve algo
+más por la misma cantidad de trabajo.
 
 ### Muerte por redondeo
 
@@ -669,47 +673,121 @@ Córdoba, Bermúdez, Samuel, Riquelme de 20 y Palermo.
 Cómo se extrajo está en [`docs/pcf_data_format.md`](pcf_data_format.md); acá
 va sólo lo que hizo falta para que el motor los pueda jugar.
 
-### Diez atributos contra veintinueve
+### Diez atributos, los del archivo y ninguno más
 
-PC Fútbol guarda diez atributos por jugador; el motor usa veintinueve. Así que
-**diez se toman del archivo sin tocarlos** y **diecinueve se derivan**:
+El motor tenía **veintinueve** atributos. Los planteles salen de un archivo que
+guarda **diez**, así que diecinueve se derivaban de los que sí estaban:
+`vision` de calidad, `centros` de pase, `manos` de portero, el juego aéreo de
+la agresividad y la altura.
 
-| Del archivo, sin tocar | Derivado de |
+Esa capa era la parte más débil del proyecto. Diecinueve números por jugador
+que parecían datos y eran nuestra estimación, sin ninguna forma de verificarlos
+contra nada: no existe fuente que diga cuál era la `concentracion` de Berizzo.
+
+**Se bajó el motor a los diez de PC Fútbol**, con sus nombres y su orden:
+
+| | |
 |---|---|
-| `velocidad`, `resistencia`, `agresividad` | — |
-| `tecnica` ← calidad | `vision`, `decisiones`, `trabajoEquipo`, `control` |
-| `regate`, `paseCorto` ← pase | `centros`, `paseLargo` |
-| `definicion` ← remate | `penales` |
-| `remate` ← tiro | `tirosLibres` |
-| `quite` y `marcaje` ← entradas | `posicionamiento`, `concentracion` (en puestos defensivos) |
-| `reflejos` ← portero | `manos`, `achique`, `saque` |
+| Físicos | `velocidad` (VE), `resistencia` (RE), `agresividad` (AG) |
+| Con la pelota | `calidad` (CA), `remate` (RM), `regate` (RG), `pase` (PA), `tiro` (TI) |
+| Defensivos | `entradas` (EN) |
+| Arquero | `portero` (PO) |
 
-`pcf-bridge.ts` declara atributo por atributo cuál es cuál, y un test verifica
-que la lista cubra exactamente los veintinueve del motor: si mañana se agrega
-un atributo al motor y nadie dice de dónde sale, el test lo dice.
+`attributesFromPcf` quedó siendo una **identidad**: acota a la escala 1..100 y
+devuelve. No hay nada derivado, y un test lo fija — si algún día vuelve a
+aparecer un atributo derivado, avisa.
+
+#### Qué se perdió, y es un costo real
+
+Los veintinueve distinguían cosas que estos diez no:
+
+- **El juego aéreo ya no es un atributo.** Un central que salta y uno que no
+  saltan igual; lo más cercano que guarda el archivo es la agresividad.
+- **Los tiros libres y los penales no se separan de la potencia de disparo**:
+  los tres son `tiro`.
+- **El arquero tiene un solo número.** Antes tenía reflejos, manos, achique y
+  saque por separado, así que podía ser seguro abajo y flojo por arriba.
+- **La concentración, las decisiones, la visión y el trabajo de equipo**
+  desaparecen dentro de `calidad`. Un volante lúcido y uno técnico pero
+  desatento ya no se distinguen.
+
+`ATTRIBUTE_ABSORBED`, en `src/domain/attributes.ts`, dice qué absorbió cada
+uno. Cada fila de esa tabla es una decisión de modelado, no un hecho, y está
+ahí para poder discutirla.
+
+#### Las mecánicas que hubo que repensar, no renombrar
+
+Bajar de veintinueve a diez no es buscar y reemplazar. Dos casos donde el
+reemplazo mecánico daba algo sin sentido:
+
+- **La ubicación en el área.** El viejo `posicionamiento` colapsó en
+  `entradas`, que para un delantero no significa nada. Donde medía "sabe
+  ubicarse en el área" ahora pesan la calidad y la velocidad.
+- **Los desvíos por puesto del generador de planteles.** Los cuatro desvíos que
+  colapsaban en `agresividad` se **promediaron**, no se sumaron (sumarlos
+  convertía un +9 en un +36), y después se escalaron al 60%: con diez
+  atributos cada uno pesa el triple en el overall, así que el mismo desvío
+  salía disparado y un DC de nivel 76 quedaba con remate 91 y calidad 70.
+
+#### El plan de entrenamiento perdió un foco y ganó otro
+
+Los grupos de atributos eran cinco: físico, técnico, mental, defensivo y
+arquero. El **foco mental ya no existe** — no hay atributo mental que entrenar,
+así que el plan "Mental" no habría movido nada, y un plan de entrenamiento que
+no mueve nada es peor que no tenerlo. En su lugar el foco **ofensivo**, que
+antes era un bonus pegado al grupo técnico, pasó a ser un grupo de verdad:
+`remate` y `tiro`.
+
+El profesionalismo del jugador —cuánto se cuida, cuánto rinde el
+entrenamiento— salía de `concentracion` y `trabajoEquipo`. Ahora sale de
+`calidad`, que es el atributo de clase del archivo.
+
+#### Tres tests cambiaron de premisa, no de umbral
+
+Bajar de veintinueve a diez rompió tests, y en tres casos lo que estaba mal era
+el test, no el código:
+
+- **El "especialista".** El fixture le ponía dos atributos altos (`remate` 94 y
+  otro). Con diez atributos, dos de los tres pesos grandes de un DC ya es un
+  delantero completo, no un especialista. Ahora es uno solo.
+- **`topFinisher` es un máximo del once**, y le suma a cada jugador su
+  corrimiento del día. Un extremo en racha le tapaba el máximo al 9 y el test
+  medía la forma en lugar del reparto de atributos. Se fija la condición del
+  plantel y queda medido lo que dice medir.
+- **"El resultado no depende sólo del overall"** comparaba dos planteles
+  distintos con tácticas distintas, así que el número que medía era en buena
+  parte la diferencia de plantel. Medido con **un solo plantel clonado** para
+  los dos lados, donde la diferencia de plantel es cero por construcción, el
+  efecto táctico es de 4 puntos de victorias locales y siempre para el mismo
+  lado. El test viejo daba 5 puntos con dos planteles, pero sólo 1,1 con uno:
+  pasaba por la razón equivocada.
 
 ### Cómo se verifica que el mapeo no deforma a nadie
 
 Con dos fórmulas que no se conocen entre sí. El motor calcula su overall por
-puesto con veintinueve pesos; PC Fútbol calcula su media con cuatro atributos.
-Si el mapeo estuviera mal, los dos números se despegarían.
+puesto con once tablas de pesos; PC Fútbol calcula su media con cuatro de los
+diez atributos. Siguen siendo dos cuentas distintas, así que su correlación
+sobre los 462 jugadores mide algo: que las tablas de pesos del motor no
+deformen el plantel.
 
-En los 409 jugadores de campo: **r = 0,85** y un sesgo global de −1,6 puntos.
+En los 409 jugadores de campo: **r = 0,87** y un sesgo global de **+0,5**
+puntos. Con veintinueve atributos daba r = 0,85 y −1,6: **el recorte mejoró la
+fidelidad**, que era de esperarse — lo que se fue era ruido nuestro.
 
 ### Los arqueros divergen, y la culpa es del juego original
 
-Con los arqueros la correlación cae a 0,66, y no es el mapeo: **la media de PC
-Fútbol no incluye el atributo `portero`**. Es `(velocidad + resistencia +
-agresividad + calidad) / 4`, así que para un arquero mide todo menos lo único
-que importa de su puesto. En el archivo hay arqueros con media 62 y `portero`
-19.
+Con los arqueros la correlación cae a 0,75 (con veintinueve atributos era
+0,66), y no es el mapeo: **la media de PC Fútbol no incluye el atributo
+`portero`**. Es `(velocidad + resistencia + agresividad + calidad) / 4`, así
+que para un arquero mide todo menos lo único que importa de su puesto. En el
+archivo hay arqueros con media 62 y `portero` 19.
 
-Eso se prueba **sin que el motor intervenga**: la correlación entre la media de
-PC Fútbol y su propio atributo `portero`, entre los 143 arqueros del archivo,
-ya es floja de por sí. El test lo afirma y avisa si algún día sube.
+Eso se prueba **sin que el motor intervenga**: entre los arqueros del archivo,
+la correlación entre la media de PC Fútbol y su propio atributo `portero` es
+0,45. El test lo afirma y avisa si algún día sube.
 
-El overall del motor, que sí es por puesto, es el número correcto ahí. Chilavert
-queda 91 por su `portero` 90, no a pesar de él.
+El overall del motor, que sí es por puesto, es el número correcto ahí.
+Chilavert queda 91 por su `portero` 90, no a pesar de él.
 
 ### Diecinueve roles contra once puestos
 
@@ -832,7 +910,7 @@ interfaz.
 
 ## Verificación
 
-**Tests automatizados** (`npm test`, 310 en total):
+**Tests automatizados** (`npm test`, 311 en total):
 
 - `tests/ui-logic.test.ts` — el puente con el motor, las alertas derivadas,
   el estado de preparación, la autoselección, el cambio de formación sin
@@ -844,17 +922,18 @@ interfaz.
   los clubes: ningún id inventado, ningún club en las dos listas ni en
   ninguna, y el archivo de cada escudo declarado existe.
 - `tests/pcf-bridge.test.ts` — el puente con los datos del Apertura 98: que el
-  mapeo cubra los 29 atributos del motor declarando el origen de cada uno, que
-  el overall siga a la media original en los jugadores de campo, que ningún
-  atributo derivado se salga de escala, que el arco no se mezcle con la cancha
-  y que el mapeo sea determinista.
+  mapeo cubra los diez atributos del motor declarando el origen de cada uno y
+  que **ninguno se derive**, que los diez lleguen intactos uno por uno, que el
+  overall siga a la media original en los jugadores de campo, que ninguno se
+  salga de escala, que el arco no se mezcle con la cancha y que el mapeo sea
+  determinista.
 - `tests/season.test.ts` — el fixture, la tabla y las estadísticas del torneo.
 - `tests/staff.test.ts` — entre otras cosas, el test de **honestidad**: un rol
   no puede declararse `implementado` sin un consumidor real que se mueva, y la
   fase que promete un rol pendiente tiene que existir en `plan.ts` y no estar
   entregada.
 
-**Flujos en el navegador** (`scripts/ui-smoke.mjs`, 20 comprobaciones): la
+**Flujos en el navegador** (`scripts/ui-smoke.mjs`, 21 comprobaciones): la
 navegación, el once completo, el cambio de formación conservando jugadores, el
 drag & drop del plantel a la cancha, las métricas actualizándose en vivo, el
 aviso de cambios sin guardar y la confirmación de guardado, la ficha rápida

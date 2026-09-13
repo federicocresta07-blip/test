@@ -108,7 +108,10 @@ export function foulWeight(rated: RatedPlayer): number {
   // El arquero practicamente no hace faltas.
   if (rated.position === 'POR') return 0.03;
   const a = rated.player.attributes;
-  const discipline = (a.agresividad * 0.6 + (100 - a.decisiones) * 0.2 + (100 - a.concentracion) * 0.2) / 100;
+  // La agresividad empuja a la falta y la calidad la evita: el jugador que
+  // lee bien llega al cruce sin necesidad de barrer. Las decisiones y la
+  // concentracion eran atributos propios y ahora estan dentro de la calidad.
+  const discipline = (a.agresividad * 0.6 + (100 - a.calidad) * 0.4) / 100;
   return 0.25 + discipline * 1.5 + rated.slot.defenseDuty * 0.6;
 }
 
