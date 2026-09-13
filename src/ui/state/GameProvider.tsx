@@ -19,7 +19,7 @@ import type { FacilityId } from '../../domain/facilities.ts';
 import type { StaffRole } from '../../domain/staff.ts';
 import type { GameState, LineupSelection, TrainingPlan } from '../models/index.ts';
 import { gameService } from '../services/index.ts';
-import type { OfferOutcome, PlayRoundReport } from '../services/types.ts';
+import type { OfferOutcome, PlayRoundReport, SeasonCloseReport } from '../services/types.ts';
 
 export type SaveState = 'limpio' | 'sin-guardar' | 'guardando' | 'guardado' | 'error';
 
@@ -54,6 +54,13 @@ export type MarketState = {
   readonly outcome: OfferOutcome | null;
 };
 
+/** Estado del cierre de temporada (fase 6). */
+export type SeasonCloseState = {
+  readonly pending: boolean;
+  readonly error: string | null;
+  readonly report: SeasonCloseReport | null;
+};
+
 export type GameContextValue = {
   readonly state: GameState | null;
   readonly loading: boolean;
@@ -71,6 +78,19 @@ export type GameContextValue = {
   readonly hireStaff: (role: StaffRole, candidateId: string, label: string) => Promise<void>;
   readonly upgradeFacility: (facilityId: FacilityId, label: string) => Promise<void>;
   readonly dismissInvestment: () => void;
+
+  /** Estadio y finanzas (seccion 9, fase 6). */
+  readonly setTicketPrice: (price: number) => Promise<void>;
+  readonly expandStadium: (seats: number, label: string) => Promise<void>;
+  /**
+   * Cierra la temporada y empieza la siguiente (fase 6).
+   *
+   * Deja el informe en `seasonClose` para poder mostrar quien se retiro y
+   * quien entro, que es lo unico que hace visible el paso del tiempo.
+   */
+  readonly closeSeason: () => Promise<void>;
+  readonly seasonClose: SeasonCloseState;
+  readonly dismissSeasonClose: () => void;
 
   /** Desarrollo del plantel (seccion 7, fase 4). */
   readonly saveTraining: (plan: TrainingPlan) => Promise<void>;
@@ -108,6 +128,11 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
     done: null,
   });
   const [round, setRound] = useState<RoundState>({ playing: false, error: null, report: null });
+  const [seasonClose, setSeasonClose] = useState<SeasonCloseState>({
+    pending: false,
+    error: null,
+    report: null,
+  });
   const [market, setMarket] = useState<MarketState>({
     pending: false,
     error: null,
@@ -227,6 +252,62 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
 
   const dismissInvestment = useCallback(
     () => setInvestment({ pending: false, error: null, done: null }),
+    [],
+  );
+
+  /**
+   * El precio de la entrada (fase 6).
+   *
+   * Recarga el estado porque el precio cambia la recaudacion proyectada, y con
+   * ella el presupuesto de fichajes: recomponerlo a mano seria pedir que se
+   * desincronice.
+   */
+  const setTicketPrice = useCallback(
+    async (price: number) => {
+      if (!state) return;
+      setInvestment({ pending: true, error: null, done: null });
+      try {
+        await gameService.setTicketPrice(state.club.id, price);
+        setState(await gameService.loadGame());
+        setInvestment({ pending: false, error: null, done: null });
+      } catch (cause: unknown) {
+        setInvestment({
+          pending: false,
+          error: cause instanceof Error ? cause.message : 'No se pudo cambiar el precio',
+          done: null,
+        });
+      }
+    },
+    [state],
+  );
+
+  const expandStadium = useCallback(
+    async (seats: number, label: string) => {
+      if (!state) return;
+      await invest(() => gameService.expandStadium(state.club.id, seats), label);
+    },
+    [invest, state],
+  );
+
+  const closeSeason = useCallback(async () => {
+    if (!state) return;
+    setSeasonClose({ pending: true, error: null, report: null });
+    try {
+      const report = await gameService.closeSeason(state.club.id);
+      setState(await gameService.loadGame());
+      setSaveState('limpio');
+      setSeasonClose({ pending: false, error: null, report });
+    } catch (cause: unknown) {
+      setSeasonClose({
+        pending: false,
+        error: cause instanceof Error ? cause.message : 'No se pudo cerrar la temporada',
+        report: null,
+      });
+    }
+  }, [state]);
+
+  const dismissSeasonClose = useCallback(
+    () => setSeasonClose({ pending: false, error: null, report: null }),
     [],
   );
 
@@ -384,6 +465,11 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
       hireStaff,
       upgradeFacility,
       dismissInvestment,
+      setTicketPrice,
+      expandStadium,
+      closeSeason,
+      seasonClose,
+      dismissSeasonClose,
       saveTraining,
       promoteYouth,
       market,
@@ -410,6 +496,11 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
       hireStaff,
       upgradeFacility,
       dismissInvestment,
+      setTicketPrice,
+      expandStadium,
+      closeSeason,
+      seasonClose,
+      dismissSeasonClose,
       saveTraining,
       promoteYouth,
       market,

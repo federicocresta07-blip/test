@@ -33,6 +33,7 @@ import {
 } from '../../data/apertura98.ts';
 import { playerFromApertura98 } from '../../data/pcf-bridge.ts';
 import { overallForPosition } from '../../ratings/overall.ts';
+import { reputationFromStadium } from '../../domain/stadium.ts';
 
 type Setup = {
   readonly clubId: string;
@@ -130,10 +131,18 @@ function squadStrength(players: readonly Player[]): number {
  * distinto que Platense con 7.500 y 12.657.
  */
 function reputationFromClub(club: Apertura98Club): number {
-  const members = club.members ?? 2000;
-  const capacity = club.capacity ?? 15000;
-  const scale = Math.log10(Math.max(members, 100)) * 12 + Math.log10(Math.max(capacity, 1000)) * 8;
-  return Math.max(10, Math.min(95, Math.round(scale * 1.35 - 45)));
+  // La cuenta esta en `domain/stadium.ts`, que es el unico lugar donde vive.
+  //
+  // Aca habia una segunda formula, con logaritmos, que daba EXACTAMENTE el
+  // mismo orden de los veinte clubes pero otros valores absolutos. Dos
+  // formulas para el mismo concepto es una fuente de verdad de mas: cuando la
+  // fase 6 necesito la reputacion para la television y el sponsor, esta se
+  // borro y quedo la del dominio.
+  return reputationFromStadium({
+    name: club.stadium ?? '',
+    capacity: club.capacity ?? 15_000,
+    members: club.members ?? 2_000,
+  });
 }
 
 const SQUAD_CACHE = new Map<string, readonly Player[]>();

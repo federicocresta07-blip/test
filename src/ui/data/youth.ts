@@ -44,6 +44,16 @@ export function buildYouthSquad(
   clubId: string,
   academyLevel: number,
   seed = 'camada-2026',
+  /**
+   * Cuantos anios lleva esta camada en el club (fase 6).
+   *
+   * Al cerrar la temporada los juveniles cumplen anios. En lugar de guardar la
+   * edad de cada uno, la camada se vuelve a generar igual y se le suman los
+   * anios transcurridos: el pibe es el mismo, un anio mas grande. El que pasa
+   * de `YOUTH_MAX_AGE` deja de estar en la lista, que es la consecuencia de no
+   * haberlo subido.
+   */
+  yearsElapsed = 0,
 ): readonly YouthPlayer[] {
   const shape = intakeShape(academyLevel);
   const rng = new Rng(`${seed}:${clubId}:${academyLevel}`);
@@ -51,7 +61,8 @@ export function buildYouthSquad(
 
   return Array.from({ length: shape.count }, (_, index) => {
     const position = YOUTH_POSITIONS[rng.int(YOUTH_POSITIONS.length)] as Position;
-    const age = rng.intBetween(15, 19);
+    const bornAge = rng.intBetween(15, 19);
+    const age = bornAge + yearsElapsed;
 
     // El potencial es el techo real. Sale de la camada, no de la edad: un pibe
     // de 15 y otro de 19 pueden tener el mismo techo, y el de 15 tiene mas
@@ -63,11 +74,11 @@ export function buildYouthSquad(
     );
 
     // El nivel de hoy: lejos de su techo, y mas lejos cuanto mas chico es.
-    const gap = clamp(Math.round(rng.boundedNormal(20 - (age - 15) * 2.5, 4, 2)), 4, 30);
+    const gap = clamp(Math.round(rng.boundedNormal(20 - (bornAge - 15) * 2.5, 4, 2)), 4, 30);
     const overall = clamp(potential - gap, 30, 80);
 
     const player: Player = createPlayer({
-      id: `${clubId}-juv-${index + 1}`,
+      id: `${clubId}-juv-${seed}-${index + 1}`,
       name: names[index] as string,
       position,
       age,
@@ -87,7 +98,7 @@ export function buildYouthSquad(
     return {
       player,
       origin: ORIGINS[rng.int(ORIGINS.length)] as string,
-      yearsAtClub: clamp(rng.intBetween(0, age - 13), 0, 6),
+      yearsAtClub: clamp(rng.intBetween(0, bornAge - 13) + yearsElapsed, 0, 8),
     };
   });
 }

@@ -25,7 +25,6 @@ import { LEAGUE_CLUB_IDS, leagueTeams, USER_CLUB_ID } from '../src/ui/data/leagu
 import { restDaysBefore, seasonTable, toUiFixtures } from '../src/ui/lib/season-bridge.ts';
 import {
   DEMO_FACILITIES,
-  DEMO_FINANCES,
   DEMO_PROJECTS,
   DEMO_STAFF,
   DEMO_VACANCIES,
@@ -44,6 +43,9 @@ import {
   teamMetrics,
 } from '../src/ui/lib/engine-bridge.ts';
 import { squadAlerts } from '../src/ui/lib/alerts.ts';
+import { financesOf, reputationOf } from '../src/ui/lib/stadium-bridge.ts';
+import { REFERENCE_TICKET_PRICE } from '../src/domain/stadium.ts';
+import { OPENING_CASH } from '../src/ui/data/club-development.ts';
 import { preparationStatus } from '../src/ui/lib/preparation.ts';
 import { NAVIGATION, findNavItem } from '../src/ui/router/navigation.ts';
 import type { GameState, LineupSelection } from '../src/ui/models/index.ts';
@@ -66,7 +68,19 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
       tactics: TACTICS,
       roles: { captainId: null, penaltiesId: null, freeKicksId: null, leftCornerId: null, rightCornerId: null },
     },
-    finances: DEMO_FINANCES,
+    // Las finanzas del fixture salen del MISMO calculo que las del juego: si
+    // se escribieran a mano aca, el test podria pasar con un balance que el
+    // dominio nunca produciria.
+    finances: financesOf({
+      clubId: 'river', builtSeats: 0, squad: DEMO_SQUAD, staff: DEMO_STAFF,
+      facilities: DEMO_FACILITIES, position: 7, clubsInLeague: 20, gates: [],
+      openingCash: OPENING_CASH, capitalSpent: 0, capitalReceived: 0, homeMatchesLeft: 9,
+    }),
+    stadium: {
+      name: 'Antonio Vespucio Liberti', capacity: 76_687, originalCapacity: 76_687,
+      builtSeats: 0, members: 63_000, ticketPrice: REFERENCE_TICKET_PRICE,
+      reputation: reputationOf('river'), gates: [],
+    },
     staff: DEMO_STAFF,
     vacancies: DEMO_VACANCIES,
     facilities: DEMO_FACILITIES,

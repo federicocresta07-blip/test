@@ -142,7 +142,7 @@ export function FacilitiesPage(): ReactNode {
       {state.projects.length > 0 && (
         <Panel
           title="Obras en curso"
-          subtitle="Información: el avance por semanas empieza a correr con el calendario, en la fase 7"
+          subtitle="Las semanas bajan al jugar cada fecha. La ampliación del estadio se encara en Club · Estadio"
         >
           <ul className="projectlist">
             {state.projects.map((project) => (

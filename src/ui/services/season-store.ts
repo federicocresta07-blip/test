@@ -53,6 +53,40 @@ export type SeasonSave = {
   readonly transfers?: readonly StoredTransfer[];
   /** Jugadores del club del manager puestos en el mercado (fase 5). */
   readonly listed?: readonly string[];
+  /** Recaudacion de cada partido de local ya jugado (fase 6). */
+  readonly gates?: readonly GateRecord[];
+  /** Temporadas cerradas: cuantas veces se paso de anio (fase 6). */
+  readonly seasonsClosed?: number;
+  /**
+   * Jugadores retirados, por id (fase 6).
+   *
+   * Hay que guardarlos porque el plantel se REGENERA del archivo en cada
+   * carga: si no estuviera esta lista, un jugador que se retiro a los 38
+   * volveria a aparecer en la temporada siguiente con 38 otra vez. Es la
+   * misma razon por la que se guardan los traspasos.
+   */
+  readonly retired?: readonly string[];
+};
+
+/**
+ * LA RECAUDACION DE UN PARTIDO JUGADO ES HISTORIA, NO ESTADO DERIVADO.
+ *
+ * Casi todo en este archivo se guarda porque no se puede recalcular. Esto
+ * tambien, y por una razon que no es obvia: la recaudacion depende del PRECIO
+ * DE LA ENTRADA, que el manager puede cambiar cuando quiera. Si se derivara,
+ * subir el precio en la fecha 15 reescribiria hacia atras lo que se recaudo en
+ * la fecha 3, y la historia del club cambiaria sola.
+ *
+ * Un partido cobrado es un hecho, igual que su resultado.
+ */
+export type GateRecord = {
+  readonly round: number;
+  readonly opponentId: string;
+  readonly attendance: number;
+  /** El precio que estaba vigente ese dia. */
+  readonly ticketPrice: number;
+  /** Lo que le quedo al club, ya descontada la parte del visitante. */
+  readonly total: number;
 };
 
 /**
@@ -87,7 +121,7 @@ export type StoredTransfer = {
   readonly round: number;
 };
 
-export const SEASON_VERSION = 1;
+export const SEASON_VERSION = 2;
 export const DEFAULT_SEASON_SEED = 'clausura-2026';
 
 export function emptySeason(seed = DEFAULT_SEASON_SEED): SeasonSave {
@@ -104,6 +138,9 @@ export function emptySeason(seed = DEFAULT_SEASON_SEED): SeasonSave {
     offers: [],
     transfers: [],
     listed: [],
+    gates: [],
+    seasonsClosed: 0,
+    retired: [],
   };
 }
 
@@ -131,6 +168,9 @@ export function readSeason(): SeasonSave {
       offers: parsed.offers ?? [],
       transfers: parsed.transfers ?? [],
       listed: parsed.listed ?? [],
+      gates: parsed.gates ?? [],
+      seasonsClosed: parsed.seasonsClosed ?? 0,
+      retired: parsed.retired ?? [],
     };
   } catch {
     return emptySeason();

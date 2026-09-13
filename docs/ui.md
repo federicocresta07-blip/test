@@ -1,8 +1,7 @@
 # Interfaz web — diseño y estado
 
 Prototipo de la interfaz del juego, construido sobre el master prompt de UI
-v0.2. El plan es incremental y por fases: **entregadas las fases 0 a 5 y la
-7**. La sección 22 pedía empezar por las fases 0 a 2; el resto avanza de a una
+v0.2. El plan es incremental y por fases: **entregadas las fases 0 a 7**. La sección 22 pedía empezar por las fases 0 a 2; el resto avanza de a una
 fase por entrega. La 7 se adelantó a pedido: es la que permite jugar los
 partidos, y sin ella el resto del juego no se puede probar.
 
@@ -22,13 +21,14 @@ tres lugares y se desincronizó: ver más abajo.
 | **3** | Staff, desarrollo e instalaciones | **Entregada** (incluye contratación y mejora reales, y la bandeja completa) |
 | **4** | Inferiores, Scouting y Entrenamiento | **Entregada** (el motor ya hace crecer los atributos de un jugador) |
 | **5** | Mercado y negociaciones | **Entregada** (buscador, transferibles, ofertas en los dos sentidos e historial; el valor y el sueldo se calculan) |
+| **6** | Estadio y finanzas | **Entregada** (recaudación por partido, precio de entrada, ampliación del estadio, balance derivado y cierre de temporada) |
 | **7** | Competición y resultado de partido | **Entregada** (el torneo se juega de verdad: fixture, tabla, goleadores, ficha de partido, rivales y noticias) |
-| 6 | Estadio y finanzas | Pendiente |
 | 8 | Hardening y preparación para backend real | Pendiente |
 
-Los 2 módulos pendientes están en la navegación con su página propia, que
-dice qué va a hacer y en qué fase se construye. Ninguno tiene botones que
-finjan funcionar: la página pendiente no tiene un solo botón.
+Ya no queda ninguna pantalla de la navegación sin construir. La página de
+módulo pendiente sigue existiendo para la fase 8, que no tiene pantalla
+propia: es backend real, tests automatizados de interfaz y el riesgo de lesión
+por equipo.
 
 ---
 
@@ -39,7 +39,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # build de producción
 npm run typecheck  # motor + UI, por separado
-npm test           # 311 tests
+npm test           # 358 tests
 ```
 
 Requiere Node 22.18 o superior.
@@ -908,9 +908,182 @@ interfaz.
 
 ---
 
+## Estadio y finanzas (fase 6)
+
+### El estadio es dato real; la asistencia es nuestro modelo
+
+`EQ003003.PKF` guarda por club el **aforo del estadio y la cantidad de
+socios**. River con 76.687 y 63.000; Platense con 12.657 y 7.500; Huracán con
+48.314 de cancha y 9.800 socios. Esa diferencia es del archivo, y es lo que
+hace que dos clubes de la misma división vivan economías distintas.
+
+Lo que **no** existe en ninguna fuente es la asistencia partido por partido del
+Apertura 98, así que eso es un modelo y va declarado como tal. Arranca del piso
+de socios —el que paga la cuota va— y encima suma gente que decide según el
+rival, la posición en la tabla, la racha, la importancia del partido y el
+precio de la entrada. Con un techo que no se discute: el aforo.
+
+**El socio no paga entrada.** Paga la cuota todos los meses y por eso entra. Es
+lo que hace que un club con muchos socios tenga ingreso estable y uno con pocos
+dependa de llenar la cancha, que es exactamente como funcionaba.
+
+Y la **reputación** del club, que decide el reparto de televisión y el sponsor,
+sale de esos dos números del archivo. Los socios pesan más que el aforo: una
+cancha grande y vacía no hace grande a un club, y por eso Lanús (30.500 de
+aforo, 24.635 socios) queda por encima de Huracán.
+
+### El precio de la entrada tiene filo
+
+Es la decisión económica más directa del manager, y **no es un deslizador que
+siempre conviene subir**: más caro recauda más por persona y puede recaudar
+menos en total. La pantalla dibuja la curva completa con el mismo modelo que va
+a cobrar el domingo, así que la decisión se toma mirando y no adivinando. Un
+test exige que la curva tenga **máximo interior**: si el mejor precio fuera
+siempre el más alto o el más bajo, la decisión no existiría.
+
+### Nada declarado que se pueda derivar
+
+Las finanzas eran **cinco constantes escritas a mano**:
+
+```
+cash: 418_500_000, transferBudget: 140_000_000, wageBill: 96_300_000,
+monthlyIncome: 182_400_000, monthlyExpenses: 151_700_000
+```
+
+El problema no era que estuvieran mal, era que no podían estar bien: se
+ampliaba el estadio y el ingreso no se movía, o se vendía a medio plantel y el
+presupuesto de fichajes quedaba igual.
+
+Ahora lo único escrito a mano es `OPENING_CASH`, la caja con la que arranca la
+partida, que no se puede calcular de nada. Todo lo demás sale de
+`domain/finances.ts`, línea por línea, **y cada línea trae de dónde viene**.
+Eso último no es decorado: un test recorre el balance y falla si alguna línea
+no explica su número, que es lo único que impide que las constantes vuelvan.
+
+| Línea | De dónde sale |
+|---|---|
+| Cuota social | socios del archivo × cuota |
+| Recaudación | los partidos de local **que se jugaron** |
+| Televisión | reparto por reputación, con piso para todos |
+| Sponsor | reputación y posición en la tabla |
+| Sueldos del plantel | suma de los contratos |
+| Sueldos del cuerpo técnico | suma de los contratos |
+| Mantenimiento | nivel de cada instalación, más los asientos construidos |
+| Presupuesto de fichajes | caja − colchón + parte del superávit proyectado |
+
+### La recaudación de un partido jugado es historia, no estado derivado
+
+Casi todo en el guardado de la temporada está ahí porque no se puede
+recalcular. La recaudación también, y por una razón que no es obvia: depende
+del **precio de la entrada**, que el manager cambia cuando quiere. Si se
+derivara, subir el precio en la fecha 15 reescribiría hacia atrás lo que se
+recaudó en la fecha 3 y la historia del club cambiaría sola. Un partido cobrado
+es un hecho, igual que su resultado.
+
+### Las dos escalas de plata
+
+El error más grande de esta fase, y lo encontró un test. La primera versión usó
+**precios de 1998** —entrada a 25 pesos, cuota de 12— mientras el mercado de la
+fase 5 ya valuaba a Aimar en 111 millones con un sueldo de 4,6 por mes.
+Resultado: la recaudación de un partido daba 700 mil contra una masa salarial
+de 120 millones. El club quedaba fundido por un factor de treinta y el
+presupuesto de fichajes era cero para siempre.
+
+Ninguno de los dos modelos estaba mal por dentro: **estaban en escalas
+distintas**. Se eligió la del mercado, que ya estaba y ya se mostraba, y los
+números del estadio se recalcularon contra ella. Hoy River gana unos 160
+millones por mes con la cancha llena y paga 121 de sueldos, que es la relación
+que hace que las dos cosas sean comparables. Un test fija esa relación en las
+dos direcciones: si los ingresos no alcanzaran para los sueldos el club sería
+injugable, y si los empequeñecieran, fichar sería gratis.
+
+### El cierre de temporada: la deuda más vieja del proyecto
+
+`ageUp` estaba en el motor desde la fase 4 y **nadie lo llamaba**. Se podía
+terminar el torneo y empezar otro, pero nadie cumplía un año: Aimar tenía 18
+para siempre, Astrada no se retiraba nunca y los juveniles se quedaban en
+inferiores hasta el final de los tiempos. Sin paso del tiempo no hay carrera de
+manager, y las inferiores, el scouting y el mercado son adornos porque nunca
+hace falta reemplazar a nadie.
+
+Cerrar la temporada ahora hace cuatro cosas, y es irreversible:
+
+1. **Todos cumplen un año**, plantel e inferiores.
+2. **Los veteranos se retiran.** No a una edad fija: depende de la edad y de lo
+   que todavía rinden. Un 5 de 36 que sigue siendo el mejor del plantel juega
+   otra temporada; uno de 36 que ya no entra, cuelga.
+3. **A los juveniles se les termina el tiempo.** El que pasa de 20 y no fue
+   promovido se va libre: es la consecuencia de no haberlo subido.
+4. **Entra una camada nueva**, que la produce la academia, así que su nivel se
+   ve de una temporada a la otra.
+
+Medido sobre seis cierres seguidos con el plantel real de River: la edad media
+sube de 24,0 a 28,7 y el plantel se achica de 27 a 22 jugadores, con retiros
+que caen donde tienen que caer (Hernán Díaz a los 34, Burgos a los 33, Astrada
+a los 33). Eso es el bucle que convierte "jugar un torneo" en "dirigir un
+club", y hay un test que lo recorre.
+
+Las edades **no se guardan por jugador**: se guarda un solo número, cuántas
+temporadas se cerraron, y el resto se deriva. Lo que sí se guarda es quién se
+retiró, porque el plantel se regenera del archivo en cada carga y sin esa lista
+el que colgó los botines volvería el año siguiente.
+
+### Y el entrenador juvenil decía una mentira
+
+`staff.ts` declaraba que el efecto del **entrenador juvenil** se consume en "el
+desarrollo de los atributos de sus jugadores, fecha a fecha", y hasta esta fase
+eso era falso: la camada se regeneraba idéntica en cada carga, así que ningún
+juvenil mejoraba nunca y el rol no movía nada. El test de honestidad no lo
+agarró porque verifica que el rol *declare* un consumidor, no que el consumidor
+exista de verdad.
+
+El cierre de temporada lo dejó a la vista, porque ahora un pibe se queda hasta
+cinco años en inferiores. Los juveniles se desarrollan con **el mismo
+`developPlayer`** que el plantel profesional —tener dos formas de hacer crecer a
+un jugador sería tener dos fuentes de verdad— con los minutos de inferiores y
+el efecto de su entrenador. Un juvenil de 16 con techo 67 llega a 67 a los 20.
+
+Y ahí apareció otro error mío: pedirle al motor **cuatro temporadas de una sola
+vez**. `developPlayer` mide el margen contra el potencial una vez por llamada,
+así que crecía como si el margen del primer día durara los cuatro años y un
+juvenil de potencial 66 terminaba en 74, por encima de su propio techo. Se
+aplica año por año y el techo se respeta. Hay un test.
+
+### Cuatro errores que sólo aparecieron jugándolo
+
+Los tests pasaban y las pantallas estaban mal. Vale anotarlos:
+
+- **La curva de precios daba "$5" como mejor precio.** La lista de precios de
+  la pantalla había quedado en la escala vieja, entera por debajo del mínimo
+  nuevo: las once barras valían lo mismo y el máximo caía en la primera. Ahora
+  los precios se reparten por el rango real en lugar de estar escritos a mano.
+- **Mover el precio no cambiaba nada.** La previsión tomaba el punto más
+  cercano de la curva en lugar de calcular con el precio elegido, así que el
+  deslizador parecía muerto hasta cruzar el punto medio entre dos barras.
+- **Ninguna ampliación se podía pagar.** A 1,4 millones el asiento, la obra más
+  chica salía casi tres mil millones contra una caja de 419: la pantalla era
+  decorado. Recalibrado, la de 2.000 asientos entra en la primera temporada.
+- **El informe del cierre no se veía nunca.** Estaba dentro del bloque "el
+  torneo terminó", y cerrar la temporada hace que el torneo ya no esté
+  terminado, así que el bloque desaparecía con el informe adentro.
+
+Y uno más, del código y no de la pantalla: la **curva calculaba la reputación
+del rival con nuestro propio estadio**, así que daba lo mismo contra Boca que
+contra Belgrano. Lo encontré releyendo el diff, no jugando.
+
+### Una fuente de verdad menos
+
+Había **dos fórmulas de reputación**: una con logaritmos en `ui/data/league.ts`
+para la presión del partido, y otra que hacía falta para la televisión y el
+sponsor. Daban el mismo orden de los veinte clubes y valores distintos. Se
+borró la de la interfaz y quedó la del dominio; un test verifica que la
+reputación del equipo del motor sea exactamente la misma que usan las finanzas.
+
+---
+
 ## Verificación
 
-**Tests automatizados** (`npm test`, 311 en total):
+**Tests automatizados** (`npm test`, 358 en total):
 
 - `tests/ui-logic.test.ts` — el puente con el motor, las alertas derivadas,
   el estado de preparación, la autoselección, el cambio de formación sin
@@ -928,6 +1101,20 @@ interfaz.
   salga de escala, que el arco no se mezcle con la cancha y que el mapeo sea
   determinista.
 - `tests/season.test.ts` — el fixture, la tabla y las estadísticas del torneo.
+- `tests/stadium.test.ts` — el modelo de asistencia: que la capacidad sea un
+  techo duro, que el precio tenga **máximo interior** (subirlo puede recaudar
+  menos), que el socio no pague entrada y que la reputación derivada del
+  archivo ponga a los grandes arriba y a Belgrano último.
+- `tests/finances.test.ts` y `tests/stadium-ui.test.ts` — el balance: el test de
+  **honestidad** que exige que cada línea diga de dónde sale su número, que la
+  masa salarial sea la suma de los contratos, que el presupuesto de fichajes se
+  mueva con el club, y el que fija la relación entre **las dos escalas de
+  plata** para que no vuelvan a separarse.
+- `tests/season-close.test.ts` — el cierre: que todos cumplan un año (el test
+  que hubiera detectado que `ageUp` no se llamaba nunca), que nadie se retire
+  antes de los 33 y todos a los 40, que al que rinde se le estire la carrera, y
+  el recorrido de **seis temporadas seguidas** donde la edad media sube y el
+  plantel obliga a renovarse.
 - `tests/staff.test.ts` — entre otras cosas, el test de **honestidad**: un rol
   no puede declararse `implementado` sin un consumidor real que se mueva, y la
   fase que promete un rol pendiente tiene que existir en `plan.ts` y no estar
@@ -951,18 +1138,21 @@ para correrlo. Convertirlo en tests automatizados es la fase 8.
 
 ## Lo que sigue
 
-Con las fases 4, 5 y 7 el prototipo se juega, se arma y los planteles
-evolucionan: se prepara el equipo, se juega la fecha, el torneo avanza, los
-jugadores crecen o se caen, y el plantel se puede cambiar comprando y vendiendo.
-Lo próximo es la fase 6 (estadio y finanzas) y después la 8 (backend real y el
-riesgo de lesión por equipo, que es lo que falta para el último rol del staff).
+Con las fases 0 a 7 el prototipo es un juego: se prepara el equipo, se juega la
+fecha, el torneo avanza, los jugadores crecen o se caen, el plantel se cambia
+comprando y vendiendo, el club recauda y gasta, y al terminar el torneo pasa un
+año. Queda la fase 8: backend real, tests de interfaz automatizados y el riesgo
+de lesión por equipo, que es lo que falta para el último rol del staff.
 
 Deuda anotada, no escondida:
 
-- **La temporada no rota.** Al terminar el torneo se puede empezar uno nuevo,
-  pero nadie cumple años y no entra una camada nueva a inferiores. `ageUp` ya
-  existe en el motor; engancharlo es parte de la fase 6, con el cierre de
-  ejercicio.
+- **Los rivales no tienen economía.** Recaudan, pagan sueldos y amplían su
+  estadio sólo en el club del manager: los otros diecinueve juegan sin
+  finanzas. La reputación de cada uno sí sale de su estadio real, así que
+  arrastran público de visitante, pero su propia caja no existe.
+- **El cierre de temporada sólo alcanza al club del manager.** Los rivales no
+  envejecen ni se renuevan, así que después de varias temporadas sus planteles
+  quedan congelados en 1998 mientras el propio se recambia.
 - **Los rivales no tienen cuerpo técnico simulado.** Desarrollan a un ritmo base
   equivalente a un entrenador de dos estrellas (`BASELINE_COACHING`): si les
   diera cero, sus juveniles no crecerían nunca y el torneo se desbalancearía
@@ -972,9 +1162,9 @@ Deuda anotada, no escondida:
   mercado y los ascensos, y la pantalla de tabla lo dice en lugar de mostrar
   una tabla inventada.
 - **El torneo es de una sola vuelta** (19 fechas). Dos vueltas, copas y
-  descensos son parte de la fase 6/7 ampliada.
-
-Vale una nota sobre la fase 7: el resultado de partido ya está resuelto del
-lado del motor —`simulateMatch` devuelve marcador, eventos minuto a minuto,
-estadísticas completas, notas individuales, mejor jugador y el relato del
-partido—, así que esa fase es sobre todo trabajo de interfaz.
+  descensos quedan para más adelante.
+- **Las obras de instalaciones son instantáneas.** La del estadio tarda semanas
+  de verdad y avanza al jugar cada fecha; las cinco instalaciones suben de
+  nivel en el momento, aunque el dominio ya tiene sus semanas de obra
+  declaradas en `facilityUpgradeWeeks`. Engancharlas es el mismo mecanismo que
+  ya existe para el estadio.

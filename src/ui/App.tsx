@@ -10,6 +10,8 @@ import { SquadPage } from './pages/SquadPage.tsx';
 import { LineupPage } from './pages/LineupPage.tsx';
 import { StaffPage } from './pages/StaffPage.tsx';
 import { FacilitiesPage } from './pages/FacilitiesPage.tsx';
+import { StadiumPage } from './pages/StadiumPage.tsx';
+import { FinancesPage } from './pages/FinancesPage.tsx';
 import { MessagesPage } from './pages/MessagesPage.tsx';
 import { CalendarPage } from './pages/CalendarPage.tsx';
 import { ResultsPage } from './pages/ResultsPage.tsx';
@@ -54,6 +56,10 @@ function Screen(): ReactNode {
       return <StaffPage />;
     case '/club/instalaciones':
       return <FacilitiesPage />;
+    case '/club/estadio':
+      return <StadiumPage />;
+    case '/club/finanzas':
+      return <FinancesPage />;
     case '/informacion/mensajes':
       return <MessagesPage />;
     case '/competicion/calendario':

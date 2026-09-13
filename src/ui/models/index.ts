@@ -18,6 +18,7 @@ import type { SeasonTotals } from '../../competition/stats.ts';
 import type { ScoutingReport } from '../../domain/youth.ts';
 import type { TrainingPlan } from '../../domain/training.ts';
 import type { StoredOffer, StoredTransfer } from '../services/season-store.ts';
+import type { LedgerLine } from '../../domain/finances.ts';
 
 export type Division = 'Primera División' | 'Primera Nacional';
 
@@ -140,12 +141,56 @@ export function projectProgress(project: DevelopmentProject): number {
   return Math.max(0, Math.min(1, 1 - project.weeksLeft / project.weeksTotal));
 }
 
+/**
+ * Las finanzas del club.
+ *
+ * Los cinco numeros eran constantes escritas a mano hasta la fase 6. Ahora
+ * TODOS salen de `domain/finances.ts`, y el desglose viene con ellos: cada
+ * linea del balance trae de donde sale su numero, asi que la pantalla no
+ * muestra nada sin explicacion.
+ */
 export type Finances = {
   readonly cash: number;
   readonly transferBudget: number;
   readonly wageBill: number;
   readonly monthlyIncome: number;
   readonly monthlyExpenses: number;
+  /** Ingresos y gastos linea por linea, con su origen (fase 6). */
+  readonly income: readonly LedgerLine[];
+  readonly expenses: readonly LedgerLine[];
+  /** Ingreso menos gasto del mes. Derivado. */
+  readonly balance: number;
+  /** Que fraccion de los gastos se van en sueldos. Arriba de 0.8 es alerta. */
+  readonly wageShare: number;
+  /** Recaudacion promedio por partido de local jugado. */
+  readonly averageGate: number;
+};
+
+/** El estadio del club, para la pantalla de la fase 6. */
+export type StadiumView = {
+  readonly name: string;
+  /** Capacidad de juego: el aforo del archivo mas lo que se amplio. */
+  readonly capacity: number;
+  /** El aforo que trae el archivo. Dato historico, nunca se pisa. */
+  readonly originalCapacity: number;
+  /** Asientos que agrego el manager. */
+  readonly builtSeats: number;
+  readonly members: number;
+  /** Precio de la entrada elegido por el manager. */
+  readonly ticketPrice: number;
+  /** Reputacion del club, derivada de socios y aforo. */
+  readonly reputation: number;
+  /** Recaudacion de cada partido de local jugado, del mas reciente al mas viejo. */
+  readonly gates: readonly StadiumGate[];
+};
+
+export type StadiumGate = {
+  readonly round: number;
+  readonly opponentName: string;
+  readonly attendance: number;
+  readonly occupancy: number;
+  readonly ticketPrice: number;
+  readonly total: number;
 };
 
 export type Fixture = {
@@ -310,6 +355,8 @@ export type GameState = {
   readonly squad: readonly ClubPlayer[];
   readonly lineup: LineupSelection;
   readonly finances: Finances;
+  /** El estadio del club (fase 6). */
+  readonly stadium: StadiumView;
   readonly staff: readonly StaffMember[];
   readonly vacancies: readonly StaffVacancy[];
   readonly facilities: readonly ClubFacility[];
@@ -349,3 +396,5 @@ export type {
   Tactics,
   TrainingPlan,
 };
+
+export type { LedgerLine };

@@ -115,14 +115,7 @@ export const NAVIGATION: readonly NavSection[] = [
         summary:
           'Plantilla juvenil con potencial estimado como rango: mejor scouting, rango más preciso.',
       },
-      {
-        label: 'Estadio',
-        path: '/club/estadio',
-        ready: false,
-        phase: 6,
-        summary:
-          'Capacidad, ocupación, estado del campo, ingresos por partido y proyectos de ampliación.',
-      },
+      { label: 'Estadio', path: '/club/estadio', ready: true, phase: 6 },
       {
         label: 'Instalaciones',
         path: '/club/instalaciones',
@@ -131,13 +124,7 @@ export const NAVIGATION: readonly NavSection[] = [
         summary:
           'Centro de entrenamiento, academia, centro médico, scouting y oficinas, de una a cinco estrellas.',
       },
-      {
-        label: 'Finanzas',
-        path: '/club/finanzas',
-        ready: false,
-        phase: 6,
-        summary: 'Caja, presupuesto, masa salarial, ingresos y gastos con detalle por rubro.',
-      },
+      { label: 'Finanzas', path: '/club/finanzas', ready: true, phase: 6 },
     ],
   },
   {

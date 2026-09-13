@@ -27,12 +27,7 @@ export const PHASES: readonly PhasePlan[] = [
   { phase: 3, label: 'Staff, Desarrollo e Instalaciones', delivered: true },
   { phase: 4, label: 'Inferiores, Scouting y Entrenamiento', delivered: true },
   { phase: 5, label: 'Mercado y negociaciones', delivered: true },
-  {
-    phase: 6,
-    label: 'Estadio y finanzas',
-    delivered: false,
-    summary: 'Capacidad, ocupación, ingresos por partido, presupuesto y detalle de gastos.',
-  },
+  { phase: 6, label: 'Estadio y finanzas', delivered: true },
   { phase: 7, label: 'Competición y resultado de partido', delivered: true },
   {
     phase: 8,

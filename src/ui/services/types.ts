@@ -30,7 +30,26 @@ export type PlayRoundReport = {
   readonly suspensions: readonly { readonly playerName: string; readonly matches: number }[];
   /** Partidos que no se pudieron jugar, con el motivo. */
   readonly skipped: readonly string[];
+  /** La recaudacion, si el club jugo de local esa fecha (fase 6). */
+  readonly gate: {
+    readonly attendance: number;
+    readonly occupancy: number;
+    readonly total: number;
+  } | null;
+  /** La obra del estadio que termino esta fecha, si termino alguna (fase 6). */
+  readonly workFinished: { readonly seats: number; readonly capacity: number } | null;
   readonly saveWarning: string | null;
+};
+
+/** Lo que dejo un cierre de temporada (fase 6). */
+export type SeasonCloseReport = {
+  /** La temporada que empieza, para mostrarla. */
+  readonly seasonNumber: number;
+  readonly retired: readonly { readonly name: string; readonly age: number }[];
+  /** Juveniles a los que se les termino el tiempo en el club. */
+  readonly released: readonly { readonly name: string; readonly age: number }[];
+  /** Cuantos entraron a inferiores desde la academia. */
+  readonly intake: number;
 };
 
 export type GameService = {
@@ -72,6 +91,34 @@ export type GameService = {
 
   /** Vuelve a empezar el torneo desde la fecha 1. */
   resetSeason(clubId: string): Promise<void>;
+
+  /**
+   * CIERRA LA TEMPORADA Y EMPIEZA LA SIGUIENTE (fase 6).
+   *
+   * Es lo que convierte "jugar un torneo" en "dirigir un club": todos cumplen
+   * un anio, los veteranos se retiran, a los juveniles pasados de edad se les
+   * termina el tiempo y entra la camada nueva de la academia. Irreversible.
+   *
+   * Solo se puede cuando el torneo termino: cerrar a mitad de temporada seria
+   * perder los partidos jugados.
+   */
+  closeSeason(clubId: string): Promise<SeasonCloseReport>;
+
+  /**
+   * El precio de la entrada (seccion 9, fase 6).
+   *
+   * Es la decision economica mas directa del manager: mas caro recauda mas por
+   * persona y puede recaudar menos en total.
+   */
+  setTicketPrice(clubId: string, price: number): Promise<void>;
+
+  /**
+   * Encara la ampliacion del estadio (seccion 9, fase 6).
+   *
+   * Cobra la obra de una y las semanas bajan al jugar cada fecha. La mas
+   * grande no entra en una temporada, a proposito.
+   */
+  expandStadium(clubId: string, seats: number): Promise<void>;
 
   /** Guarda el plan de entrenamiento del plantel (seccion 7, fase 4). */
   saveTraining(clubId: string, plan: TrainingPlan): Promise<void>;

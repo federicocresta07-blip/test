@@ -13,7 +13,6 @@
 import type {
   ClubFacility,
   DevelopmentProject,
-  Finances,
   StaffMember,
   StaffVacancy,
 } from '../models/index.ts';
@@ -62,29 +61,34 @@ export const DEMO_FACILITIES: readonly ClubFacility[] = [
   { id: 'oficinas', level: 3 },
 ];
 
-export const DEMO_FINANCES: Finances = {
-  cash: 418_500_000,
-  transferBudget: 140_000_000,
-  wageBill: 96_300_000,
-  monthlyIncome: 182_400_000,
-  monthlyExpenses: 151_700_000,
-};
+/**
+ * LA CAJA CON LA QUE ARRANCA EL CLUB.
+ *
+ * Es el UNICO numero de finanzas que sigue escrito a mano, porque es el punto
+ * de partida de la partida y no se puede calcular de nada.
+ *
+ * Acá había cinco:
+ *
+ *     cash, transferBudget, wageBill, monthlyIncome, monthlyExpenses
+ *
+ * La masa salarial se fue en la fase 3 (es la suma de los contratos) y los
+ * otros tres en la fase 6: los calcula `domain/finances.ts` a partir de los
+ * socios reales del club, de los partidos que se jugaron, de la reputación y
+ * de los sueldos. Tenerlos acá hacía que el juego mintiera: se podía vender a
+ * medio plantel y el presupuesto de fichajes quedaba igual.
+ */
+export const OPENING_CASH = 418_500_000;
 
 /**
- * Obras en curso al empezar. La ampliación de la tribuna sur es del estadio,
- * que se gestiona en la fase 6: acá figura como información, no como algo
- * que se pueda tocar todavía.
+ * Obras en curso al empezar: NINGUNA.
+ *
+ * Acá había una ampliación de la tribuna sur escrita a mano, con 7 de 18
+ * semanas cumplidas, que no se podía tocar y nunca terminaba: cada vez que se
+ * cargaba la partida volvía a estar en la semana 7. Era decorado.
+ *
+ * Ahora las obras del estadio son reales (fase 6): las encara el manager desde
+ * la pantalla de Estadio, las semanas bajan al jugar cada fecha y al terminar
+ * los asientos entran a la capacidad. La lista de obras se deriva del estado,
+ * así que este arreglo está vacío a propósito.
  */
-export const DEMO_PROJECTS: readonly DevelopmentProject[] = [
-  {
-    id: 'pr-estadio-sur',
-    kind: 'estadio',
-    label: 'Ampliación de la tribuna sur',
-    targetId: null,
-    fromLevel: null,
-    toLevel: null,
-    weeksTotal: 18,
-    weeksLeft: 7,
-    cost: 96_000_000,
-  },
-];
+export const DEMO_PROJECTS: readonly DevelopmentProject[] = [];

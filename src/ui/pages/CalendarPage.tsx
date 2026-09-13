@@ -8,7 +8,7 @@ import { useGame, useGameState } from '../state/GameProvider.tsx';
 import { clubById } from '../data/clubs.ts';
 import { preparationStatus } from '../lib/preparation.ts';
 import { restDaysBefore } from '../lib/season-bridge.ts';
-import { longDate } from '../lib/format.ts';
+import { longDate, moneyShort, percent } from '../lib/format.ts';
 import type { Fixture } from '../models/index.ts';
 
 /**
@@ -22,7 +22,8 @@ import type { Fixture } from '../models/index.ts';
  */
 export function CalendarPage(): ReactNode {
   const state = useGameState();
-  const { round, playRound, clearRound, resetSeason } = useGame();
+  const { round, playRound, clearRound, resetSeason, closeSeason, seasonClose, dismissSeasonClose } =
+    useGame();
   const { navigate } = useRouter();
   const [shownRound, setShownRound] = useState<number | null>(null);
 
@@ -44,17 +45,116 @@ export function CalendarPage(): ReactNode {
   return (
     <div className="page">
       {/* --- Jugar la fecha --- */}
+      {/*
+        EL INFORME DEL CIERRE VA EN SU PROPIO PANEL, no adentro del bloque de
+        "el torneo terminó". Ahí estaba al principio, y era un bug que solo
+        aparecía jugando: cerrar la temporada hace que el torneo YA NO esté
+        terminado —empieza la fecha 1 de la siguiente— así que el bloque
+        desaparecía y con él el informe. El manager cerraba la temporada y no
+        veía nunca quién se había retirado.
+      */}
+      {seasonClose.report && (
+        <Panel title={`Empieza la temporada ${seasonClose.report.seasonNumber}`}>
+          <div className="seasonclose">
+            <p>Todos cumplieron un año. Esto es lo que dejó el cierre:</p>
+            <div className="seasonclose__lists">
+              <div>
+                <span className="seasonclose__listlabel">
+                  Se retiraron ({seasonClose.report.retired.length})
+                </span>
+                <ul className="seasonclose__list">
+                  {seasonClose.report.retired.length === 0 ? (
+                    <li className="muted">Nadie colgó los botines</li>
+                  ) : (
+                    seasonClose.report.retired.map((entry) => (
+                      <li key={entry.name}>
+                        <span>{entry.name}</span>
+                        <span className="muted tnum">{entry.age} años</span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+              <div>
+                <span className="seasonclose__listlabel">
+                  Dejaron las inferiores ({seasonClose.report.released.length})
+                </span>
+                <ul className="seasonclose__list">
+                  {seasonClose.report.released.length === 0 ? (
+                    <li className="muted">A nadie se le terminó el tiempo</li>
+                  ) : (
+                    seasonClose.report.released.map((entry) => (
+                      <li key={entry.name}>
+                        <span>{entry.name}</span>
+                        <span className="muted tnum">{entry.age} años</span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+              <div>
+                <span className="seasonclose__listlabel">Camada nueva</span>
+                <ul className="seasonclose__list">
+                  <li>
+                    <span>
+                      {seasonClose.report.intake}{' '}
+                      {seasonClose.report.intake === 1 ? 'juvenil' : 'juveniles'} de la academia
+                    </span>
+                    <Link to="/club/inferiores">
+                      <Button size="sm" variant="ghost">
+                        Verlos
+                      </Button>
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <Button size="sm" variant="ghost" onClick={dismissSeasonClose}>
+              Entendido
+            </Button>
+          </div>
+        </Panel>
+      )}
+
       {state.season.finished ? (
         <Panel title="El torneo terminó">
-          <div className="matchday matchday--done">
-            <p className="clubnotes">
+          <div className="seasonclose">
+            <p>
               Se jugaron las {state.season.totalRounds} fechas. La tabla final está en{' '}
               <Link to="/competicion/tabla">Competición · Tabla</Link>, y los goleadores en{' '}
               <Link to="/competicion/estadisticas">Estadísticas</Link>.
             </p>
-            <Button variant="primary" onClick={() => void resetSeason()} disabled={round.playing}>
-              Empezar un torneo nuevo
-            </Button>
+            <p className="muted">
+              <strong>Cerrar la temporada</strong> hace pasar un año: todos cumplen años, los
+              veteranos se retiran, a los juveniles pasados de edad se les termina el tiempo y
+              entra una camada nueva de la academia. Es irreversible.{' '}
+              <strong>Reiniciar</strong>, en cambio, vuelve a jugar el mismo torneo desde la fecha
+              1 sin que pase el tiempo.
+            </p>
+            {seasonClose.error && (
+              <div className="investbanner investbanner--error" role="alert">
+                <span className="investbanner__text">{seasonClose.error}</span>
+                <Button size="sm" variant="ghost" onClick={dismissSeasonClose}>
+                  Entendido
+                </Button>
+              </div>
+            )}
+            <div className="matchday__actions">
+              <Button
+                variant="primary"
+                onClick={() => void closeSeason()}
+                disabled={seasonClose.pending || round.playing}
+              >
+                {seasonClose.pending ? 'Cerrando…' : 'Cerrar la temporada'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => void resetSeason()}
+                disabled={seasonClose.pending || round.playing}
+              >
+                Reiniciar el mismo torneo
+              </Button>
+            </div>
           </div>
         </Panel>
       ) : (
@@ -139,6 +239,21 @@ export function CalendarPage(): ReactNode {
                   </Button>
                 )}
               </div>
+              {round.report.gate && (
+                <p className="roundreport__line">
+                  Recaudación: <strong>{moneyShort(round.report.gate.total)}</strong> con{' '}
+                  {round.report.gate.attendance.toLocaleString('es-AR')} personas (
+                  {percent(round.report.gate.occupancy)} del estadio).{' '}
+                  <Link to="/club/estadio">Ver el estadio</Link>
+                </p>
+              )}
+              {round.report.workFinished && (
+                <p className="roundreport__line is-good">
+                  Terminó la ampliación: {round.report.workFinished.seats.toLocaleString('es-AR')}{' '}
+                  asientos nuevos. El estadio pasa a{' '}
+                  {round.report.workFinished.capacity.toLocaleString('es-AR')} de capacidad.
+                </p>
+              )}
               {round.report.injuries.length > 0 && (
                 <p className="roundreport__line is-bad">
                   Lesiones:{' '}

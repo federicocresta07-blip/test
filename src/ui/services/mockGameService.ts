@@ -14,7 +14,7 @@ import { CLUBS, clubById } from '../data/clubs.ts';
 import { DEMO_SQUAD, withMarketValues } from '../data/squad.ts';
 import {
   DEMO_FACILITIES,
-  DEMO_FINANCES,
+  OPENING_CASH,
   DEMO_PROJECTS,
   DEMO_STAFF,
   DEMO_VACANCIES,
@@ -41,7 +41,34 @@ import {
   type DevelopmentState,
   type InvestmentRecord,
 } from './development-store.ts';
-import type { ClubFacility, ClubPlayer, InboxMessage, StaffMember, StaffVacancy } from '../models/index.ts';
+import type {
+  ClubFacility,
+  ClubPlayer,
+  DevelopmentProject,
+  Finances,
+  InboxMessage,
+  StadiumView,
+  StaffMember,
+  StaffVacancy,
+} from '../models/index.ts';
+import {
+  financesOf,
+  gateFor,
+  originalCapacity,
+  reputationOf,
+  stadiumOf,
+  type MatchRevenue,
+} from '../lib/stadium-bridge.ts';
+import {
+  EXPANSION_STEPS,
+  MAX_TICKET_PRICE,
+  MIN_TICKET_PRICE,
+  REFERENCE_TICKET_PRICE,
+  expansionCost,
+  expansionWeeks,
+} from '../../domain/stadium.ts';
+import { closeSeason as closeSeasonOf } from '../../progression/season-close.ts';
+import { developPlayer } from '../../progression/development.ts';
 import { SEASON_LABEL } from '../data/competition.ts';
 import { offersFromMarket } from '../data/market.ts';
 import { DEMO_INBOX } from '../data/inbox.ts';
@@ -67,7 +94,7 @@ import {
   marketPrecision,
   RIVAL_CONTRACT_MONTHS,
 } from '../lib/market-bridge.ts';
-import { canPromote, scoutPotential } from '../../domain/youth.ts';
+import { canPromote, mustLeave, scoutPotential, type YouthPlayer } from '../../domain/youth.ts';
 import { focusFor, DEFAULT_TRAINING_PLAN, type TrainingPlan } from '../../domain/training.ts';
 import { overallForPosition } from '../../ratings/overall.ts';
 import { clamp } from '../../core/math.ts';
@@ -77,6 +104,7 @@ import type { Position } from '../../domain/positions.ts';
 import type { ScoutedYouth } from '../models/index.ts';
 import {
   fixtureDate,
+  outcomeOf,
   recordsOfClub,
   restDaysBefore,
   seasonFixtures,
@@ -93,10 +121,11 @@ import {
   snapshotConditions,
   withCondition,
   writeSeason,
+  type GateRecord,
   type SeasonSave,
   type StoredOffer,
 } from './season-store.ts';
-import type { GameService, OfferOutcome, PlayRoundReport } from './types.ts';
+import type { GameService, OfferOutcome, PlayRoundReport, SeasonCloseReport } from './types.ts';
 
 /**
  * Aviso visible en la interfaz, y ahora dice otra cosa.
@@ -235,37 +264,232 @@ function composeFacilities(development: DevelopmentState): readonly ClubFacility
  *
  * Las acciones de inversion solo necesitan saber si alcanza la plata, y
  * recomponer el plantel para eso seria trabajo de mas.
+ *
+ * Suma la recaudacion de los partidos ya jugados: la plata que entro por la
+ * puerta se puede gastar, que es el punto entero de la fase 6.
  */
-function availableCash(development: DevelopmentState): number {
-  return Math.max(0, DEMO_FINANCES.cash - investmentTotals(development).spent);
+function availableCash(development: DevelopmentState, save: SeasonSave): number {
+  const totals = investmentTotals(development);
+  const gates = (save.gates ?? []).reduce((total, gate) => total + gate.total, 0);
+  return Math.max(0, OPENING_CASH + gates - totals.spent);
 }
 
 /**
  * Las finanzas del club.
  *
- * La masa salarial NO se declara: es la suma de los salarios del plantel, que
- * salen del mercado, mas los del cuerpo tecnico. Antes era un numero escrito a
- * mano en `club-development.ts` que no tenia nada que ver con el plantel: se
- * podia vender a medio equipo y la masa salarial no se movia.
+ * NADA declarado. La masa salarial es la suma de los contratos del plantel y
+ * del cuerpo tecnico; el mantenimiento sale del nivel de cada instalacion; la
+ * recaudacion, de los partidos que se jugaron de local; la television y el
+ * sponsor, de la reputacion, que sale de los socios y el aforo del archivo.
+ *
+ * Lo unico escrito a mano que entra es `OPENING_CASH`, que es el punto de
+ * partida de la partida.
  */
 function composeFinances(
   development: DevelopmentState,
   squad: readonly ClubPlayer[],
-): typeof DEMO_FINANCES {
+  save: SeasonSave,
+): Finances {
   const totals = investmentTotals(development);
-  const playerWages = squad.reduce((total, entry) => total + entry.salary, 0);
-  const staffWages = composeStaff(development).reduce(
-    (total, member) => total + staffSalary(member.role, member.level),
-    0,
-  );
+  const table = seasonTable(save.records);
+  const position = table.findIndex((row) => row.clubId === CLUB_ID) + 1;
+  const rounds = totalRounds(seasonFixtures(save.seed));
 
+  return financesOf({
+    clubId: CLUB_ID,
+    builtSeats: development.stadiumSeats ?? 0,
+    squad,
+    staff: composeStaff(development),
+    facilities: composeFacilities(development),
+    position: position > 0 ? position : Math.ceil(LEAGUE_CLUB_IDS.length / 2),
+    clubsInLeague: LEAGUE_CLUB_IDS.length,
+    gates: save.gates ?? [],
+    openingCash: OPENING_CASH,
+    // Las ventas entran con coste negativo, asi que se separan por signo.
+    capitalSpent: Math.max(0, totals.spent),
+    capitalReceived: Math.max(0, -totals.spent),
+    homeMatchesLeft: homeMatchesLeft(save, rounds),
+  });
+}
+
+/**
+ * Cuantos partidos de local quedan por jugar.
+ *
+ * Lo usa el presupuesto de fichajes: cuanto mas temporada queda, mas superavit
+ * proyectado se puede comprometer. En la ultima fecha no hay nada que
+ * proyectar.
+ */
+function homeMatchesLeft(save: SeasonSave, rounds: number): number {
+  const fixtures = seasonFixtures(save.seed);
+  let left = 0;
+  for (const fixture of fixtures) {
+    if (fixture.round < save.round || fixture.round > rounds) continue;
+    if (fixture.homeClubId === CLUB_ID) left += 1;
+  }
+  return left;
+}
+
+/** El estadio del club para la pantalla: dato real mas lo que se amplio. */
+function composeStadium(development: DevelopmentState, save: SeasonSave): StadiumView {
+  const builtSeats = development.stadiumSeats ?? 0;
+  const stadium = stadiumOf(CLUB_ID, builtSeats);
   return {
-    ...DEMO_FINANCES,
-    cash: Math.max(0, DEMO_FINANCES.cash - totals.spent),
-    monthlyExpenses: DEMO_FINANCES.monthlyExpenses + totals.recurring,
-    wageBill: playerWages + staffWages,
+    name: stadium.name,
+    capacity: stadium.capacity,
+    originalCapacity: originalCapacity(CLUB_ID),
+    builtSeats,
+    members: stadium.members,
+    ticketPrice: development.ticketPrice ?? REFERENCE_TICKET_PRICE,
+    reputation: reputationOf(CLUB_ID, builtSeats),
+    gates: [...(save.gates ?? [])]
+      .sort((a, b) => b.round - a.round)
+      .map((gate) => ({
+        round: gate.round,
+        opponentName: clubById(gate.opponentId).shortName,
+        attendance: gate.attendance,
+        occupancy: stadium.capacity > 0 ? gate.attendance / stadium.capacity : 0,
+        ticketPrice: gate.ticketPrice,
+        total: gate.total,
+      })),
   };
 }
+
+/**
+ * Las obras en curso.
+ *
+ * Derivadas del estado, no escritas a mano: si hay una ampliacion del estadio
+ * andando, aparece con sus semanas reales; si no, la lista esta vacia y la
+ * pantalla lo dice.
+ */
+function composeProjects(development: DevelopmentState): readonly DevelopmentProject[] {
+  const work = development.expansion;
+  if (!work) return DEMO_PROJECTS;
+  return [
+    {
+      id: 'obra-estadio',
+      kind: 'estadio',
+      label: `Ampliación de ${work.seats.toLocaleString('es-AR')} asientos`,
+      targetId: null,
+      fromLevel: null,
+      toLevel: null,
+      weeksTotal: work.weeksTotal,
+      weeksLeft: work.weeksLeft,
+      cost: work.cost,
+    },
+  ];
+}
+
+/**
+ * LA RECAUDACION DE LA FECHA QUE SE ESTA JUGANDO (fase 6).
+ *
+ * Devuelve `null` si el club juega de visitante: la recaudacion es del local.
+ *
+ * Las condiciones que la mueven son todas estado del juego en ESTE momento —el
+ * rival, la posicion, la racha, el precio— y por eso el resultado se guarda
+ * como historia y no se recalcula.
+ */
+function gateOfRound(
+  development: DevelopmentState,
+  save: SeasonSave,
+  fixtures: readonly { readonly round: number; readonly homeClubId: string; readonly awayClubId: string }[],
+  position: number,
+  rounds: number,
+): { readonly record: GateRecord; readonly revenue: MatchRevenue } | null {
+  const fixture = fixtures.find(
+    (entry) => entry.round === save.round && entry.homeClubId === CLUB_ID,
+  );
+  if (!fixture) return null;
+
+  const table = seasonTable(save.records);
+  const row = table.find((entry) => entry.clubId === CLUB_ID);
+  const form = recordsOfClub(save.records, CLUB_ID)
+    .slice(-5)
+    .reverse()
+    .map((record) => outcomeOf(record, CLUB_ID));
+
+  const ticketPrice = development.ticketPrice ?? REFERENCE_TICKET_PRICE;
+  const revenue = gateFor({
+    clubId: CLUB_ID,
+    builtSeats: development.stadiumSeats ?? 0,
+    ticketPrice,
+    opponentId: fixture.awayClubId,
+    position: position > 0 ? position : Math.ceil(LEAGUE_CLUB_IDS.length / 2),
+    clubsInLeague: LEAGUE_CLUB_IDS.length,
+    form,
+    // La importancia crece sobre el final del torneo: la ultima fecha de un
+    // equipo que pelea arriba mueve gente que no va nunca.
+    importance: matchImportance(save.round, rounds, position, row?.points ?? 0, table),
+  });
+
+  return {
+    revenue,
+    record: {
+      round: save.round,
+      opponentId: fixture.awayClubId,
+      attendance: revenue.attendance,
+      ticketPrice,
+      total: revenue.total,
+    },
+  };
+}
+
+/**
+ * Cuanto importa este partido, 0..1.
+ *
+ * Sube con la fecha —el final del torneo pesa mas que el arranque— y sube si
+ * el club esta a tiro de algo: pelear el campeonato o zafar de abajo. Un
+ * equipo en mitad de tabla en la fecha 5 juega el partido mas intrascendente
+ * posible, y eso tambien es realista.
+ */
+function matchImportance(
+  round: number,
+  rounds: number,
+  position: number,
+  points: number,
+  table: readonly { readonly clubId: string; readonly points: number }[],
+): number {
+  const progress = rounds > 1 ? (round - 1) / (rounds - 1) : 0;
+  const leaderPoints = table[0]?.points ?? points;
+  const inTheRace = leaderPoints - points <= 6 ? 1 : 0;
+  const inTrouble = position >= LEAGUE_CLUB_IDS.length - 3 ? 1 : 0;
+  const stake = Math.max(inTheRace, inTrouble);
+  return Math.min(1, 0.3 + progress * 0.4 + stake * progress * 0.3);
+}
+
+/**
+ * La obra del estadio avanza una semana por fecha jugada.
+ *
+ * Cuando llega a cero los asientos pasan a la capacidad y la obra desaparece.
+ * Es el unico lugar del juego donde una inversion tarda en dar resultado, y
+ * por eso importa que las semanas bajen solas al jugar y no al entrar a la
+ * pantalla.
+ */
+function advanceStadiumWork(development: DevelopmentState): {
+  readonly state: DevelopmentState;
+  readonly changed: boolean;
+  readonly finished: { readonly seats: number; readonly capacity: number } | null;
+} {
+  const work = development.expansion;
+  if (!work) return { state: development, changed: false, finished: null };
+
+  const weeksLeft = work.weeksLeft - 1;
+  if (weeksLeft > 0) {
+    return {
+      state: { ...development, expansion: { ...work, weeksLeft } },
+      changed: true,
+      finished: null,
+    };
+  }
+
+  const seats = (development.stadiumSeats ?? 0) + work.seats;
+  const { expansion: _done, ...rest } = development;
+  return {
+    state: { ...rest, stadiumSeats: seats },
+    changed: true,
+    finished: { seats: work.seats, capacity: stadiumOf(CLUB_ID, seats).capacity },
+  };
+}
+
 
 function record(
   development: DevelopmentState,
@@ -340,17 +564,52 @@ function effectOfRole(development: DevelopmentState, role: StaffRole) {
  * mira a ciegas y el rango es enorme. La camada la decide el nivel de la
  * academia (seccion 8).
  */
+/**
+ * LAS INFERIORES, CAMADA POR CAMADA (fase 6).
+ *
+ * Antes era una sola camada fija: `buildYouthSquad(club, nivelAcademia)` con
+ * semilla constante. Con el cierre de temporada eso ya no alcanza, porque los
+ * juveniles tienen que cumplir anios y tiene que entrar gente nueva.
+ *
+ * Se generan TODAS las camadas desde el arranque de la partida, cada una con
+ * su semilla, y a cada una se le suman los anios que pasaron desde que entro.
+ * Al que se le paso la edad se le termino el tiempo en el club y desaparece de
+ * la lista. Nada de esto se guarda: se deriva de cuantas temporadas se
+ * cerraron, que es un solo numero.
+ */
 function composeYouth(development: DevelopmentState, save: SeasonSave): readonly ScoutedYouth[] {
   const academy = composeFacilities(development).find((entry) => entry.id === 'academia');
-  const squad = buildYouthSquad(CLUB_ID, academy?.level ?? 1);
   const scout = effectOfRole(development, 'Ojeador juvenil');
   // Sin ojeador juvenil el margen es el del nivel 1 empeorado: el club no
   // tiene a nadie mirando y lo declara en pantalla.
   const spread = scout ? scout.actual : NO_SCOUT_SPREAD;
   const promoted = new Set(save.promoted ?? []);
+  const seasonsClosed = save.seasonsClosed ?? 0;
 
-  return squad
-    .filter((entry) => !promoted.has(entry.player.id))
+  // EL ENTRENADOR JUVENIL: su efecto se aplica ACA.
+  //
+  // `staff.ts` declara su consumidor como "desarrollo de los atributos de sus
+  // jugadores, fecha a fecha", y hasta la fase 6 eso era falso: la camada se
+  // regeneraba identica en cada carga, asi que ningun juvenil mejoraba nunca y
+  // el rol no movia nada. El cierre de temporada lo dejo a la vista, porque
+  // ahora un pibe se queda hasta cinco anios en inferiores.
+  const youthCoach = effectOfRole(development, 'Entrenador juvenil');
+
+  const cohorts: YouthPlayer[] = [];
+  for (let season = 0; season <= seasonsClosed; season += 1) {
+    const years = seasonsClosed - season;
+    for (const entry of buildYouthSquad(
+      CLUB_ID,
+      academy?.level ?? 1,
+      `camada-${season}`,
+      years,
+    )) {
+      cohorts.push(years > 0 ? developedYouth(entry, years, youthCoach?.actual ?? 0) : entry);
+    }
+  }
+
+  return cohorts
+    .filter((entry) => !promoted.has(entry.player.id) && !mustLeave(entry))
     .map((entry) => ({
       id: entry.player.id,
       name: entry.player.name,
@@ -363,6 +622,43 @@ function composeYouth(development: DevelopmentState, save: SeasonSave): readonly
       promotable: canPromote(entry),
       player: entry.player,
     }));
+}
+
+/** Semanas de trabajo que tiene una temporada de 19 fechas. */
+const WEEKS_PER_SEASON = 22;
+
+/**
+ * Un juvenil que lleva anios en el club, ya desarrollado.
+ *
+ * Se desarrolla con el MISMO `developPlayer` que el plantel profesional: tener
+ * dos formas de hacer crecer a un jugador seria tener dos fuentes de verdad, y
+ * la del motor es la que manda. La diferencia es el contexto: juega en
+ * inferiores, no en primera, y lo entrena el entrenador juvenil.
+ *
+ * El resultado es derivado: no se guarda el estado de cada pibe, se recalcula
+ * de cuantas temporadas lleva. Asi un ajuste en los numeros del desarrollo se
+ * refleja en una partida ya empezada.
+ */
+function developedYouth(entry: YouthPlayer, years: number, coaching: number): YouthPlayer {
+  let player = entry.player;
+  // TEMPORADA POR TEMPORADA, no de una. `developPlayer` mide el margen contra
+  // el potencial UNA VEZ por llamada, asi que pedirle cuatro temporadas de
+  // golpe crece como si el margen del primer dia durara los cuatro anios: un
+  // juvenil de potencial 66 llegaba a 74. Aplicado anio por anio, el margen se
+  // recalcula y el techo se respeta.
+  for (let year = 0; year < years; year += 1) {
+    player = developPlayer({
+      player,
+      weeks: WEEKS_PER_SEASON,
+      // Los minutos de inferiores: juega, pero no en primera.
+      minutes: 1_100,
+      focus: 'general',
+      intensity: 0.65,
+      coaching,
+      seed: `inferiores:${entry.player.id}:${year}`,
+    }).player;
+  }
+  return { ...entry, player };
 }
 
 /** Los juveniles que el manager ya subio al plantel profesional. */
@@ -660,13 +956,25 @@ function composeSquad(
     unhappy: false,
   }));
 
-  // Y los que se vendieron ya no estan.
+  // Y los que se vendieron ya no estan. Tampoco los que se retiraron al
+  // cerrar la temporada (fase 6): el plantel se regenera del archivo en cada
+  // carga, asi que sin esta lista el que colgo los botines volveria.
   const sold = soldIds(save);
+  const retired = new Set(save.retired ?? []);
+  const seasonsClosed = save.seasonsClosed ?? 0;
+
+  // Y todos tienen un anio mas por cada temporada cerrada. La edad del archivo
+  // es la de 1998; el resto es tiempo de juego.
+  const aged = [...base, ...promoted, ...signed].map((entry) =>
+    seasonsClosed > 0
+      ? { ...entry, player: { ...entry.player, age: entry.player.age + seasonsClosed } }
+      : entry,
+  );
 
   // El valor y el salario los pone el mercado: se calculan al final, cuando el
   // plantel ya tiene su estado, sus juveniles promovidos y sus fichajes.
   return withMarketValues(
-    [...base, ...promoted, ...signed].filter((entry) => !sold.has(entry.player.id)),
+    aged.filter((entry) => !sold.has(entry.player.id) && !retired.has(entry.player.id)),
     today,
   );
 }
@@ -710,11 +1018,12 @@ export function createMockGameService(): GameService {
         clubs: CLUBS,
         squad,
         lineup: readStoredLineup() ?? initialLineup(),
-        finances: composeFinances(development, squad),
+        finances: composeFinances(development, squad, save),
+        stadium: composeStadium(development, save),
         staff: composeStaff(development),
         vacancies: composeVacancies(development),
         facilities: composeFacilities(development),
-        projects: DEMO_PROJECTS,
+        projects: composeProjects(development),
         fixtures: toUiFixtures(fixtures, save.records),
         table: toUiTable(table),
         // Se derivan de las ofertas reales del mercado, no de una lista
@@ -756,7 +1065,7 @@ export function createMockGameService(): GameService {
       if (cost === null) throw new Error(`${member.name} ya está en el nivel máximo`);
 
       const nextLevel = (member.level + 1) as StaffLevel;
-      if (availableCash(development) < cost) {
+      if (availableCash(development, readSeason()) < cost) {
         throw new Error('No hay caja suficiente para pagar la mejora');
       }
 
@@ -785,7 +1094,7 @@ export function createMockGameService(): GameService {
       if (!candidate) throw new Error('Ese candidato ya no está disponible');
 
       const cost = staffHireCost(role, candidate.level);
-      if (availableCash(development) < cost) {
+      if (availableCash(development, readSeason()) < cost) {
         throw new Error('No hay caja suficiente para pagar la contratación');
       }
 
@@ -820,7 +1129,7 @@ export function createMockGameService(): GameService {
       const cost = facilityUpgradeCost(facilityId, facility.level);
       if (cost === null) throw new Error('Esa instalación ya está en el nivel máximo');
 
-      if (availableCash(development) < cost) {
+      if (availableCash(development, readSeason()) < cost) {
         throw new Error('No hay caja suficiente para encarar la obra');
       }
 
@@ -898,6 +1207,17 @@ export function createMockGameService(): GameService {
       // cuando uno entra a la pantalla.
       const incoming = generateIncomingOffers(save, squadForOffers, save.round);
 
+      // LA RECAUDACION (fase 6). Solo si el club jugo de local esa fecha.
+      //
+      // Se calcula ACA, con el precio vigente hoy, y se guarda: un partido
+      // cobrado es un hecho. Derivarlo despues haria que cambiar el precio en
+      // la fecha 15 reescribiera lo que se recaudo en la fecha 3.
+      const gate = gateOfRound(development, save, fixtures, position, rounds);
+
+      // La obra del estadio avanza una semana por fecha.
+      const work = advanceStadiumWork(development);
+      if (work.changed) writeDevelopment(work.state);
+
       const next: SeasonSave = {
         ...save,
         round: save.round + 1,
@@ -906,6 +1226,7 @@ export function createMockGameService(): GameService {
         conditions: snapshotConditions(outcome.teams),
         chemistry: snapshotChemistry(outcome.teams),
         offers: [...(save.offers ?? []), ...incoming],
+        ...(gate ? { gates: [...(save.gates ?? []), gate.record] } : {}),
       };
       const written = writeSeason(next);
 
@@ -922,6 +1243,14 @@ export function createMockGameService(): GameService {
           matches: entry.matches,
         })),
         skipped: outcome.skipped.map((entry) => entry.reason),
+        gate: gate
+          ? {
+              attendance: gate.revenue.attendance,
+              occupancy: gate.revenue.occupancy,
+              total: gate.revenue.total,
+            }
+          : null,
+        workFinished: work.finished,
         saveWarning: written.saved
           ? written.trimmed
             ? 'Guardamos la temporada, pero hubo que dejar de lado el detalle de los partidos que no jugaste: el navegador se estaba quedando sin lugar.'
@@ -932,6 +1261,123 @@ export function createMockGameService(): GameService {
 
     async resetSeason(_clubId: string): Promise<void> {
       writeSeason(emptySeason());
+    },
+
+    /**
+     * CIERRA LA TEMPORADA (fase 6).
+     *
+     * Lo que hace irreversible a esta accion es el paso del tiempo: al volver
+     * todos tienen un anio mas. Por eso solo se puede cuando el torneo
+     * termino, y por eso avisa lo que paso.
+     *
+     * El retiro y el recambio de inferiores los decide el motor
+     * (`progression/season-close.ts`). Aca solo se junta el estado, se llama y
+     * se guarda el numero de temporadas cerradas, que es lo unico que hace
+     * falta: las edades se derivan de ese numero.
+     */
+    async closeSeason(_clubId: string): Promise<SeasonCloseReport> {
+      const save = readSeason();
+      const rounds = totalRounds(seasonFixtures(save.seed));
+      if (save.round <= rounds) {
+        throw new Error(
+          `Todavía quedan fechas por jugar (vas por la ${save.round} de ${rounds}). ` +
+            'Cerrar ahora sería perder el torneo a medio jugar.',
+        );
+      }
+
+      const development = readDevelopment();
+      const today = todayOf(save, rounds);
+      const squad = composeSquad(development, save, today);
+      const academy = composeFacilities(development).find((entry) => entry.id === 'academia');
+      const seasonsClosed = save.seasonsClosed ?? 0;
+
+      // La camada que produce la academia para la temporada que empieza. Su
+      // nivel decide cuantos y con que techo, asi que mejorar la instalacion
+      // se ve de una temporada a la otra.
+      const intake = buildYouthSquad(
+        CLUB_ID,
+        academy?.level ?? 1,
+        `camada-${seasonsClosed + 1}`,
+        0,
+      );
+
+      const result = closeSeasonOf({
+        players: squad.map((entry) => entry.player),
+        // Las inferiores de hoy, tal como las ve la pantalla.
+        youth: composeYouth(development, save).map((entry) => ({
+          player: entry.player,
+          origin: entry.origin,
+          yearsAtClub: entry.yearsAtClub,
+        })),
+        intake,
+        seed: `${save.seed}:${seasonsClosed}`,
+      });
+
+      // La temporada nueva arranca limpia, menos lo que cruza el anio: los
+      // retirados (que ya no estan), las temporadas cerradas y los juveniles
+      // que el manager subio al plantel.
+      const retiredIds = new Set(result.retired.map((entry) => entry.player.id));
+      writeSeason({
+        ...emptySeason(`${save.seed}-t${seasonsClosed + 1}`),
+        seasonsClosed: seasonsClosed + 1,
+        promoted: (save.promoted ?? []).filter((id) => !retiredIds.has(id)),
+        retired: [...(save.retired ?? []), ...retiredIds],
+      });
+
+      return {
+        seasonNumber: seasonsClosed + 2,
+        retired: result.retired.map((entry) => ({
+          name: entry.player.name,
+          age: entry.player.age,
+        })),
+        released: result.released.map((entry) => ({
+          name: entry.player.name,
+          age: entry.player.age,
+        })),
+        intake: intake.length,
+      };
+    },
+
+    /** El precio de la entrada (seccion 9, fase 6). */
+    async setTicketPrice(_clubId: string, price: number): Promise<void> {
+      if (!Number.isFinite(price)) throw new Error('Ese precio no es un número');
+      const clamped = Math.round(Math.min(MAX_TICKET_PRICE, Math.max(MIN_TICKET_PRICE, price)));
+      const development = readDevelopment();
+      writeDevelopment({ ...development, ticketPrice: clamped });
+    },
+
+    /** Encara la ampliacion del estadio (seccion 9, fase 6). */
+    async expandStadium(_clubId: string, seats: number): Promise<void> {
+      const development = readDevelopment();
+      if (development.expansion) {
+        throw new Error('Ya hay una obra en curso en el estadio');
+      }
+      if (!(EXPANSION_STEPS as readonly number[]).includes(seats)) {
+        throw new Error('Esa ampliación no está entre las opciones');
+      }
+
+      const stadium = stadiumOf(CLUB_ID, development.stadiumSeats ?? 0);
+      const cost = expansionCost(seats, stadium.capacity);
+      if (availableCash(development, readSeason()) < cost) {
+        throw new Error('No hay caja suficiente para encarar la ampliación');
+      }
+
+      const weeks = expansionWeeks(seats);
+      writeDevelopment(
+        record(
+          development,
+          {
+            id: `inv-${Date.now()}-estadio`,
+            kind: 'ampliación del estadio',
+            label: `Ampliación de ${seats.toLocaleString('es-AR')} asientos`,
+            cost,
+            // El mantenimiento arranca cuando la obra termina, no cuando
+            // empieza: todavia no hay asientos que mantener.
+            recurring: 0,
+          },
+          { expansion: { seats, weeksTotal: weeks, weeksLeft: weeks, cost } },
+        ),
+      );
     },
 
     async saveTraining(_clubId: string, plan: TrainingPlan): Promise<void> {
@@ -966,7 +1412,7 @@ export function createMockGameService(): GameService {
       const player = sellerTeam.players.find((entry) => entry.id === playerId) as Player;
 
       const squad = composeSquad(development, save, todayOf(save, 19));
-      const cash = composeFinances(development, squad).cash;
+      const cash = composeFinances(development, squad, save).cash;
       if (amount > cash) {
         throw new Error(
           `La oferta es de ${formatMoney(amount)} y en caja hay ${formatMoney(cash)}.`,

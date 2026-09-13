@@ -30,7 +30,7 @@ npm run crests     # ingesta de los escudos oficiales (ver docs/ui.md)
 npm run apertura98 # regenera los planteles del Apertura 98 desde el PKF extraido
 npm run single     # empaqueta el juego en UN solo HTML autocontenido
 
-npm test           # 311 tests
+npm test           # 358 tests
 npm run typecheck  # motor + interfaz
 ```
 
@@ -283,20 +283,21 @@ src/
   core/                        azar con semilla, utilidades numéricas
   domain/                      atributos, posiciones, jugador, equipo,
                                formaciones, tácticas, alineación, staff,
-                               inferiores, entrenamiento y mercado
+                               inferiores, entrenamiento, mercado, estadio
+                               y finanzas
   ratings/                     overall por posición, adecuación a la posición,
                                rendimiento efectivo, fuerza por dimensiones
   engine/                      las cinco etapas, balón parado, disciplina,
                                cambios, cruces tácticos, notas, relato
-  progression/                 forma, moral, fatiga, cohesión, lesiones y
-                               desarrollo de atributos
+  progression/                 forma, moral, fatiga, cohesión, lesiones,
+                               desarrollo de atributos y cierre de temporada
   competition/                 fixture, tabla, estadísticas y la fecha jugada
   calibration/                 miles de simulaciones y su informe
   presentation/                marcador, tabla de estadísticas, notas
   data/                        generador de planteles y equipos de ejemplo
   data/clausura-1998/          dataset histórico real (ver docs/clausura-1998.md)
   ui/                          la interfaz web (ver docs/ui.md)
-tests/                         311 tests
+tests/                         358 tests
 scripts/                       demo, temporada, torneo completo, calibración,
                                dataset histórico y humo de la UI
 ```
