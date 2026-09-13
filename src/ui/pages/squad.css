@@ -86,13 +86,13 @@
   min-width: 0;
 }
 
+/* Ahora contiene la camiseta chica en lugar de un numero: el ancho es el del
+   SVG y el color del dorsal lo decide el propio dibujo. */
 .playername__number {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
-  width: 18px;
-  text-align: right;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
+  width: 20px;
 }
 
 .playername__text {
@@ -177,6 +177,18 @@
   display: flex;
   align-items: center;
   gap: var(--sp-6);
+}
+
+/* La camiseta de la ficha: el lugar donde otros juegos ponen el retrato. */
+.quickpanel__kit {
+  display: grid;
+  place-items: center;
+  padding: var(--sp-3);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-inset);
+  flex-shrink: 0;
 }
 
 .quickpanel__ovr {

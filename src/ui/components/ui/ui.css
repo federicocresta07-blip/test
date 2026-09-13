@@ -56,14 +56,18 @@
   width: 100%;
 }
 
+/* El primario lleva el degradado y el filo; los demas quedan planos, para que
+   haya UN boton por pantalla que se vea como la accion principal. */
 .btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--grad-accent);
+  border-color: var(--active-edge);
+  box-shadow: var(--shadow-inset);
+  color: var(--on-color);
+  font-weight: var(--fw-semibold);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: linear-gradient(180deg, var(--accent-hover) 0%, var(--accent) 100%);
   border-color: var(--accent-hover);
 }
 
@@ -87,7 +91,7 @@
 
 .btn--danger:hover:not(:disabled) {
   background: var(--danger);
-  color: #fff;
+  color: var(--on-color);
 }
 
 .iconbtn {
@@ -169,13 +173,25 @@
 .status--neutral { background: var(--surface-3); color: var(--text-secondary); }
 
 /* --- Paneles --- */
+/*
+ * EL PANEL: la unidad de la interfaz.
+ *
+ * Cabecera con degradado y filo, cuerpo mas oscuro. Los dos tonos no son
+ * decoracion: hacen que una pantalla con seis paneles se lea como seis
+ * bloques y no como una sola mancha, que es lo que pasaba cuando cabecera y
+ * cuerpo se distinguian solo por una linea.
+ *
+ * El radio se queda chico (8px) a proposito: tarjetas muy redondeadas son la
+ * marca del panel de control moderno, y esto tiene que leerse como un juego.
+ */
 .panel {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
+  background: var(--grad-panel);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-inset);
   overflow: hidden;
 }
 
@@ -184,10 +200,11 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  min-height: 36px;
-  padding: var(--sp-4) var(--sp-5);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-2);
+  min-height: 34px;
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--grad-panelhead);
+  box-shadow: var(--shadow-edge);
 }
 
 .panel__titles {
@@ -199,7 +216,7 @@
   font-weight: var(--fw-bold);
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--silver);
 }
 
 .panel__subtitle {
@@ -353,7 +370,7 @@
 .overlay__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(3, 6, 10, 0.62);
+  background: var(--scrim);
   cursor: default;
 }
 
@@ -430,14 +447,27 @@
   font-size: var(--fs-sm);
 }
 
+/*
+ * LAS TABLAS: densidad limpia, no minimalismo.
+ *
+ * La cabecera se queda pegada arriba, en plata sobre el degradado de
+ * cabecera, para que al scrollear veintisiete filas siga diciendo que es cada
+ * columna. La fila seleccionada usa el azul ACTIVO con un riel a la izquierda,
+ * igual que el modulo abierto en la navegacion: una sola forma de decir
+ * "esto es lo que estas mirando" en toda la aplicacion.
+ *
+ * Las filas no se tocaron de alto: ya eran densas y esa densidad es la que
+ * hace que un plantel entero se lea sin scroll.
+ */
 .dtable thead th {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
   padding: var(--sp-3) var(--sp-4);
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border-default);
-  color: var(--text-muted);
+  background: var(--grad-panelhead);
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-edge);
+  color: var(--silver-dim);
   font-size: var(--fs-2xs);
   font-weight: var(--fw-bold);
   letter-spacing: 0.06em;
@@ -465,7 +495,13 @@
 }
 
 .dtable tbody tr.is-selected {
-  background: var(--accent-subtle);
+  background: var(--active-bg);
+}
+
+/* El riel va en la primera celda: `box-shadow` sobre un `tr` no se dibuja en
+   todos los navegadores, y un `border-left` en la fila desplaza las columnas. */
+.dtable tbody tr.is-selected td:first-child {
+  box-shadow: inset 2px 0 0 var(--active);
 }
 
 .th-sort {
@@ -491,12 +527,22 @@
 }
 
 /* --- Vacio y carga --- */
+/*
+ * EL ESTADO VACIO, MAS BAJO.
+ *
+ * Tenia 32px de padding arriba y abajo, y sumado al del cuerpo del panel hacia
+ * que un panel sin nada fuera el mas alto de la pantalla: "Sin movimientos"
+ * ocupando el doble que la tabla de posiciones. Es exactamente el patron que
+ * el brief pide evitar —tarjeta grande, mucho aire, poca informacion— y en un
+ * manager molesta el doble, porque el espacio vacio empuja abajo lo que si
+ * tiene datos.
+ */
 .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-9) var(--sp-6);
+  gap: var(--sp-3);
+  padding: var(--sp-7) var(--sp-6);
   text-align: center;
 }
 
@@ -570,4 +616,12 @@
 
 .select:hover {
   border-color: var(--border-strong);
+}
+
+/* --- Camiseta ---------------------------------------------------------
+   El dibujo no lleva sombra ni fondo: la camiseta ES el objeto, y encuadrarla
+   en una tarjeta es justo lo que la cancha no necesita. */
+.shirt {
+  display: block;
+  flex-shrink: 0;
 }

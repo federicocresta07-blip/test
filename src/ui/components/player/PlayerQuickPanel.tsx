@@ -19,6 +19,8 @@ import { ColorBar } from '../ui/ProgressBar.tsx';
 import { playerStatuses, PositionTag } from './PlayerCells.tsx';
 import { fitLabel } from '../../lib/positions.ts';
 import { StatusBadge } from '../ui/Badge.tsx';
+import { PlayerShirt } from '../PlayerShirt.tsx';
+import { useGame } from '../../state/GameProvider.tsx';
 
 /**
  * Nombres legibles de los diez atributos.
@@ -62,6 +64,8 @@ export function PlayerQuickPanel({
 }): ReactNode {
   if (!entry) return null;
 
+  const { state } = useGame();
+  const club = state?.club ?? null;
   const player = entry.player;
   const isGoalkeeper = player.position === 'POR';
   const natural = naturalOverall(player);
@@ -111,6 +115,21 @@ export function PlayerQuickPanel({
     >
       <div className="quickpanel">
         <div className="quickpanel__top">
+          {/*
+            LA CAMISETA, NO UNA FOTO (decision de diseño de Manager 6.0).
+            El jugador se identifica por color del club + dorsal + nombre, y el
+            nombre ya esta en el titulo del panel. No hay retratos en el juego
+            y no hacen falta: serian 462 archivos para decir menos que esto.
+          */}
+          <div className="quickpanel__kit">
+            <PlayerShirt
+              primary={club?.primaryColor ?? 'var(--surface-3)'}
+              secondary={club?.secondaryColor ?? 'var(--border-strong)'}
+              number={entry.shirtNumber}
+              size="lg"
+              {...(club ? { clubName: club.shortName } : {})}
+            />
+          </div>
           <div className="quickpanel__ovr">
             <RatingBadge value={natural} size="lg" />
             <span className="label">Overall</span>

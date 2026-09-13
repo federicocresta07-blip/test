@@ -12,6 +12,11 @@
   place-items: center;
   min-height: 100%;
   padding: var(--sp-8) var(--sp-5);
+  /* La puerta de entrada del juego lleva la misma luz de estadio que el area
+     de juego: es lo primero que se ve y tiene que decir "esto es un juego". */
+  background:
+    radial-gradient(90% 50% at 50% 0%, var(--stadium-glow) 0%, transparent 65%),
+    var(--bg-base);
 }
 
 .login__box {
@@ -21,9 +26,10 @@
   width: 100%;
   max-width: 340px;
   padding: var(--sp-7) var(--sp-6);
-  background: var(--surface-1);
+  background: var(--grad-panel);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-inset), var(--shadow-panel);
 }
 
 .login__head {
@@ -135,18 +141,23 @@
   color: var(--text-primary);
   text-align: center;
   cursor: pointer;
-  background: var(--surface-1);
+  background: var(--grad-panel);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-inset);
 }
 
 .picker__club:hover {
-  background: var(--surface-hover);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
 }
 
 .picker__club--active {
-  background: var(--accent-subtle);
-  border-color: var(--accent);
+  /* El mismo azul ACTIVO que el modulo abierto y la fila seleccionada: una
+     sola forma de decir "esto es lo elegido" en toda la aplicacion. */
+  background: var(--active-bg);
+  border-color: var(--active);
+  box-shadow: var(--shadow-inset);
 }
 
 .picker__club:focus-visible {

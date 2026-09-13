@@ -6,6 +6,8 @@ import { energyColor, energyOf, formArrow, formColor, formText } from '../../lib
 import { suspensionRisk } from '../../lib/engine-bridge.ts';
 import { StatusBadge, type PlayerStatus } from '../ui/Badge.tsx';
 import { ColorBar } from '../ui/ProgressBar.tsx';
+import { PlayerShirt } from '../PlayerShirt.tsx';
+import { useGame } from '../../state/GameProvider.tsx';
 
 /** Etiqueta de posicion con el color de su grupo. */
 export function PositionTag({ entry }: { readonly entry: ClubPlayer }): ReactNode {
@@ -21,7 +23,15 @@ export function PositionTag({ entry }: { readonly entry: ClubPlayer }): ReactNod
   );
 }
 
-/** Dorsal + nombre. El dorsal ancla la lectura, como en los managers clasicos. */
+/**
+ * Camiseta + nombre. La camiseta ancla la lectura, como el dorsal en los
+ * managers clasicos, y ademas dice de que equipo es.
+ *
+ * Aca la camiseta va CHICA (20px) y sin cuello legible: a este tamaño lo que
+ * comunica es el color y el dorsal, que es exactamente lo que hace falta en
+ * una lista de veintisiete filas. Esta lista es del plantel propio, asi que
+ * son veintisiete SVG y no cuatrocientos: el mercado usa otras celdas.
+ */
 export function PlayerName({
   entry,
   showSecondary = false,
@@ -29,9 +39,18 @@ export function PlayerName({
   readonly entry: ClubPlayer;
   readonly showSecondary?: boolean;
 }): ReactNode {
+  const { state } = useGame();
   return (
     <span className="playername">
-      <span className="playername__number tnum">{entry.shirtNumber}</span>
+      <span className="playername__number">
+        <PlayerShirt
+          primary={state?.club.primaryColor ?? 'var(--surface-3)'}
+          secondary={state?.club.secondaryColor ?? 'var(--border-strong)'}
+          number={entry.shirtNumber}
+          size="xs"
+          {...(state ? { clubName: state.club.shortName } : {})}
+        />
+      </span>
       <span className="playername__text truncate">{entry.player.name}</span>
       {showSecondary && entry.player.secondaryPositions.length > 0 && (
         <span className="playername__secondary muted">

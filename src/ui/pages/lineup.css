@@ -45,16 +45,35 @@
 }
 
 /* --- Cancha --- */
+/*
+ * LA CANCHA.
+ *
+ * El cesped rayado se queda —es la referencia de escala que hace que la
+ * formacion se lea— y encima lleva dos capas mas: una viñeta que oscurece los
+ * bordes y un halo de luz arriba. Las dos son gradientes, sin animacion y sin
+ * un solo archivo de imagen, y hacen que la cancha se vea iluminada en lugar
+ * de pintada.
+ *
+ * El borde plata y el relieve la separan del panel: es el objeto principal de
+ * la pantalla y tiene que pesar mas que lo que la rodea.
+ */
 .pitch {
   position: relative;
   width: 100%;
   aspect-ratio: 68 / 92;
   min-height: 400px;
-  background: repeating-linear-gradient(
-    var(--pitch-grass) 0 24px,
-    var(--pitch-grass-alt) 24px 48px
-  );
+  background:
+    radial-gradient(90% 45% at 50% 0%, var(--stadium-glow) 0%, transparent 60%),
+    /* La viñeta es propia de la cancha: no hay otro lugar donde se use, asi
+       que no gana nada siendo un token. */
+    radial-gradient(120% 80% at 50% 50%, transparent 55%, rgba(2, 8, 4, 0.42) 100%),
+    repeating-linear-gradient(
+      var(--pitch-grass) 0 24px,
+      var(--pitch-grass-alt) 24px 48px
+    );
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-inset), 0 2px 10px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 
@@ -87,7 +106,7 @@
   font-size: 9px;
   font-weight: var(--fw-bold);
   letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-color-dim);
 }
 
 .pitch__chipbtn {
@@ -103,18 +122,18 @@
 .pitch__empty {
   display: grid;
   place-items: center;
-  width: 74px;
-  height: 50px;
+  width: 60px;
+  height: 48px;
   border: 1px dashed var(--pitch-line);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--pitch-slot-empty) 70%, transparent);
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--on-color-dim);
   transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
 .pitch__empty:hover {
-  border-color: rgba(255, 255, 255, 0.55);
-  color: rgba(255, 255, 255, 0.8);
+  border-color: var(--pitch-accent);
+  color: var(--on-color);
 }
 
 .pitch__plus {
@@ -127,69 +146,89 @@
   border-style: solid;
 }
 
-.pitch__slot.is-hover .pitch__empty,
-.pitch__slot.is-hover .chip {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+/*
+ * SELECCIONADO Y DESTINO DE ARRASTRE.
+ *
+ * Sin tarjeta no hay caja a la que ponerle un contorno, asi que la marca va
+ * sobre la CAMISETA: un halo del azul activo alrededor de la prenda. Se ve de
+ * reojo, no agrega una linea a la cancha, y el `drop-shadow` lo hace seguir la
+ * silueta del SVG en lugar de dibujar un rectangulo.
+ */
+.pitch__slot.is-hover .pitch__empty {
+  border-color: var(--active);
+  border-style: solid;
+  background: color-mix(in srgb, var(--active) 22%, transparent);
 }
 
-.pitch__slot.is-selected .chip {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.pitch__slot.is-hover .chip__kit,
+.pitch__slot.is-selected .chip__kit,
+.bench__chip.is-selected .chip__kit {
+  filter: drop-shadow(0 0 0 var(--active)) drop-shadow(0 0 3px var(--active))
+    drop-shadow(var(--shadow-onpitch));
+}
+
+.pitch__slot.is-selected .chip__name,
+.bench__chip.is-selected .chip__name {
+  background: var(--active);
+  color: var(--on-color);
 }
 
 /* --- Ficha de jugador --- */
+/*
+ * LA FICHA EN LA CANCHA: camiseta, apellido, overall.
+ *
+ * SIN TARJETA. No hay fondo, ni borde, ni sombra alrededor del jugador: el
+ * objeto es la camiseta. Lo unico opaco es la banda del apellido, y es
+ * necesaria —texto blanco sobre cesped no se lee— pero va al ancho del texto
+ * y no al de una tarjeta.
+ */
 .chip {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  width: 74px;
-  padding: var(--sp-2) var(--sp-2) var(--sp-3);
-  background: rgba(10, 14, 18, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--radius-md);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  color: #fff;
+  gap: 2px;
+  width: 76px;
+  color: var(--on-color);
 }
 
 .chip--compact {
-  width: 66px;
-  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+  width: 62px;
+  gap: 1px;
 }
 
-.chip--outofposition {
-  border-color: color-mix(in srgb, var(--warn) 65%, transparent);
+.chip__kit {
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* La camiseta se despega del cesped con una sombra proyectada, no con un
+     borde: es lo que hace que se vea como una prenda y no como un icono. */
+  filter: drop-shadow(var(--shadow-onpitch));
 }
 
-.chip__top {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  width: 100%;
-}
-
-.chip__number {
-  font-size: 9px;
-  font-weight: var(--fw-bold);
-  color: rgba(255, 255, 255, 0.65);
-}
-
+/* Fuera de puesto: el aviso va SOBRE la camiseta, chico, y no cambia el color
+   de un borde que ya no existe. */
 .chip__natural {
-  padding: 0 2px;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--warn) 28%, transparent);
-  color: var(--warn);
+  position: absolute;
+  top: -3px;
+  right: -7px;
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  background: var(--warn);
+  color: var(--text-inverse);
   font-size: 8px;
   font-weight: var(--fw-bold);
+  line-height: 12px;
 }
 
 .chip__name {
-  width: 100%;
+  max-width: 100%;
+  padding: 1px var(--sp-3);
+  border-radius: var(--radius-sm);
+  /* La banda: lo justo para que el apellido se lea sobre el verde. */
+  background: var(--on-pitch-band);
   font-size: 10px;
   font-weight: var(--fw-semibold);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
   text-align: center;
   text-transform: uppercase;
 }
@@ -202,13 +241,17 @@
 }
 
 .chip__ovr {
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--on-pitch-band);
   font-size: var(--fs-sm);
   font-weight: var(--fw-bold);
-  line-height: 1;
+  line-height: 15px;
 }
 
 .chip__delta {
   font-size: 8px;
+  font-weight: var(--fw-bold);
   color: var(--warn);
 }
 
@@ -224,21 +267,31 @@
 }
 
 /* --- Banco --- */
+/*
+ * EL BANCO.
+ *
+ * Mismo lenguaje que la cancha pero en tono de panel: las camisetas se leen
+ * igual, y el fondo dice que esto no es el campo de juego. Los suplentes
+ * comparten componente con los titulares (`chip--compact`), asi que un cambio
+ * en la ficha se ve en los dos lugares y no se pueden desincronizar.
+ */
 .bench {
   margin-top: var(--sp-5);
   padding: var(--sp-4);
-  background: var(--surface-2);
-  border: 1px solid var(--border-subtle);
+  background: var(--grad-panel);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-inset);
   transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
 .bench.is-droppable {
-  border-color: var(--accent);
+  border-color: var(--active);
 }
 
 .bench.is-hover {
-  box-shadow: 0 0 0 2px var(--accent);
+  border-color: var(--active);
+  box-shadow: var(--shadow-inset), 0 0 0 2px var(--active);
 }
 
 .bench__head {
@@ -269,10 +322,9 @@
   cursor: grabbing;
 }
 
-.bench__chip.is-selected .chip {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
+/* El suplente seleccionado usa el mismo halo sobre la camiseta que el titular
+   (definido arriba, junto al de la cancha): una sola forma de decir
+   "seleccionado" en toda la pantalla. */
 
 .bench__remove {
   position: absolute;
@@ -299,7 +351,7 @@
 .bench__remove:hover {
   background: var(--danger);
   border-color: var(--danger);
-  color: #fff;
+  color: var(--on-color);
 }
 
 .bench__placeholder {
@@ -449,8 +501,10 @@
 }
 
 .choice__option.is-active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--grad-accent);
+  border-color: var(--active-edge);
+  box-shadow: var(--shadow-inset);
+  color: var(--on-color);
 }
 
 .tacticsform__toggles {
@@ -500,7 +554,7 @@
 
 .toggle.is-on .toggle__knob {
   transform: translateX(14px);
-  background: #fff;
+  background: var(--on-color);
 }
 
 .tacticsform__section {

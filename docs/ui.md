@@ -49,6 +49,75 @@ Requiere Node 22.18 o superior.
 
 ---
 
+## Mánager 6.0: el sistema visual
+
+PC Fútbol 6.0 / Apertura 98 recordado a través de una interfaz moderna. Ni una
+copia del juego viejo ni un panel de control genérico.
+
+**Azul marino de base, azul medio en los paneles, azul más claro en lo activo,
+plata en los detalles estructurales, verde de cancha como único acento fuera de
+la familia.** La paleta anterior era gris pizarra neutro con un azul de acento
+brillante: legible, densa y sin personalidad — se leía como una herramienta.
+
+Todo sale de `styles/tokens.css`, y esa es la razón de que el cambio de
+identidad cueste un archivo en lugar de doce: ningún componente define colores
+propios. Cuando este pase empezó eso era *casi* cierto —había 22 colores
+crudos sueltos, 13 de ellos en la cancha— y quedaron 4, todos velos y sombras.
+
+### Lo que se midió, no se estimó
+
+- **Contraste.** Los 49 pares de texto y superficie: el texto principal queda
+  entre 9,1:1 y 17,0:1, el secundario entre 5,1:1 y 9,6:1, y **ningún par baja
+  de 3,0:1**. `--text-muted` se aclaró de `#7189ad` a `#8096b7` justo por esto:
+  sobre una fila seleccionada daba 2,91:1.
+- **El dorsal de los veinte clubes.** El color del número lo calcula
+  `lib/club-colors.ts` contra el color del club, no se elige a mano: con blanco
+  fijo el dorsal de Belgrano (celeste) era ilegible, con negro fijo el de River.
+  El peor caso queda en **4,94:1**, arriba del mínimo AA, y Belgrano y Racing
+  son los dos que caen del lado de la tinta oscura.
+- **El anillo de foco** contra las seis superficies: entre 3,56:1 y 6,62:1.
+- **Peso.** El CSS pasó de 84 a 87 kB y el HTML autocontenido de 1,02 a
+  1,03 MB. La camiseta es SVG: no hay un solo archivo de imagen nuevo.
+
+### La camiseta es la firma
+
+Un jugador se reconoce por **color del club + dorsal + nombre**, sin foto.
+`components/PlayerShirt.tsx` dibuja la camiseta en SVG con `primaryColor` y
+`secondaryColor`, que los veinte clubes ya tenían, y el `shirtNumber` que ya
+venía del archivo del juego: **no agrega un solo campo al modelo**. Las mangas y
+el cuello van en el color secundario porque hay cinco clubes rojos y seis
+azules, y el principal no alcanza para distinguirlos.
+
+Aparece en la cancha (40px), el banco (26px), la lista del plantel (20px) y la
+ficha del jugador (72px, donde otros juegos ponen el retrato). El cuerpo del
+dorsal está tabulado por tamaño y no es proporcional: con un cuerpo fijo, un
+dorsal de dos cifras en la lista del plantel quedaba en 7,5px.
+
+**La ficha en la cancha dejó de ser una tarjeta.** Tenía fondo opaco, borde y
+sombra: once rectángulos oscuros sobre el césped, todos iguales, sin decir de
+qué equipo eran. Ahora el objeto es la camiseta, el apellido va sobre una banda
+del ancho del texto y el seleccionado se marca con un halo sobre la prenda
+—`drop-shadow`, que sigue la silueta del SVG— en lugar de un contorno
+rectangular.
+
+### Una sola forma de decir "esto está activo"
+
+El módulo abierto en la navegación, la fila seleccionada de una tabla, el club
+elegido en el elector de equipo y el jugador seleccionado en la cancha usan
+todos `--active`, que es **más claro que `--accent`**. Antes compartían token
+con el acento del producto, así que "seleccionado" y "es un botón" se veían
+igual.
+
+### Lo que no se tocó
+
+- **La tipografía es del sistema.** No se carga ninguna webfont, y es a
+  propósito: el HTML autocontenido se abre sin red.
+- **La escala de espaciado y los radios chicos.** Ya eran densos y contenidos.
+- **Los nombres de los tokens y de las clases CSS.** Los 26 tests de navegador
+  afirman sobre `.chip`, `.pitch__slot`, `.bench__chip`, `.sidebar__item` y una
+  veintena más: renombrarlas rompería tests que verifican comportamiento real.
+- **Ningún dato, cálculo ni mecánica.** Fue un pase de presentación.
+
 ## Decisiones de arquitectura
 
 ### La UI consume el motor real

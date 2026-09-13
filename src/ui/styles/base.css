@@ -63,8 +63,16 @@ table {
   width: 100%;
 }
 
+/*
+ * EL FOCO usa el azul ACTIVO, no el acento del producto.
+ *
+ * Sobre el marino de los paneles el acento se parecia demasiado al borde de un
+ * boton primario, asi que el foco de teclado se confundia con "este boton es
+ * el importante". El azul activo es mas claro y solo significa una cosa: aca
+ * esta el teclado.
+ */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--active);
   outline-offset: 1px;
   border-radius: var(--radius-sm);
 }

@@ -137,7 +137,7 @@
   border-radius: 2px;
   font-size: 8px;
   font-weight: var(--fw-bold);
-  color: #fff;
+  color: var(--on-color);
 }
 
 .formstrip__dot.is-V { background: var(--ok); }
@@ -530,7 +530,7 @@
   border-radius: 2px;
   font-size: 9px;
   font-weight: var(--fw-bold);
-  color: #fff;
+  color: var(--on-color);
   flex-shrink: 0;
 }
 

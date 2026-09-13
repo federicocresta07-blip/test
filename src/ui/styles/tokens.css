@@ -1,12 +1,41 @@
 /*
- * TOKENS VISUALES (secciones 15, 16).
+ * TOKENS VISUALES — MANAGER 6.0.
  *
- * Objetivo: manager clasico de futbol + aplicacion deportiva moderna.
- * Densidad alta, tablas legibles, jerarquia clara. Nada de gradientes,
- * tarjetas gigantes ni estetica SaaS.
+ * Objetivo: PC Futbol 6.0 / Apertura 98 recordado a traves de una interfaz
+ * moderna. Ni una copia del juego viejo ni un panel de control generico.
+ *
+ * Densidad alta, tablas legibles, jerarquia clara, identidad de juego. Nada
+ * de tarjetas gigantes, aire de sobra ni estetica SaaS.
  *
  * Ningun componente define colores, tamanios ni espaciados propios: todo
- * sale de aqui.
+ * sale de aqui. (Cuando esto se escribio era casi cierto: habia veintidos
+ * colores crudos sueltos por las hojas de estilo, trece de ellos en la
+ * cancha. Se limpiaron en este mismo pase.)
+ *
+ * ============================================================
+ * DE GRIS PIZARRA A AZUL MARINO
+ * ============================================================
+ *
+ * La paleta anterior era gris pizarra neutro con un azul de acento brillante:
+ * legible, densa y sin personalidad — se leia como una herramienta, no como un
+ * juego. La direccion aprobada es azul: marino de base, azul medio en los
+ * paneles, azul mas claro en lo activo, plata en los detalles estructurales y
+ * verde de cancha como unico acento ajeno a la familia.
+ *
+ * El azul no es decorativo: es lo que hace que la pantalla se lea como un
+ * manager de futbol de los 90 sin imitar sus pixeles.
+ *
+ * ============================================================
+ * QUE NO SE TOCO, Y POR QUE
+ * ============================================================
+ *
+ * - LOS NOMBRES DE LOS TOKENS. Cambiar `--surface-2` por otro nombre obligaria
+ *   a tocar doce hojas de estilo para no ganar nada visual.
+ * - LA TIPOGRAFIA ES DEL SISTEMA. No se carga ninguna webfont, y es a
+ *   proposito: el HTML autocontenido se abre sin red, y una fuente remota lo
+ *   dejaria con la tipografia de reserva justo cuando no hay como pedirla.
+ * - LA ESCALA DE ESPACIADO Y LOS RADIOS chicos. Ya eran densos y contenidos,
+ *   que es lo que pide un manager.
  */
 
 :root {
@@ -18,55 +47,111 @@
    */
   color-scheme: dark;
 
-  /* --- Superficies: fondo oscuro sobrio, tipo panel de control deportivo --- */
-  --bg-base: #0e1116;
-  --bg-sunken: #0a0d11;
-  --surface-1: #151a21;
-  --surface-2: #1b2129;
-  --surface-3: #222a34;
-  --surface-hover: #26303b;
-  --surface-active: #2d3945;
+  /* --- Superficies: azul marino de base, azul medio en los paneles --- */
+  --bg-base: #0a1628;
+  --bg-sunken: #060e1a;
+  --surface-1: #10203a;
+  --surface-2: #16294a;
+  --surface-3: #1d3358;
+  --surface-hover: #24406b;
+  --surface-active: #2b4c7e;
 
-  /* --- Bordes --- */
-  --border-subtle: #222b35;
-  --border-default: #2c3742;
-  --border-strong: #3b4956;
+  /* --- Bordes: plata apagada, no gris neutro --- */
+  --border-subtle: #1b3054;
+  --border-default: #24406b;
+  --border-strong: #365a91;
 
-  /* --- Texto --- */
-  --text-primary: #e8edf3;
-  --text-secondary: #9dabba;
-  --text-muted: #6b7987;
-  --text-inverse: #0e1116;
+  /* --- Texto: frio, para que pertenezca al azul --- */
+  --text-primary: #eaf1fb;
+  --text-secondary: #a3b8d6;
+  --text-muted: #8096b7;
+  --text-inverse: #071322;
+
+  /*
+   * --- Plata: los detalles ESTRUCTURALES ---
+   *
+   * Separadores, numeros de cabecera, filos. Es lo que da el aire metalico
+   * contenido sin un solo degradado de mas.
+   */
+  --silver: #c9d8ef;
+  --silver-dim: #93a9c8;
 
   /* --- Identidad: el acento es del producto, no del club --- */
-  --accent: #2f81f7;
-  --accent-hover: #4a92f8;
-  --accent-subtle: #16294a;
-  --accent-text: #79b0ff;
+  --accent: #3d8bfd;
+  --accent-hover: #5b9dff;
+  --accent-subtle: #14305c;
+  --accent-text: #93c0ff;
 
-  /* --- Cancha --- */
-  --pitch-grass: #1c3d28;
-  --pitch-grass-alt: #1f4430;
-  --pitch-line: #3d6b4e;
-  --pitch-slot-empty: #24402e;
+  /*
+   * --- Azul ACTIVO: mas claro que el acento ---
+   *
+   * El modulo abierto en la navegacion y la fila seleccionada en una tabla
+   * usan esto. Antes compartian token con el acento del producto, asi que
+   * "seleccionado" y "es un boton" se veian igual y la navegacion se leia
+   * peor de lo que funcionaba.
+   */
+  --active: #4d97ff;
+  --active-bg: #1d3f70;
+  --active-edge: #5aa2ff;
 
-  /* --- Semanticos --- */
-  --ok: #3fb950;
-  --ok-subtle: #10251a;
-  --warn: #d29922;
-  --warn-subtle: #2a2213;
-  --danger: #f85149;
-  --danger-subtle: #2d1517;
-  --info: #58a6ff;
-  --info-subtle: #12233d;
+  /* --- Cancha: el unico acento fuera de la familia azul --- */
+  --pitch-grass: #17402a;
+  --pitch-grass-alt: #1b4a31;
+  --pitch-line: #437c58;
+  --pitch-slot-empty: #1f4a33;
+  --pitch-accent: #37b866;
+
+  /* --- Semanticos: calibrados para leerse sobre azul marino --- */
+  --ok: #43d16c;
+  --ok-subtle: #0d2a1c;
+  --warn: #e3a92b;
+  --warn-subtle: #2c2312;
+  --danger: #ff6157;
+  --danger-subtle: #331618;
+  --info: #5aa8ff;
+  --info-subtle: #12294d;
 
   /* --- Escala de ratings 1-100 (secciones 6.2, 6.3) --- */
-  --rating-elite: #3fb950;
-  --rating-great: #74c365;
-  --rating-good: #d3c022;
-  --rating-average: #d29922;
-  --rating-poor: #d4643c;
-  --rating-bad: #b5483f;
+  --rating-elite: #43d16c;
+  --rating-great: #8ad46a;
+  --rating-good: #e0cf3c;
+  --rating-average: #e3a92b;
+  --rating-poor: #e87c48;
+  --rating-bad: #e0564a;
+
+  /*
+   * --- Degradados y biseles: el metal, con cuidado ---
+   *
+   * Cuatro, y ninguno decorativo: cabecera de panel, cuerpo de panel, boton
+   * primario y el brillo de arriba que hace que un borde parezca un filo. El
+   * brief pide "metalico contenido", que en la practica quiere decir que se
+   * note cuando lo buscas y no cuando lees una tabla.
+   */
+  --grad-panel: linear-gradient(180deg, #16294a 0%, #101f37 100%);
+  --grad-panelhead: linear-gradient(180deg, #223d66 0%, #182e51 100%);
+  --grad-accent: linear-gradient(180deg, #4e96ff 0%, #2c74dd 100%);
+  --grad-pitch: linear-gradient(180deg, #1b4a31 0%, #143a26 100%);
+
+  --bevel-hi: rgba(255, 255, 255, 0.08);
+  --bevel-lo: rgba(0, 0, 0, 0.32);
+
+  /* Luz de estadio: el halo tenue detras de la cancha y de las cabeceras. */
+  --stadium-glow: rgba(77, 151, 255, 0.14);
+
+  /*
+   * Sobre el cesped: la banda del apellido y la sombra de la camiseta.
+   * Estan aca y no en la hoja de la cancha porque las usan la ficha, el banco
+   * y el panel de ficha, y tres copias del mismo valor se desincronizan.
+   */
+  --on-pitch-band: rgba(4, 10, 20, 0.78);
+  --shadow-onpitch: 0 2px 3px rgba(0, 0, 0, 0.55);
+
+  /* El velo detras de un modal o un cajon. */
+  --scrim: rgba(3, 8, 18, 0.68);
+
+  /* --- Blanco de la camiseta y del texto sobre color de club --- */
+  --on-color: #ffffff;
+  --on-color-dim: rgba(255, 255, 255, 0.72);
 
   /* --- Tipografia --- */
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -109,9 +194,12 @@
   --radius-lg: 8px;
   --radius-pill: 999px;
 
-  /* --- Sombras: solo para capas flotantes --- */
+  /* --- Sombras: solo para capas flotantes y filos --- */
   --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.45);
   --shadow-drag: 0 6px 16px rgba(0, 0, 0, 0.6);
+  /* El filo de una cabecera: una linea de luz arriba y peso abajo. */
+  --shadow-edge: inset 0 1px 0 var(--bevel-hi), 0 1px 0 var(--bevel-lo);
+  --shadow-inset: inset 0 1px 0 var(--bevel-hi);
 
   /* --- Layout del shell --- */
   --sidebar-w: 216px;

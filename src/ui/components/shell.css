@@ -1,6 +1,15 @@
 /* ============================================================
-   GAME SHELL (secciones 3.1, 4, 5.1)
-   ============================================================ */
+   GAME SHELL (secciones 3.1, 4, 5.1) — MANAGER 6.0
+   ============================================================
+
+   La barra superior es el TABLERO PERSISTENTE del juego y la navegacion
+   izquierda el indice de modulos. Las dos cosas viven encima de un marino mas
+   oscuro que el contenido, para que el area de juego sea lo que se lee
+   primero y el marco quede alrededor sin competir.
+
+   El modulo abierto usa el azul ACTIVO, que es mas claro que el acento del
+   producto. Antes compartian token: "seleccionado" y "es un boton" se veian
+   igual, y la navegacion se leia peor de lo que funcionaba. */
 
 .shell {
   display: grid;
@@ -19,6 +28,14 @@
   min-width: 0;
   overflow-y: auto;
   padding: var(--sp-6);
+  /*
+   * LUZ DE ESTADIO. Un halo azul tenue arriba del area de juego, fijo y sin
+   * animacion: es lo unico que separa el contenido del marco sin una linea
+   * mas. Cuesta un gradiente y no se nota hasta que se apaga.
+   */
+  background:
+    radial-gradient(120% 60% at 50% -10%, var(--stadium-glow) 0%, transparent 70%),
+    var(--bg-base);
 }
 
 /* --- Sidebar --- */
@@ -26,7 +43,7 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--bg-sunken);
-  border-right: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-default);
   min-height: 0;
 }
 
@@ -45,9 +62,11 @@
   width: 26px;
   height: 26px;
   flex-shrink: 0;
-  background: var(--accent);
+  background: var(--grad-accent);
+  border: 1px solid var(--active-edge);
   border-radius: var(--radius-md);
-  color: #fff;
+  box-shadow: var(--shadow-inset);
+  color: var(--on-color);
   font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
@@ -86,13 +105,15 @@
 
 .sidebar__single:hover,
 .sidebar__sectionhead:hover {
-  background: var(--surface-2);
+  background: var(--surface-1);
   color: var(--text-primary);
 }
 
 .sidebar__single.is-active {
-  background: var(--accent-subtle);
-  color: var(--accent-text);
+  background: var(--active-bg);
+  box-shadow: var(--shadow-inset), inset 2px 0 0 var(--active);
+  color: var(--on-color);
+  font-weight: var(--fw-semibold);
 }
 
 .sidebar__section {
@@ -106,6 +127,20 @@
 .sidebar__sectionlabel {
   flex: 1;
   text-align: left;
+}
+
+/* El nombre de la seccion es una ETIQUETA, no un titulo: plata, chica y
+   espaciada. Es la convencion de los managers clasicos para el indice. */
+.sidebar__section > .sidebar__sectionhead .sidebar__sectionlabel {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--silver-dim);
+}
+
+.sidebar__section.is-active > .sidebar__sectionhead .sidebar__sectionlabel {
+  color: var(--silver);
 }
 
 .sidebar__chevron {
@@ -136,14 +171,17 @@
 }
 
 .sidebar__item:hover {
-  background: var(--surface-2);
+  background: var(--surface-1);
   color: var(--text-primary);
 }
 
 .sidebar__item.is-active {
-  background: var(--accent-subtle);
-  color: var(--accent-text);
-  font-weight: var(--fw-medium);
+  /* El riel de la izquierda hace el trabajo: se ve de reojo, a diferencia de
+     un cambio de color de texto, y no pide subir el contraste del fondo. */
+  background: var(--active-bg);
+  box-shadow: inset 2px 0 0 var(--active);
+  color: var(--on-color);
+  font-weight: var(--fw-semibold);
 }
 
 .sidebar__item.is-pending {
@@ -168,14 +206,17 @@
   line-height: 1.5;
 }
 
-/* --- Barra superior --- */
+/* --- Barra superior: el tablero persistente --- */
 .topbar {
   display: flex;
   align-items: center;
   gap: var(--sp-6);
   padding: 0 var(--sp-6);
-  background: var(--surface-1);
-  border-bottom: 1px solid var(--border-subtle);
+  /* Degradado y filo: es el marco del juego, y tiene que leerse como una
+     pieza solida y no como la primera fila del contenido. */
+  background: var(--grad-panelhead);
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-edge);
   position: relative;
 }
 
@@ -190,7 +231,7 @@
 }
 
 .topbar__club:hover {
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 
 .clubbadge {
@@ -231,7 +272,7 @@
   align-items: center;
   gap: var(--sp-7);
   padding-left: var(--sp-6);
-  border-left: 1px solid var(--border-subtle);
+  border-left: 1px solid var(--border-strong);
   height: 28px;
 }
 
@@ -247,13 +288,15 @@
   font-weight: var(--fw-bold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  /* Plata: es rotulo de instrumento, no texto para leer. */
+  color: var(--silver-dim);
 }
 
 .topbar__metricvalue {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
   line-height: 1.1;
+  color: var(--silver);
 }
 
 .topbar__right {
@@ -290,7 +333,7 @@
   place-items: center;
   background: var(--danger);
   border-radius: var(--radius-pill);
-  color: #fff;
+  color: var(--on-color);
   font-size: 9px;
   font-weight: var(--fw-bold);
 }
@@ -367,7 +410,7 @@
   padding: 0 var(--sp-2);
   background: var(--accent);
   border-radius: var(--radius-sm);
-  color: #fff;
+  color: var(--on-color);
   font-size: var(--fs-2xs);
   font-weight: var(--fw-bold);
   flex-shrink: 0;
@@ -386,12 +429,17 @@
   gap: var(--sp-7);
   padding: 0 var(--sp-6);
   background: var(--bg-sunken);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-default);
 }
 
+/* El titulo de pantalla: el unico texto en mayusculas espaciadas del marco.
+   Es el rotulo del modulo abierto, la convencion de cabecera de un manager. */
 .clubheader__title {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--silver);
   white-space: nowrap;
 }
 
@@ -400,7 +448,7 @@
   align-items: center;
   gap: var(--sp-4);
   padding-left: var(--sp-7);
-  border-left: 1px solid var(--border-subtle);
+  border-left: 1px solid var(--border-default);
   min-width: 0;
 }
 
@@ -444,7 +492,7 @@
 
 .clubheader__alert:hover {
   background: var(--danger);
-  color: #fff;
+  color: var(--on-color);
 }
 
 .clubheader__ready {
