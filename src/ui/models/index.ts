@@ -273,6 +273,13 @@ export type SeasonView = {
   /** El ultimo partido del club del manager, si ya jugo alguno. */
   readonly lastUserMatch: MatchRecord | null;
   /**
+   * Temporadas cerradas desde el arranque de la partida (fase 6).
+   *
+   * La interfaz la necesita porque de ella se derivan las edades: no solo las
+   * del plantel del manager, tambien las de los diecinueve rivales (fase 8).
+   */
+  readonly seasonsClosed: number;
+  /**
    * Cohesion del plantel del manager, 1..100 (seccion 39).
    *
    * La calcula la progresion del motor despues de cada partido y la guarda la

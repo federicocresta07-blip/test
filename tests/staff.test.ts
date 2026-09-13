@@ -38,12 +38,14 @@ import {
   type StaffRole,
 } from '../src/domain/staff.ts';
 import { advanceDays } from '../src/progression/after-match.ts';
+import { preventionFactor } from '../src/engine/discipline.ts';
 import { developPlayer } from '../src/progression/development.ts';
 import { scoutPotential } from '../src/domain/youth.ts';
 import { appraise } from '../src/domain/market.ts';
 import { scoutingDetail } from '../src/ui/lib/scouting.ts';
 import { createPlayer } from '../src/domain/player.ts';
 import { createTeam } from '../src/domain/team.ts';
+import { simulateMatch } from '../src/engine/match-engine.ts';
 import { attributesFor, buildSquad } from '../src/data/squad-builder.ts';
 import { navigationPhaseMismatches } from '../src/ui/router/navigation.ts';
 import { phasePlan } from '../src/ui/router/plan.ts';
@@ -289,6 +291,11 @@ const CONSUMED_BY: Readonly<Record<string, readonly StaffRole[]>> = {
   // Mercado: con cuanta precision se ve a un jugador de otro club y cuanto se
   // cree que vale.
   mercado: ['Ojeador', 'Secretario técnico'],
+  // Las lesiones que sortea el partido (`engine/discipline.ts` via
+  // `team.injuryPrevention`). Fue el ultimo rol en engancharse: hasta la fase
+  // 8 el motor tomaba el riesgo de su configuracion global, igual para los
+  // veinte clubes, asi que mejorar al fisioterapeuta no movia nada.
+  partido: ['Fisioterapeuta'],
 };
 
 test('HONESTIDAD: todo rol implementado tiene un consumidor de verdad', () => {
@@ -328,6 +335,18 @@ test('HONESTIDAD: todo rol implementado tiene un consumidor de verdad', () => {
       withCoach.overallAfter > without.overallAfter,
       `${role} no hace crecer mas rapido a sus jugadores`,
     );
+  }
+
+  // El fisioterapeuta tiene que reducir las lesiones que sortea el partido.
+  for (const role of CONSUMED_BY['partido'] as readonly StaffRole[]) {
+    const effect = staffEffect(role, 5, 5).actual;
+    assert.ok(effect > 0, `${role} declara un efecto de cero`);
+    assert.ok(
+      preventionFactor(effect) < preventionFactor(0),
+      `${role} no reduce el riesgo de lesion`,
+    );
+    // Y nunca lo anula: el mejor fisioterapeuta no evita un ligamento roto.
+    assert.ok(preventionFactor(effect) > 0, `${role} anula el riesgo por completo`);
   }
 
   // El ojeador del mercado angosta el informe sobre un jugador ajeno y el
@@ -455,4 +474,68 @@ test('HONESTIDAD: la navegacion y el plan dicen lo mismo', () => {
   // Marcar una pantalla como lista sin actualizar su fase dejaria el plan
   // diciendo una cosa y la aplicacion otra.
   assert.deepEqual(navigationPhaseMismatches(), []);
+});
+
+test('EL FISIOTERAPEUTA CAMBIA EL PARTIDO, no solo la ficha', () => {
+  // El test de honestidad de mas arriba verifica que el rol este enganchado.
+  // Este mide que el enganche SIRVA: se juegan miles de partidos con y sin
+  // fisioterapeuta y se cuentan las lesiones que salen.
+  //
+  // Medido: sin fisioterapeuta 0,203 lesiones por partido; con uno de cinco
+  // estrellas 0,159. Sobre un torneo de 19 fechas es casi una lesion menos por
+  // temporada, que es poco y es exactamente lo que un fisioterapeuta hace.
+  const squadOf = (id: string) => buildSquad({ target: 78, prefix: id, seed: 'fisio' });
+  const teamWith = (id: string, prevention: number) =>
+    createTeam({
+      id,
+      name: id,
+      players: squadOf(id),
+      chemistry: 70,
+      injuryPrevention: prevention,
+    });
+
+  const injuriesWith = (prevention: number): number => {
+    let total = 0;
+    const matches = 1500;
+    for (let seed = 0; seed < matches; seed += 1) {
+      const result = simulateMatch({
+        home: teamWith('A', prevention),
+        away: teamWith('B', 0),
+        seed,
+      });
+      total += result.events.filter(
+        (event) => event.type === 'lesion' && event.side === 'local',
+      ).length;
+    }
+    return total / matches;
+  };
+
+  const without = injuriesWith(0);
+  const withBest = injuriesWith(staffEffect('Fisioterapeuta', 5, 5).actual);
+
+  assert.ok(without > 0, 'tienen que salir lesiones: si no, el test no mide nada');
+  assert.ok(
+    withBest < without,
+    `el fisioterapeuta tiene que reducirlas: ${without.toFixed(3)} vs ${withBest.toFixed(3)}`,
+  );
+  // Y no puede hacerlas desaparecer: un plantel blindado rompe el juego.
+  assert.ok(
+    withBest > without * 0.6,
+    `el mejor fisioterapeuta no puede blindar al plantel: ${withBest.toFixed(3)}`,
+  );
+
+  // El rival, que no tiene fisioterapeuta, se sigue lesionando igual: el
+  // efecto es POR EQUIPO y no una constante global del motor.
+  let awayInjuries = 0;
+  for (let seed = 0; seed < 600; seed += 1) {
+    const result = simulateMatch({
+      home: teamWith('A', staffEffect('Fisioterapeuta', 5, 5).actual),
+      away: teamWith('B', 0),
+      seed,
+    });
+    awayInjuries += result.events.filter(
+      (event) => event.type === 'lesion' && event.side === 'visitante',
+    ).length;
+  }
+  assert.ok(awayInjuries / 600 > withBest, 'el rival sin fisioterapeuta se lesiona mas');
 });

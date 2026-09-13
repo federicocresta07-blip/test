@@ -5,7 +5,7 @@ import { Badge } from './ui/Badge.tsx';
 import { Tooltip } from './ui/Tooltip.tsx';
 import { Link } from '../router/router.tsx';
 import { useGameState } from '../state/GameProvider.tsx';
-import { DATA_SOURCE_LABEL, DATA_SOURCE_NOTICE } from '../services/index.ts';
+import { currentGameId, DATA_SOURCE_LABEL, DATA_SOURCE_NOTICE } from '../services/index.ts';
 import { moneyShort, shortDate } from '../lib/format.ts';
 import { squadAlerts } from '../lib/alerts.ts';
 
@@ -19,6 +19,9 @@ import { squadAlerts } from '../lib/alerts.ts';
 export function TopBar(): ReactNode {
   const state = useGameState();
   const [openNotifications, setOpenNotifications] = useState(false);
+  // El estado ya cargó cuando esto se dibuja, así que la conexión al servidor
+  // ya se resolvió: leerlo en el render es correcto y no hace falta estado.
+  const partida = currentGameId();
 
   const position = state.table.findIndex((row) => row.clubId === state.club.id) + 1;
   const unread = state.inbox.filter((message) => message.unread).length;
@@ -58,6 +61,36 @@ export function TopBar(): ReactNode {
         <Tooltip content={DATA_SOURCE_NOTICE} side="bottom">
           <Badge tone="accent">{DATA_SOURCE_LABEL}</Badge>
         </Tooltip>
+
+        {/*
+          DONDE VIVE LA PARTIDA (fase 8).
+          
+          Con un servidor detrás se muestra el nombre de la partida, y no es un
+          adorno: el servidor la identifica por una cookie `HttpOnly`, que no se
+          puede llevar a otra máquina a mano. Sin ver el nombre, una carrera
+          guardada en el servidor es inalcanzable desde otro navegador.
+        */}
+        {partida !== null ? (
+          <Tooltip
+            content={
+              `La partida se guarda en el servidor con el nombre "${partida}". ` +
+              `Para retomarla desde otro navegador o otra máquina, abrí ?partida=${partida}`
+            }
+            side="bottom"
+          >
+            <Badge tone="ok">servidor · {partida}</Badge>
+          </Tooltip>
+        ) : (
+          <Tooltip
+            content={
+              'La partida se guarda en este navegador. Borrar los datos del sitio la pierde. ' +
+              'Servida por `npm run serve`, se guarda en el servidor.'
+            }
+            side="bottom"
+          >
+            <Badge>local</Badge>
+          </Tooltip>
+        )}
 
         <button
           className={`topbar__icon ${unread + pendingOffers + critical > 0 ? 'has-badge' : ''}`}

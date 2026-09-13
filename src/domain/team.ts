@@ -36,6 +36,20 @@ export type Team = {
   readonly chemistry: number;
   /** Reputacion 1..100: solo informativa para el resto del juego. */
   readonly reputation: number;
+  /**
+   * TRABAJO PREVENTIVO DEL CUERPO MEDICO, 0..100 (seccion 38, fase 8).
+   *
+   * Reduce el riesgo de que un jugador de este equipo se lesione durante el
+   * partido. Es una propiedad del CLUB, como la cohesion: dos equipos con los
+   * mismos jugadores y distinto fisioterapeuta no se lesionan igual.
+   *
+   * Existe porque el fisioterapeuta prometia "reduccion del riesgo de lesion
+   * durante el partido" y no lo hacia: el motor tomaba el riesgo de su
+   * configuracion global, igual para los veinte clubes, asi que mejorarlo no
+   * movia nada. Era el ultimo rol del cuerpo tecnico que declaraba
+   * `pendiente`.
+   */
+  readonly injuryPrevention: number;
   readonly setPieceTakers: SetPieceTakers;
   readonly instructions: readonly ConditionalInstruction[];
 };
@@ -48,6 +62,7 @@ export type TeamInput = {
   readonly tactics?: Tactics;
   readonly chemistry?: number;
   readonly reputation?: number;
+  readonly injuryPrevention?: number;
   readonly setPieceTakers?: SetPieceTakers;
   readonly instructions?: readonly ConditionalInstruction[];
 };
@@ -61,6 +76,11 @@ export function createTeam(input: TeamInput): Team {
     tactics: input.tactics ?? DEFAULT_TACTICS,
     chemistry: clamp(input.chemistry ?? 60, 1, 100),
     reputation: clamp(input.reputation ?? 60, 1, 100),
+    // Por defecto CERO: un club sin fisioterapeuta no previene nada, y el
+    // riesgo base del motor es el de un equipo sin trabajo preventivo. Si el
+    // defecto fuera un valor medio, contratar a uno restaria en lugar de
+    // sumar en la mitad de los casos.
+    injuryPrevention: clamp(input.injuryPrevention ?? 0, 0, 100),
     setPieceTakers: input.setPieceTakers ?? {},
     instructions: input.instructions ?? [],
   };

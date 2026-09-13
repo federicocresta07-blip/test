@@ -57,7 +57,12 @@ function labelOf(key: string): string {
 export function RivalsPage({ clubId }: { readonly clubId?: string | undefined }): ReactNode {
   const state = useGameState();
   const table = useMemo(() => seasonTable(state.season.records), [state.season.records]);
-  const teams = useMemo(() => leagueTeams(), []);
+  // Los rivales cumplen anios al cerrar la temporada (fase 8), asi que la
+  // pantalla tiene que pedir los de ESTA temporada y no los de 1998.
+  const teams = useMemo(
+    () => leagueTeams(undefined, undefined, [], 0, state.season.seasonsClosed),
+    [state.season.seasonsClosed],
+  );
 
   // Cuanto se ve de un rival lo decide el analista del club (seccion 7). Sin
   // analista se ve lo que ya esta en la tabla; con uno de cinco estrellas, el

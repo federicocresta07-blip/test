@@ -68,6 +68,8 @@ import {
   expansionWeeks,
 } from '../../domain/stadium.ts';
 import { closeSeason as closeSeasonOf } from '../../progression/season-close.ts';
+import { storage } from './storage.ts';
+import { ATTRIBUTE_KEYS } from '../../domain/attributes.ts';
 import { developPlayer } from '../../progression/development.ts';
 import { SEASON_LABEL } from '../data/competition.ts';
 import { offersFromMarket } from '../data/market.ts';
@@ -80,6 +82,7 @@ import {
 } from '../../competition/season.ts';
 import { accumulateRound } from '../../competition/stats.ts';
 import {
+  injuryPreventionOf,
   progressionEffects,
   staffEffect,
   staffSpec,
@@ -117,8 +120,10 @@ import {
   emptySeason,
   readSeason,
   restoreTeams,
+  snapshotAttributes,
   snapshotChemistry,
   snapshotConditions,
+  withAttributes,
   withCondition,
   writeSeason,
   type GateRecord,
@@ -213,7 +218,7 @@ function initialLineup(): LineupSelection {
 
 function readStoredLineup(): LineupSelection | null {
   try {
-    const raw = localStorage.getItem(LINEUP_STORAGE_KEY);
+    const raw = storage().getItem(LINEUP_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as LineupSelection;
     // Validacion minima: si el formato cambio, se descarta y se arranca limpio.
@@ -529,18 +534,27 @@ function composeInbox(development: DevelopmentState, today: string): readonly In
  * juega una fecha: el preparador fisico acelera la recuperacion, el medico
  * acorta las lesiones y el psicologo levanta la moral.
  */
-function progressionStaff(development: DevelopmentState): ReturnType<typeof progressionEffects> {
+/**
+ * El cuerpo tecnico del club con la instalacion que lo respalda.
+ *
+ * Es la forma en que el dominio lo pide: cada efecto sale del nivel del
+ * profesional ACOTADO por su instalacion, asi que un entrenador de cinco
+ * estrellas en instalaciones de dos no rinde cinco.
+ */
+function staffAssignments(development: DevelopmentState): readonly StaffAssignment[] {
   const facilities = composeFacilities(development);
   const levelOf = (facilityId: FacilityId): FacilityLevel =>
     facilities.find((facility) => facility.id === facilityId)?.level ?? 1;
 
-  const assignments: StaffAssignment[] = composeStaff(development).map((member) => ({
+  return composeStaff(development).map((member) => ({
     role: member.role,
     level: member.level,
     facilityLevel: levelOf(staffSpec(member.role).facility),
   }));
+}
 
-  return progressionEffects(assignments);
+function progressionStaff(development: DevelopmentState): ReturnType<typeof progressionEffects> {
+  return progressionEffects(staffAssignments(development));
 }
 
 
@@ -743,7 +757,10 @@ function recordTransferIncome(amount: number, label: string): void {
  * el manager marco.
  */
 function listedIds(save: SeasonSave): readonly string[] {
-  const teams = applyTransfers(leagueTeams(), save.transfers ?? []);
+  const teams = applyTransfers(
+    leagueTeams(undefined, undefined, [], 0, save.seasonsClosed ?? 0),
+    save.transfers ?? [],
+  );
   const ids: string[] = [...(save.listed ?? [])];
   for (const [clubId, team] of teams) {
     if (clubId === CLUB_ID) continue;
@@ -776,7 +793,7 @@ function signedPlayers(save: SeasonSave): readonly Player[] {
   if (incoming.length === 0) return [];
 
   return incoming
-    .map((entry) => findLeaguePlayer(entry.playerId))
+    .map((entry) => findLeaguePlayer(entry.playerId, save.seasonsClosed ?? 0))
     .filter((found): found is { player: Player; clubId: string } => found !== null)
     .map((found) => withCondition(found.player, save.conditions[found.player.id]));
 }
@@ -794,7 +811,10 @@ function generateIncomingOffers(
   squad: readonly ClubPlayer[],
   round: number,
 ): readonly StoredOffer[] {
-  const teams = applyTransfers(leagueTeams(), save.transfers ?? []);
+  const teams = applyTransfers(
+    leagueTeams(undefined, undefined, [], 0, save.seasonsClosed ?? 0),
+    save.transfers ?? [],
+  );
   const alreadyOffered = new Set(
     (save.offers ?? [])
       .filter((entry) => entry.toClubId === CLUB_ID && entry.status === 'enviada')
@@ -925,7 +945,12 @@ function composeSquad(
 ): readonly ClubPlayer[] {
   const base = DEMO_SQUAD.map((entry) => ({
     ...entry,
-    player: withCondition(entry.player, save.conditions[entry.player.id]),
+    // El orden importa: primero los atributos desarrollados, despues el
+    // estado. Los dos vienen del guardado y ninguno se puede recalcular.
+    player: withCondition(
+      withAttributes(entry.player, save.attributes?.[entry.player.id]),
+      save.conditions[entry.player.id],
+    ),
     yellowCards: save.totals[entry.player.id]?.yellowCards ?? 0,
   }));
 
@@ -993,6 +1018,7 @@ function composeSeason(save: SeasonSave): GameState['season'] {
     records: save.records,
     totals: save.totals,
     lastUserMatch: own[0] ?? null,
+    seasonsClosed: save.seasonsClosed ?? 0,
     chemistry: save.chemistry[CLUB_ID] ?? INITIAL_CHEMISTRY,
   };
 }
@@ -1043,7 +1069,7 @@ export function createMockGameService(): GameService {
 
     async saveLineup(_clubId: string, selection: LineupSelection): Promise<void> {
       try {
-        localStorage.setItem(LINEUP_STORAGE_KEY, JSON.stringify(selection));
+        storage().setItem(LINEUP_STORAGE_KEY, JSON.stringify(selection));
       } catch {
         // Sin almacenamiento disponible la alineacion vive solo en memoria.
       }
@@ -1172,6 +1198,12 @@ export function createMockGameService(): GameService {
         selection.tactics,
         save.chemistry[CLUB_ID] ?? INITIAL_CHEMISTRY,
         promotedPlayers(development, save),
+        // EL FISIOTERAPEUTA (fase 8). Su efecto entra al partido por aca y
+        // reduce cuantas lesiones sortea el motor. Antes no entraba a ningun
+        // lado y el rol declaraba `pendiente`.
+        injuryPreventionOf(staffAssignments(development)),
+        // Los rivales tambien cumplen anios (fase 8).
+        save.seasonsClosed ?? 0,
       );
       // Los traspasos mueven jugadores entre planteles antes de jugar: el que
       // se vendio el jueves no juega el domingo.
@@ -1224,6 +1256,10 @@ export function createMockGameService(): GameService {
         records: [...save.records, ...outcome.records],
         totals: accumulateRound(save.totals, outcome.records),
         conditions: snapshotConditions(outcome.teams),
+        // LOS ATRIBUTOS DESARROLLADOS (fase 8). Solo del club del manager: los
+        // rivales se derivan de las temporadas cerradas y guardar 418
+        // jugadores mas seria medio megabyte por nada.
+        attributes: snapshotAttributes(outcome.teams, [CLUB_ID]),
         chemistry: snapshotChemistry(outcome.teams),
         offers: [...(save.offers ?? []), ...incoming],
         ...(gate ? { gates: [...(save.gates ?? []), gate.record] } : {}),
@@ -1317,11 +1353,23 @@ export function createMockGameService(): GameService {
       // retirados (que ya no estan), las temporadas cerradas y los juveniles
       // que el manager subio al plantel.
       const retiredIds = new Set(result.retired.map((entry) => entry.player.id));
+
+      // LOS ATRIBUTOS CRUZAN EL ANIO (fase 8). `closeSeason` devuelve el
+      // plantel con un anio mas encima —y con lo que se desarrollo durante la
+      // temporada, porque venia de `composeSquad`— asi que hay que guardarlos
+      // en la temporada nueva. Sin esto, cerrar la temporada tiraba todo el
+      // crecimiento del anio y el plantel volvia al del archivo.
+      const carried: Record<string, readonly number[]> = {};
+      for (const player of result.players) {
+        carried[player.id] = ATTRIBUTE_KEYS.map((key) => player.attributes[key]);
+      }
+
       writeSeason({
         ...emptySeason(`${save.seed}-t${seasonsClosed + 1}`),
         seasonsClosed: seasonsClosed + 1,
         promoted: (save.promoted ?? []).filter((id) => !retiredIds.has(id)),
         retired: [...(save.retired ?? []), ...retiredIds],
+        attributes: carried,
       });
 
       return {
@@ -1403,7 +1451,10 @@ export function createMockGameService(): GameService {
       const save = readSeason();
       const development = readDevelopment();
 
-      const teams = applyTransfers(leagueTeams(), save.transfers ?? []);
+      const teams = applyTransfers(
+    leagueTeams(undefined, undefined, [], 0, save.seasonsClosed ?? 0),
+    save.transfers ?? [],
+  );
       const found = [...teams].find(([clubId, team]) =>
         clubId !== CLUB_ID && team.players.some((entry) => entry.id === playerId),
       );

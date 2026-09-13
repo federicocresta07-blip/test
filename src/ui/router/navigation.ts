@@ -220,6 +220,19 @@ export function pendingModuleCount(): number {
 }
 
 /**
+ * La primera pantalla de una seccion.
+ *
+ * Las rutas de seccion (`/club`, `/mercado`) no son pantallas: son cabeceras
+ * que agrupan. Entrar a una a mano daba "Ruta desconocida", que es cierto y
+ * es inutil. Con esto se va a su primera pantalla, que es lo que el que
+ * escribio la URL queria.
+ */
+export function firstItemOfSection(path: string): string | undefined {
+  const section = NAVIGATION.find((entry) => entry.path === path && entry.items.length > 0);
+  return section?.items[0]?.path;
+}
+
+/**
  * Coherencia entre la navegacion y el plan.
  *
  * Una pantalla marcada como lista tiene que pertenecer a una fase entregada, y

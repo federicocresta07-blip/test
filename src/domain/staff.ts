@@ -261,10 +261,10 @@ export const STAFF_SPECS: Readonly<Record<StaffRole, StaffRoleSpec>> = {
     upgradeCost: [850_000, 1_500_000, 2_400_000, 3_900_000],
     upgradeWeeks: [3, 4, 6, 8],
     hireCost: [380_000, 850_000, 1_700_000, 3_000_000, 5_200_000],
-    // El riesgo de lesión se sortea dentro del partido, y el motor toma su
-    // configuración de forma global, no por equipo. Engancharlo pide un
-    // cambio en el motor que no corresponde a esta fase.
-    consumer: { kind: 'pendiente', module: 'Motor de partido', phase: 8 },
+    consumer: {
+      kind: 'implementado',
+      where: 'las lesiones que sortea el partido, via `team.injuryPrevention`',
+    },
   },
 
   'Psicólogo deportivo': {
@@ -504,6 +504,22 @@ export const NO_STAFF_EFFECTS: ProgressionStaffEffects = {
  * Traduce el cuerpo técnico a los efectos que aplica la progresión.
  * Un puesto vacante simplemente no aporta nada: no hay penalización oculta.
  */
+/**
+ * El trabajo preventivo del club, para `team.injuryPrevention`.
+ *
+ * Sale del fisioterapeuta, ya descontado el limite de las instalaciones: un
+ * fisioterapeuta de cinco estrellas en un centro medico de dos no puede
+ * aprovechar todo su efecto, igual que el resto del cuerpo tecnico.
+ *
+ * Sin fisioterapeuta devuelve CERO, que es lo correcto: el riesgo base del
+ * motor es el de un equipo sin trabajo preventivo.
+ */
+export function injuryPreventionOf(assignments: readonly StaffAssignment[]): number {
+  const assignment = assignments.find((entry) => entry.role === 'Fisioterapeuta');
+  if (!assignment) return 0;
+  return staffEffect('Fisioterapeuta', assignment.level, assignment.facilityLevel).actual;
+}
+
 export function progressionEffects(
   assignments: readonly StaffAssignment[],
 ): ProgressionStaffEffects {

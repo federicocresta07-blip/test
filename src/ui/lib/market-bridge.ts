@@ -101,6 +101,14 @@ export type MarketPoolInput = {
   readonly transferredIds: readonly string[];
   /** Quien puso a quien en la lista, por id de jugador. */
   readonly listedIds: readonly string[];
+  /**
+   * Temporadas cerradas (fase 8).
+   *
+   * Hace falta porque los planteles rivales envejecen: sin esto el mercado
+   * ofreceria el Boca de 1998 en la temporada cinco, con jugadores que ya se
+   * retiraron y con las edades —y por lo tanto los valores— equivocados.
+   */
+  readonly seasonsClosed?: number;
 };
 
 /**
@@ -112,7 +120,7 @@ export type MarketPoolInput = {
  * imposible de usar.
  */
 export function marketPool(input: MarketPoolInput): readonly MarketPlayer[] {
-  const teams = leagueTeams();
+  const teams = leagueTeams(undefined, undefined, [], 0, input.seasonsClosed ?? 0);
   const transferred = new Set(input.transferredIds);
   const listed = new Set(input.listedIds);
   const pool: MarketPlayer[] = [];
@@ -265,8 +273,11 @@ export function applyTransfers(
 }
 
 /** El jugador de cualquier club del torneo, por id. */
-export function findLeaguePlayer(playerId: string): { player: Player; clubId: string } | null {
-  for (const [clubId, team] of leagueTeams()) {
+export function findLeaguePlayer(
+  playerId: string,
+  seasonsClosed = 0,
+): { player: Player; clubId: string } | null {
+  for (const [clubId, team] of leagueTeams(undefined, undefined, [], 0, seasonsClosed)) {
     const player = team.players.find((entry) => entry.id === playerId);
     if (player) return { player, clubId };
   }

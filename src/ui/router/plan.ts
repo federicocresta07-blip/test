@@ -29,13 +29,7 @@ export const PHASES: readonly PhasePlan[] = [
   { phase: 5, label: 'Mercado y negociaciones', delivered: true },
   { phase: 6, label: 'Estadio y finanzas', delivered: true },
   { phase: 7, label: 'Competición y resultado de partido', delivered: true },
-  {
-    phase: 8,
-    label: 'Hardening y backend real',
-    delivered: false,
-    summary:
-      'Multijugador persistente, tests de interfaz automatizados y el riesgo de lesión por equipo, que hoy el motor toma de forma global y por eso el fisioterapeuta todavía no se aplica.',
-  },
+  { phase: 8, label: 'Hardening y backend real', delivered: true },
 ];
 
 const BY_PHASE = new Map(PHASES.map((entry) => [entry.phase, entry]));

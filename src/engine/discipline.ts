@@ -84,7 +84,29 @@ export function injuryRisk(player: Player, intensity: number, config: EngineConf
   return cfg.baseInjuryRate * fatigueFactor * historyFactor * ageFactor * intensityFactor;
 }
 
-/** Sortea las lesiones del partido para un equipo. */
+/**
+ * Cuanto reduce el riesgo el trabajo preventivo del club, como factor.
+ *
+ * Es un factor de EQUIPO, no de jugador: se aplica a cuantas lesiones sortea
+ * el partido, no a cual jugador le toca. Dentro de un mismo equipo un factor
+ * constante no cambiaria a quien le toca, asi que aplicarlo por jugador seria
+ * trabajo de mas con el mismo resultado.
+ *
+ * Nunca llega a cero: el mejor fisioterapeuta del mundo no evita que a alguien
+ * se le rompa un ligamento.
+ */
+export function preventionFactor(injuryPrevention: number): number {
+  return 1 - clamp(injuryPrevention, 0, 100) / 100;
+}
+
+/**
+ * Sortea las lesiones del partido para un equipo.
+ *
+ * El TRABAJO PREVENTIVO DEL CLUB (`team.injuryPrevention`, que en el juego sale
+ * del fisioterapeuta) reduce cuantas salen. Antes no entraba en la cuenta: el
+ * riesgo se tomaba solo de la configuracion global, igual para los veinte
+ * clubes, y por eso mejorar al fisioterapeuta no movia nada.
+ */
 export function planInjuries(
   side: Side,
   team: TeamStrength,
@@ -95,6 +117,7 @@ export function planInjuries(
 ): PlannedInjury[] {
   let expected = 0;
   for (const rated of team.players) expected += injuryRisk(rated.player, intensity, config);
+  expected *= preventionFactor(team.team.injuryPrevention);
   const count = rng.poisson(expected);
   const planned: PlannedInjury[] = [];
   for (let i = 0; i < count; i += 1) {

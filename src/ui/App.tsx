@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { AppShell } from './components/AppShell.tsx';
 import { Button } from './components/ui/Button.tsx';
 import { Skeleton } from './components/ui/EmptyState.tsx';
 import { useGame } from './state/GameProvider.tsx';
 import { useRouter } from './router/router.tsx';
-import { findNavItem } from './router/navigation.ts';
+import { firstItemOfSection } from './router/navigation.ts';
 import { DashboardPage } from './pages/DashboardPage.tsx';
 import { SquadPage } from './pages/SquadPage.tsx';
 import { LineupPage } from './pages/LineupPage.tsx';
@@ -26,7 +26,7 @@ import { MarketSearchPage } from './pages/MarketSearchPage.tsx';
 import { TransferListPage } from './pages/TransferListPage.tsx';
 import { OffersPage } from './pages/OffersPage.tsx';
 import { TransferHistoryPage } from './pages/TransferHistoryPage.tsx';
-import { NotFoundPage, PlaceholderPage } from './pages/PlaceholderPage.tsx';
+import { NotFoundPage } from './pages/NotFoundPage.tsx';
 
 /** Resuelve la pantalla que corresponde a la ruta actual. */
 function Screen(): ReactNode {
@@ -89,8 +89,31 @@ function Screen(): ReactNode {
     case '/mercado/historial':
       return <TransferHistoryPage />;
     default:
-      return findNavItem(path) ? <PlaceholderPage /> : <NotFoundPage />;
+      // Una ruta de seccion (`/club`, `/mercado`) no es una pantalla: es una
+      // cabecera que agrupa. Se va a su primera pantalla.
+      //
+      // Y ya no hay `PlaceholderPage`: con las nueve fases entregadas no queda
+      // ningun modulo pendiente, asi que una pagina que dice "esto todavia no
+      // esta construido" solo podia mentir. Se borro en lugar de dejarla
+      // inalcanzable esperando a que volviera a ser cierta.
+      return <SectionRedirect path={path} />;
   }
+}
+
+/**
+ * Lleva de una ruta de seccion a su primera pantalla.
+ *
+ * Si la ruta no es una seccion, es una ruta que no existe y se dice.
+ */
+function SectionRedirect({ path }: { readonly path: string }): ReactNode {
+  const { navigate } = useRouter();
+  const target = firstItemOfSection(path);
+
+  useEffect(() => {
+    if (target) navigate(target);
+  }, [target, navigate]);
+
+  return target ? null : <NotFoundPage />;
 }
 
 /** El segmento que sigue a un prefijo de ruta, si la ruta lo trae. */

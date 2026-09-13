@@ -55,8 +55,17 @@ export function MarketSearchPage(): ReactNode {
       precision,
       transferredIds: state.market.transfers.map((entry) => entry.playerId),
       listedIds: state.market.listedElsewhere,
+      // Los planteles rivales envejecen (fase 8): sin esto el mercado
+      // ofreceria el Boca de 1998 en la temporada cinco.
+      seasonsClosed: state.season.seasonsClosed,
     });
-  }, [state.staff, state.facilities, state.market.transfers, state.market.listedElsewhere]);
+  }, [
+    state.staff,
+    state.facilities,
+    state.market.transfers,
+    state.market.listedElsewhere,
+    state.season.seasonsClosed,
+  ]);
 
   const results = useMemo(() => sortPool(applyFilters(pool, filters), sort), [pool, filters, sort]);
   const shown = results.slice(0, 60);

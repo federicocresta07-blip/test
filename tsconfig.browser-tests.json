@@ -1,0 +1,33 @@
+{
+  // LOS TESTS DE NAVEGADOR TIENEN SU PROPIO TSCONFIG.
+  //
+  // Corren en Node pero sus funciones de `page.evaluate` se ejecutan DENTRO
+  // del navegador, asi que usan `document`. Agregar "dom" al tsconfig del
+  // motor le habilitaria las APIs del navegador a todo el codigo del motor, y
+  // esa separacion es deliberada: el motor no sabe que existe un navegador.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023", "dom"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "noEmit": true,
+
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["tests-browser", "src/server"]
+}

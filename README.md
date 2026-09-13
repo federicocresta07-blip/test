@@ -30,9 +30,16 @@ npm run crests     # ingesta de los escudos oficiales (ver docs/ui.md)
 npm run apertura98 # regenera los planteles del Apertura 98 desde el PKF extraido
 npm run single     # empaqueta el juego en UN solo HTML autocontenido
 
-npm test           # 358 tests
-npm run typecheck  # motor + interfaz
+npm test           # 369 tests
+npm run typecheck  # motor + interfaz + tests de navegador
+
+npm run serve      # servidor de partida en http://localhost:8787
+npm run test:ui    # 22 tests de interfaz en un navegador (pide Playwright)
 ```
+
+Con `npm run serve` la partida se guarda **en el servidor** y sobrevive a
+cambiar de navegador o de máquina; abierto como archivo, se guarda en el
+navegador. La misma build hace las dos cosas y la barra superior dice cuál.
 
 El motor no tiene **ninguna dependencia de runtime**. La interfaz agrega solo
 React; el drag & drop es HTML5 nativo y el router son 60 líneas propias.
@@ -296,8 +303,10 @@ src/
   presentation/                marcador, tabla de estadísticas, notas
   data/                        generador de planteles y equipos de ejemplo
   data/clausura-1998/          dataset histórico real (ver docs/clausura-1998.md)
+  server/                      servidor de partida: API y archivos estáticos
   ui/                          la interfaz web (ver docs/ui.md)
-tests/                         358 tests
+tests/                         369 tests
+tests-browser/                 22 tests de interfaz en un navegador real
 scripts/                       demo, temporada, torneo completo, calibración,
                                dataset histórico y humo de la UI
 ```

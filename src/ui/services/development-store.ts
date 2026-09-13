@@ -12,6 +12,7 @@
 
 import type { FacilityId, FacilityLevel } from '../../domain/facilities.ts';
 import type { StaffLevel, StaffRole } from '../../domain/staff.ts';
+import { storage } from './storage.ts';
 import {
   MAX_TICKET_PRICE,
   MIN_TICKET_PRICE,
@@ -90,7 +91,7 @@ function clampTicketPrice(value: number | undefined): number {
 
 export function readDevelopment(): DevelopmentState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storage().getItem(STORAGE_KEY);
     if (!raw) return EMPTY_DEVELOPMENT;
     const parsed = JSON.parse(raw) as DevelopmentState;
     // Validación mínima: si el formato cambió, se arranca limpio.
@@ -114,7 +115,7 @@ export function readDevelopment(): DevelopmentState {
 
 export function writeDevelopment(state: DevelopmentState): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    storage().setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
     // Sin almacenamiento, las decisiones viven solo en memoria.
   }

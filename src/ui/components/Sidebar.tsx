@@ -18,6 +18,8 @@ export function Sidebar(): ReactNode {
   const toggle = (label: string): void =>
     setCollapsed((current) => ({ ...current, [label]: !current[label] }));
 
+  const pending = pendingModuleCount();
+
   return (
     <nav className="sidebar" aria-label="Navegación principal">
       <div className="sidebar__brand">
@@ -41,9 +43,16 @@ export function Sidebar(): ReactNode {
       </div>
 
       <footer className="sidebar__foot">
-        <p className="sidebar__footline">
-          {pendingModuleCount()} módulos pendientes del plan por fases
-        </p>
+        {/*
+          Cuando queda algo pendiente se dice cuanto; cuando no queda nada, se
+          dice eso. "0 módulos pendientes" es una línea que ocupa lugar y no
+          informa, y dejarla puesta era esperar a que volviera a ser cierta.
+        */}
+        {pending > 0 ? (
+          <p className="sidebar__footline">{pending} módulos pendientes del plan por fases</p>
+        ) : (
+          <p className="sidebar__footline">Plan completo: las nueve fases entregadas</p>
+        )}
         <p className="sidebar__footline muted">Fases {deliveredPhasesLabel()} entregadas</p>
       </footer>
     </nav>

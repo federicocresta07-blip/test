@@ -18,7 +18,7 @@ import {
 import type { FacilityId } from '../../domain/facilities.ts';
 import type { StaffRole } from '../../domain/staff.ts';
 import type { GameState, LineupSelection, TrainingPlan } from '../models/index.ts';
-import { gameService } from '../services/index.ts';
+import { connectToServer, gameService } from '../services/index.ts';
 import type { OfferOutcome, PlayRoundReport, SeasonCloseReport } from '../services/types.ts';
 
 export type SaveState = 'limpio' | 'sin-guardar' | 'guardando' | 'guardado' | 'error';
@@ -143,8 +143,12 @@ export function GameProvider({ children }: { readonly children: ReactNode }): Re
     let cancelled = false;
     setLoading(true);
     setError(null);
-    gameService
-      .loadGame()
+    // PRIMERO SE BUSCA EL SERVIDOR (fase 8). Si hay uno detras de esta pagina,
+    // la partida vive ahi y no en el navegador. Si no hay, se sigue con el
+    // servicio local y el juego arranca igual: el HTML autocontenido no tiene
+    // ningun servidor.
+    connectToServer()
+      .then(() => gameService.loadGame())
       .then((loaded) => {
         if (cancelled) return;
         setState(loaded);

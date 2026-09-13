@@ -16,10 +16,12 @@
  */
 
 import type { Player } from '../../domain/player.ts';
+import { ATTRIBUTE_KEYS, type AttributeKey } from '../../domain/attributes.ts';
 import type { Team } from '../../domain/team.ts';
 import type { MatchRecord } from '../../competition/season.ts';
 import { EMPTY_TOTALS, type SeasonTotals } from '../../competition/stats.ts';
 import { DEFAULT_TRAINING_PLAN, type TrainingPlan } from '../../domain/training.ts';
+import { storage } from './storage.ts';
 
 /** Lo que cambia de un jugador entre partidos, como tupla para ahorrar lugar. */
 export type ConditionTuple = readonly [
@@ -66,6 +68,30 @@ export type SeasonSave = {
    * misma razon por la que se guardan los traspasos.
    */
   readonly retired?: readonly string[];
+  /**
+   * LOS ATRIBUTOS DESARROLLADOS, por id de jugador (fase 8).
+   *
+   * ============================================================
+   * EL BUG QUE ESTO ARREGLA
+   * ============================================================
+   *
+   * El desarrollo existia desde la fase 4 —los jugadores crecen fecha a
+   * fecha, hay una pantalla de entrenamiento y una tabla medida en la
+   * documentacion— y NO SE GUARDABA. Este archivo guardaba la forma, la
+   * moral, la fatiga y las lesiones, y los atributos quedaban afuera; como el
+   * plantel se reconstruye del archivo del juego en cada carga, todo el
+   * crecimiento se tiraba a la basura en cada recarga.
+   *
+   * Se vio midiendo: despues de tres temporadas jugadas y cerradas, el mejor
+   * once de River seguia clavado en 83,7 mientras los rivales subian a 86,2.
+   * El juego se ponia mas dificil cada temporada sin que el manager hiciera
+   * nada mal, y el entrenamiento era una pantalla que no servia para nada.
+   *
+   * Se guardan CON DECIMALES a proposito. Es la leccion de la "muerte por
+   * redondeo" de la fase 4: una ganancia de 0,4 puntos por semana redondeada
+   * a entero es cero, y nunca se acumula.
+   */
+  readonly attributes?: Readonly<Record<string, readonly number[]>>;
 };
 
 /**
@@ -141,6 +167,7 @@ export function emptySeason(seed = DEFAULT_SEASON_SEED): SeasonSave {
     gates: [],
     seasonsClosed: 0,
     retired: [],
+    attributes: {},
   };
 }
 
@@ -148,7 +175,7 @@ const STORAGE_KEY = 'manager:temporada:v1';
 
 export function readSeason(): SeasonSave {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storage().getItem(STORAGE_KEY);
     if (!raw) return emptySeason();
     const parsed = JSON.parse(raw) as SeasonSave;
     // Validacion minima: si el formato cambio, se arranca de cero. Preferimos
@@ -171,6 +198,7 @@ export function readSeason(): SeasonSave {
       gates: parsed.gates ?? [],
       seasonsClosed: parsed.seasonsClosed ?? 0,
       retired: parsed.retired ?? [],
+      attributes: parsed.attributes ?? {},
     };
   } catch {
     return emptySeason();
@@ -198,12 +226,12 @@ export type SaveOutcome = { readonly saved: boolean; readonly trimmed: boolean; 
  */
 export function writeSeason(save: SeasonSave): SaveOutcome {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
+    storage().setItem(STORAGE_KEY, JSON.stringify(save));
     return { saved: true, trimmed: false };
   } catch {
     try {
       const trimmed: SeasonSave = { ...save, records: save.records.map(slim) };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+      storage().setItem(STORAGE_KEY, JSON.stringify(trimmed));
       return { saved: true, trimmed: true };
     } catch {
       return {
@@ -219,7 +247,7 @@ export function writeSeason(save: SeasonSave): SaveOutcome {
 
 export function clearSeason(): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    storage().removeItem(STORAGE_KEY);
   } catch {
     // Sin almacenamiento no hay nada que borrar.
   }
@@ -251,6 +279,46 @@ export function snapshotConditions(
   return snapshot;
 }
 
+/**
+ * Los atributos de cada jugador, para guardarlos.
+ *
+ * Se guardan como arreglo en el orden de `ATTRIBUTE_KEYS` y no como objeto:
+ * diez numeros por jugador contra diez pares clave-valor es la diferencia
+ * entre unos kilobytes y unas decenas, y el navegador tiene un limite de
+ * espacio que esta temporada ya roza.
+ */
+export function snapshotAttributes(
+  teams: ReadonlyMap<string, Team>,
+  clubIds?: readonly string[],
+): Readonly<Record<string, readonly number[]>> {
+  const wanted = clubIds ? new Set(clubIds) : null;
+  const snapshot: Record<string, readonly number[]> = {};
+  for (const [clubId, team] of teams) {
+    if (wanted && !wanted.has(clubId)) continue;
+    for (const player of team.players) {
+      snapshot[player.id] = ATTRIBUTE_KEYS.map((key) => player.attributes[key]);
+    }
+  }
+  return snapshot;
+}
+
+/** Un jugador con sus atributos desarrollados aplicados. */
+export function withAttributes(
+  player: Player,
+  values: readonly number[] | undefined,
+): Player {
+  if (!values || values.length !== ATTRIBUTE_KEYS.length) return player;
+  const attributes = {} as Record<AttributeKey, number>;
+  ATTRIBUTE_KEYS.forEach((key, index) => {
+    attributes[key] = values[index] as number;
+  });
+  // El POTENCIAL no se toca: sale del jugador reconstruido del archivo, que es
+  // donde se derivo una vez. Recalcularlo sobre el overall ya desarrollado lo
+  // haria crecer junto con el jugador, y entonces nadie llegaria nunca a su
+  // techo.
+  return { ...player, attributes };
+}
+
 export function snapshotChemistry(teams: ReadonlyMap<string, Team>): Readonly<Record<string, number>> {
   const snapshot: Record<string, number> = {};
   for (const [clubId, team] of teams) snapshot[clubId] = team.chemistry;
@@ -272,8 +340,13 @@ export function withCondition(player: Player, tuple: ConditionTuple | undefined)
 /**
  * Los equipos del torneo con el estado de la temporada aplicado.
  *
- * Los planteles vienen del generador determinista; esto les pone encima la
- * forma, la moral, la fatiga y las lesiones con las que quedaron.
+ * Los planteles vienen del generador determinista; esto les pone encima los
+ * atributos desarrollados, la forma, la moral, la fatiga y las lesiones con
+ * las que quedaron.
+ *
+ * Los ATRIBUTOS tambien: sin ellos el partido se juega con el jugador del
+ * archivo y todo el desarrollo de la temporada no cuenta para nada. Era el
+ * bug de la fase 4 que aparecio recien en la 8.
  */
 export function restoreTeams(
   teams: ReadonlyMap<string, Team>,
@@ -284,7 +357,12 @@ export function restoreTeams(
     restored.set(clubId, {
       ...team,
       chemistry: save.chemistry[clubId] ?? team.chemistry,
-      players: team.players.map((player) => withCondition(player, save.conditions[player.id])),
+      players: team.players.map((player) =>
+        withCondition(
+          withAttributes(player, save.attributes?.[player.id]),
+          save.conditions[player.id],
+        ),
+      ),
     });
   }
   return restored;

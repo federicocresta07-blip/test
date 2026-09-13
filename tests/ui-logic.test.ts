@@ -98,6 +98,7 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
       records: [],
       totals: {},
       lastUserMatch: null,
+      seasonsClosed: 0,
       chemistry: 74,
     },
     youth: [],

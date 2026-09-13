@@ -32,6 +32,11 @@ import {
   type Apertura98Club,
 } from '../../data/apertura98.ts';
 import { playerFromApertura98 } from '../../data/pcf-bridge.ts';
+import { closeSeason } from '../../progression/season-close.ts';
+import { BASELINE_COACHING, developSquad } from '../../progression/development.ts';
+import { defaultFocusFor } from '../../domain/training.ts';
+import { MIN_PROMOTION_AGE } from '../../domain/youth.ts';
+import { buildYouthSquad } from './youth.ts';
 import { overallForPosition } from '../../ratings/overall.ts';
 import { reputationFromStadium } from '../../domain/stadium.ts';
 
@@ -147,12 +152,154 @@ function reputationFromClub(club: Apertura98Club): number {
 
 const SQUAD_CACHE = new Map<string, readonly Player[]>();
 
-function squadFor(clubId: string): readonly Player[] {
-  const cached = SQUAD_CACHE.get(clubId);
+/**
+ * El plantel de un club, N temporadas despues del Apertura 98.
+ *
+ * ============================================================
+ * LOS RIVALES TAMBIEN ENVEJECEN (fase 8)
+ * ============================================================
+ *
+ * Hasta ahora no: el plantel del manager cumplia anios al cerrar la temporada
+ * y los diecinueve rivales quedaban congelados en 1998. Despues de cinco
+ * temporadas el manager tenia un plantel renovado y enfrentaba a un Boca con
+ * Riquelme de 20 para siempre. Eso vaciaba la carrera larga, que es lo unico
+ * que la fase 6 vino a habilitar.
+ *
+ * Se resuelve con el MISMO `closeSeason` del motor que usa el club del
+ * manager: tener dos formas de envejecer un plantel seria tener dos fuentes de
+ * verdad, y la diferencia se notaria justo donde importa (un rival que no se
+ * retira nunca).
+ *
+ * Es DERIVADO, no guardado. Cada temporada se aplica con una semilla fija por
+ * club, asi que el Boca de la temporada 5 es siempre el mismo Boca. Guardar
+ * diecinueve planteles por temporada serian megabytes de estado que se puede
+ * recalcular.
+ *
+ * Los rivales NO tienen inferiores propias: `closeSeason` recibe una camada
+ * vacia, asi que sus planteles se achican con los anios en lugar de
+ * renovarse. Es una simplificacion declarada, no un olvido — ver `docs/ui.md`.
+ */
+function squadFor(clubId: string, seasonsClosed = 0): readonly Player[] {
+  const key = `${clubId}:${seasonsClosed}`;
+  const cached = SQUAD_CACHE.get(key);
   if (cached) return cached;
-  const players = apertura98Squad(clubId).map((raw) => playerFromApertura98(raw, clubId));
-  SQUAD_CACHE.set(clubId, players);
+
+  let players: readonly Player[] = apertura98Squad(clubId).map((raw) =>
+    playerFromApertura98(raw, clubId),
+  );
+
+  // La academia del rival sale de su REPUTACION, que sale de sus socios y su
+  // aforo, que son dato del archivo. River saca mas y mejores juveniles que
+  // Belgrano, y eso no lo elegimos nosotros: lo dice el PKF.
+  const academyLevel = academyFor(reputationFromClub(apertura98Club(clubId)));
+
+  for (let season = 0; season < seasonsClosed; season += 1) {
+    // 1. UN ANIO DE TRABAJO. Los rivales no tienen cuerpo tecnico simulado,
+    //    asi que entrenan al ritmo base (`BASELINE_COACHING`, un entrenador de
+    //    dos estrellas). Sin esto los rivales cumplian anios y no cambiaban de
+    //    nivel: un Riquelme de 28 seguia siendo el de 20, y un Palermo de 32
+    //    tampoco se caia. Envejecer sin desarrollarse es media cosa.
+    //
+    //    Va FECHA POR FECHA, no de una. El desarrollo mide el margen contra el
+    //    potencial una vez por llamada, asi que pedirle una temporada entera
+    //    de golpe crece como si el margen del primer dia durara todo el anio:
+    //    Riquelme pasaba de 84 a 93 en una temporada. Es el mismo error que
+    //    aparecio con los juveniles del club del manager.
+    for (let round = 0; round < ROUNDS_PER_SEASON; round += 1) {
+      players = developSquad({
+        players,
+        weeks: WEEKS_PER_SEASON / ROUNDS_PER_SEASON,
+        minutes: Object.fromEntries(
+          players.map((player) => [player.id, RIVAL_SEASON_MINUTES / ROUNDS_PER_SEASON]),
+        ),
+        focusOf: (player) => defaultFocusFor(player.position),
+        coachingOf: () => BASELINE_COACHING,
+        seed: `rival:${clubId}:${season}:${round}`,
+      }).players;
+    }
+
+    // 2. EL CIERRE: cumplen anios y los veteranos se retiran.
+    players = closeSeason({ players, youth: [], intake: [], seed: `${clubId}:${season}` }).players;
+
+    // 3. SUBEN JUVENILES, los mejores de su camada. Sin esto los planteles se
+    //    achicaban solos —de 23 jugadores a 17 en ocho temporadas— y en unas
+    //    cuantas mas no habrian podido poner once.
+    //
+    //    Suben DOS, no la camada entera: con seis por anio los planteles
+    //    crecian a cincuenta jugadores, que no es un plantel. Un club sube a
+    //    los que le sirven y deja ir al resto, y eso es lo que hace esto.
+    const promoted = buildYouthSquad(clubId, academyLevel, `rival-camada:${clubId}:${season}`, 3)
+      .map((entry) => entry.player)
+      .filter((player) => player.age >= MIN_PROMOTION_AGE)
+      .sort(
+        (a, b) =>
+          overallForPosition(b.attributes, b.position) -
+          overallForPosition(a.attributes, a.position),
+      )
+      .slice(0, PROMOTED_PER_SEASON);
+
+    players = trimSquad([...players, ...promoted]);
+  }
+
+  SQUAD_CACHE.set(key, players);
   return players;
+}
+
+/** Semanas de trabajo de una temporada de 19 fechas. */
+const WEEKS_PER_SEASON = 22;
+const ROUNDS_PER_SEASON = 19;
+
+/** Cuantos juveniles sube un rival por temporada. */
+const PROMOTED_PER_SEASON = 2;
+
+/**
+ * Tope de plantel de un rival.
+ *
+ * Un club no acumula jugadores sin fin: cuando le sobran, deja ir a los que no
+ * le sirven. Sin este tope los planteles rivales crecian temporada a temporada
+ * y terminaban con cincuenta jugadores.
+ */
+const MAX_RIVAL_SQUAD = 26;
+
+/**
+ * Deja el plantel en su tope, soltando a los peores.
+ *
+ * Se corta por overall y no por edad a proposito: un club deja ir al que ya no
+ * le rinde, tenga 33 o 24. Un veterano que sigue siendo de los mejores se
+ * queda, que es lo que pasa de verdad.
+ */
+function trimSquad(players: readonly Player[]): readonly Player[] {
+  if (players.length <= MAX_RIVAL_SQUAD) return players;
+  return [...players]
+    .sort(
+      (a, b) =>
+        overallForPosition(b.attributes, b.position) - overallForPosition(a.attributes, a.position),
+    )
+    .slice(0, MAX_RIVAL_SQUAD);
+}
+
+/**
+ * Minutos de una temporada para un jugador de un plantel rival.
+ *
+ * Es un promedio: no simulamos quien es titular en Belgrano. Con la mitad de
+ * los minutos posibles, los planteles rivales crecen algo menos que el del
+ * manager si el manager reparte bien los minutos, que es lo correcto.
+ */
+const RIVAL_SEASON_MINUTES = 900;
+
+/**
+ * El nivel de academia de un rival, derivado de su reputacion.
+ *
+ * No es una tabla escrita a mano por club: es la misma reputacion que decide
+ * su television y su sponsor, repartida en los cinco niveles que el dominio
+ * define para la instalacion.
+ */
+function academyFor(reputation: number): number {
+  if (reputation >= 85) return 5;
+  if (reputation >= 72) return 4;
+  if (reputation >= 62) return 3;
+  if (reputation >= 52) return 2;
+  return 1;
 }
 
 /**
@@ -182,18 +329,18 @@ export const LEAGUE_CLUB_IDS: readonly string[] = [
   ...RIVALS.map((entry) => entry.clubId),
 ];
 
-/** El plantel real del rival, del archivo del juego. */
-function rivalSquad(entry: Setup): readonly Player[] {
-  return squadFor(entry.clubId);
+/** El plantel real del rival, del archivo del juego, con los anios encima. */
+function rivalSquad(entry: Setup, seasonsClosed = 0): readonly Player[] {
+  return squadFor(entry.clubId, seasonsClosed);
 }
 
-function rivalTeam(entry: Setup): Team {
+function rivalTeam(entry: Setup, seasonsClosed = 0): Team {
   const club = clubById(entry.clubId);
   return createTeam({
     id: club.id,
     name: club.name,
     shortName: club.shortName,
-    players: rivalSquad(entry),
+    players: rivalSquad(entry, seasonsClosed),
     chemistry: entry.chemistry,
     tactics: entry.tactics,
     reputation: reputationFromClub(apertura98Club(entry.clubId)),
@@ -211,6 +358,14 @@ export function userTeam(
   tactics?: Tactics,
   chemistry = 74,
   extra: readonly Player[] = [],
+  /**
+   * Trabajo preventivo del cuerpo medico, 0..100 (fase 8).
+   *
+   * Sale del fisioterapeuta del club. Por defecto CERO: un equipo sin
+   * fisioterapeuta no previene nada, y quien construye el equipo tiene que
+   * pasarlo explicitamente para que exista.
+   */
+  injuryPrevention = 0,
 ): Team {
   const club = clubById(USER_CLUB_ID);
   return createTeam({
@@ -221,23 +376,31 @@ export function userTeam(
     chemistry,
     ...(tactics ? { tactics } : {}),
     reputation: reputationFromClub(apertura98Club(USER_CLUB_ID)),
+    injuryPrevention,
   });
 }
 
-let cachedRivals: Map<string, Team> | null = null;
+const RIVALS_CACHE = new Map<number, ReadonlyMap<string, Team>>();
 
 /**
- * Los diecinueve rivales, generados una sola vez por sesion.
+ * Los diecinueve rivales, generados una vez por temporada del juego.
  *
- * Generar 418 jugadores con sus atributos no es gratis, y la interfaz los
- * pide en cada render de la tabla y del calendario. Como el resultado es
+ * Generar 418 jugadores con sus atributos no es gratis, y la interfaz los pide
+ * en cada render de la tabla y del calendario. Como el resultado es
  * determinista, calcularlo una vez y reusarlo no cambia nada.
+ *
+ * La clave del cache es cuantas temporadas se cerraron (fase 8): al cerrar una
+ * los rivales envejecen, asi que el Boca de la temporada 3 no es el de la 0 y
+ * un cache sin esa clave devolveria el equipo de otro anio.
  */
-export function rivalTeams(): ReadonlyMap<string, Team> {
-  if (!cachedRivals) {
-    cachedRivals = new Map(RIVALS.map((entry) => [entry.clubId, rivalTeam(entry)]));
-  }
-  return cachedRivals;
+export function rivalTeams(seasonsClosed = 0): ReadonlyMap<string, Team> {
+  const cached = RIVALS_CACHE.get(seasonsClosed);
+  if (cached) return cached;
+  const built = new Map(
+    RIVALS.map((entry) => [entry.clubId, rivalTeam(entry, seasonsClosed)] as const),
+  );
+  RIVALS_CACHE.set(seasonsClosed, built);
+  return built;
 }
 
 /** Todos los equipos del torneo, con el del manager incluido. */
@@ -245,9 +408,16 @@ export function leagueTeams(
   userTactics?: Tactics,
   userChemistry?: number,
   userExtra: readonly Player[] = [],
+  /** Trabajo preventivo del club del manager, que sale de su fisioterapeuta. */
+  userInjuryPrevention = 0,
+  /** Temporadas cerradas: los rivales tambien cumplen anios (fase 8). */
+  seasonsClosed = 0,
 ): ReadonlyMap<string, Team> {
-  const teams = new Map(rivalTeams());
-  teams.set(USER_CLUB_ID, userTeam(userTactics, userChemistry, userExtra));
+  const teams = new Map(rivalTeams(seasonsClosed));
+  teams.set(
+    USER_CLUB_ID,
+    userTeam(userTactics, userChemistry, userExtra, userInjuryPrevention),
+  );
   return teams;
 }
 
